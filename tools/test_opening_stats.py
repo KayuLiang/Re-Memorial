@@ -92,6 +92,21 @@ class OpeningStatsTests(unittest.TestCase):
             stats_complete({"str": 19, "dex": 1, "int": 1, "pow": 1})
         )
 
+    def test_complete_rejects_out_of_range_values_that_cancel_out(self):
+        below_minimum = {"str": 19, "dex": 0, "int": 1, "pow": 1}
+        above_maximum = {"str": 21, "dex": 0, "int": 0, "pow": 0}
+
+        self.assertEqual(0, remaining_points(below_minimum))
+        self.assertEqual(0, remaining_points(above_maximum))
+        self.assertFalse(stats_complete(below_minimum))
+        self.assertFalse(stats_complete(above_maximum))
+
+    def test_complete_rejects_non_integer_values(self):
+        values = {"str": 18.0, "dex": 1, "int": 1, "pow": 1}
+
+        self.assertEqual(0, remaining_points(values))
+        self.assertFalse(stats_complete(values))
+
     def test_attribute_dice_are_unconfigured(self):
         self.assertEqual((), get_attribute_dice("int"))
 

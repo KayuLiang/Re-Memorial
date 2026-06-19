@@ -44,8 +44,19 @@ def adjust_stat(values, stat_name, delta):
     return current
 
 
+def _has_valid_stat_values(values):
+    return all(
+        type(values.get(stat_name)) is int
+        and STAT_MIN <= values[stat_name] <= STAT_MAX
+        for stat_name in ADJUSTABLE_STATS
+    )
+
+
 def stats_complete(values):
-    return remaining_points(values) == 0
+    return (
+        _has_valid_stat_values(values)
+        and remaining_points(values) == 0
+    )
 
 
 def get_attribute_dice(_stat_name):
