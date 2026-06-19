@@ -532,17 +532,30 @@ class OpeningSystemShellContractTests(unittest.TestCase):
             window_block,
             r"(?m)^\s*use\s+expression\s+body_screen\b",
         )
-        self.assertIn("body_args", window_block)
+        self.assertRegex(
+            window_block,
+            r"(?m)^\s*use\s+expression\s+body_screen\s+pass\s+\((?:\*{1,2})body_args\)\s*$",
+        )
+        self.assertNotIn("len(body_args)", window_block)
+        self.assertNotIn("暂不支持超过四个", window_block)
 
     def test_opening_shell_window_border_is_uniform_and_explicit(self):
-        style_block, _ = block_with_header(
+        outer_style_block, _ = block_with_header(
             self.source,
             "style opening_shell_window_outer_frame is frame:",
         )
+        inner_style_block, _ = block_with_header(
+            self.source,
+            "style opening_shell_window_inner_frame is frame:",
+        )
 
-        self.assertIn("background Solid(opening_color_border_dark)", style_block)
-        padding = parse_style_tuple(style_block, "padding")
+        self.assertIn("background Solid(opening_color_border_dark)", outer_style_block)
+        padding = parse_style_tuple(outer_style_block, "padding")
         self.assertIn(padding, {(4, 4), (4, 4, 4, 4)})
+        inner_padding = parse_style_tuple(inner_style_block, "padding")
+        self.assertIn(inner_padding, {(0, 0), (0, 0, 0, 0)})
+        self.assertNotIn("background Solid(opening_color_border)", inner_style_block)
+        self.assertNotIn("background Solid(opening_color_border_dark)", inner_style_block)
 
     def test_opening_shell_clips_main_body_region(self):
         style_block, _ = block_with_header(
@@ -553,6 +566,21 @@ class OpeningSystemShellContractTests(unittest.TestCase):
         self.assertIn("clipping True", style_block)
         self.assertIn("xfill True", style_block)
         self.assertIn("yfill True", style_block)
+
+    def test_title_bar_uses_win7_blue_and_exposes_window_controls(self):
+        title_style_block, _ = block_with_header(
+            self.source,
+            "style opening_shell_title_bar_frame is frame:",
+        )
+        window_block, _ = block_with_header(
+            self.source,
+            "screen opening_window_frame(title, body_screen, body_args=None):",
+        )
+
+        self.assertIn("background Solid(opening_color_border)", title_style_block)
+        self.assertIn('text "—"', window_block)
+        self.assertIn('text "□"', window_block)
+        self.assertIn('text "×"', window_block)
 
     def test_taskbar_has_single_top_highlight_without_second_upper_border(self):
         desktop_block, _ = block_with_header(
@@ -569,15 +597,24 @@ class OpeningSystemShellContractTests(unittest.TestCase):
             desktop_block,
             r'(?m)^\s*add Solid\([^)\n]+\)\s+xpos 0 ypos (?:1|2) xsize config\.screen_width ysize (?:1|2)\s*$',
         )
+        self.assertIn('text "⊕"', desktop_block)
+        self.assertIn('text "特殊治疗管理系统"', desktop_block)
+        self.assertIn('text "13:30"', desktop_block)
 
     def test_preview_body_keeps_paper_placeholder_and_scope_signature(self):
         preview_block, _ = block_with_header(
             self.source,
             "screen opening_shell_preview_body():",
         )
+        paper_style_block, _ = block_with_header(
+            self.source,
+            "style opening_shell_preview_paper_frame is frame:",
+        )
 
         self.assertIn("opening_color_paper", preview_block)
         self.assertIn("use opening_oscilloscope", preview_block)
+        paper_width = parse_style_tuple(paper_style_block, "xsize")
+        self.assertEqual((1030,), paper_width)
 
     def test_scope_screen_uses_local_scroll_transform_and_metrics(self):
         scope_block, _ = block_with_header(

@@ -47,6 +47,40 @@ screen opening_system_desktop(body_screen, body_args=None):
 
             add Solid("#a8bfd0") xpos 0 ypos 0 xsize config.screen_width ysize 2
 
+            frame:
+                style "opening_shell_taskbar_content_frame"
+
+                hbox:
+                    xfill True
+                    yfill True
+                    spacing 14
+
+                    frame:
+                        style "opening_shell_taskbar_start_frame"
+
+                        hbox:
+                            spacing 8
+                            xalign 0.5
+                            yalign 0.5
+
+                            text "⊕" style "opening_shell_taskbar_start_icon_text"
+                            text "开始" style "opening_shell_taskbar_start_text"
+
+                    frame:
+                        style "opening_shell_taskbar_program_frame"
+
+                        text "特殊治疗管理系统" style "opening_shell_taskbar_program_text"
+
+                    null width 0 xfill True
+
+                    vbox:
+                        spacing 0
+                        xalign 1.0
+                        yalign 0.5
+
+                        text "13:30" style "opening_shell_taskbar_time_text" xalign 1.0
+                        text "2026-06-19 / 网络 / 待机" style "opening_shell_taskbar_status_text" xalign 1.0
+
 
 screen opening_window_frame(title, body_screen, body_args=None):
     $ body_args = tuple(body_args or ())
@@ -69,8 +103,30 @@ screen opening_window_frame(title, body_screen, body_args=None):
                         xfill True
                         yalign 0.5
 
-                        text title style "opening_shell_title_text"
-                        text "RECOVERY MODE" style "opening_shell_title_meta_text" xalign 1.0
+                        hbox:
+                            spacing 10
+                            yalign 0.5
+
+                            text title style "opening_shell_title_text"
+                            text "RECOVERY MODE" style "opening_shell_title_meta_text"
+
+                        null width 0 xfill True
+
+                        hbox:
+                            spacing 4
+                            yalign 0.5
+
+                            frame:
+                                style "opening_shell_window_control_frame"
+                                text "—" style "opening_shell_window_control_text"
+
+                            frame:
+                                style "opening_shell_window_control_frame"
+                                text "□" style "opening_shell_window_control_text"
+
+                            frame:
+                                style "opening_shell_window_close_frame"
+                                text "×" style "opening_shell_window_control_text"
 
                 frame:
                     style "opening_shell_menu_bar_frame"
@@ -88,18 +144,7 @@ screen opening_window_frame(title, body_screen, body_args=None):
                 frame:
                     style "opening_shell_window_body_frame"
 
-                    if len(body_args) == 0:
-                        use expression body_screen pass ()
-                    elif len(body_args) == 1:
-                        use expression body_screen pass (body_args[0],)
-                    elif len(body_args) == 2:
-                        use expression body_screen pass (body_args[0], body_args[1])
-                    elif len(body_args) == 3:
-                        use expression body_screen pass (body_args[0], body_args[1], body_args[2])
-                    elif len(body_args) == 4:
-                        use expression body_screen pass (body_args[0], body_args[1], body_args[2], body_args[3])
-                    else:
-                        text "opening_system_desktop 暂不支持超过四个 body_args。" style "opening_shell_preview_body_text"
+                    use expression body_screen pass (*body_args)
 
 
 screen opening_oscilloscope():
@@ -206,23 +251,42 @@ style opening_shell_window_outer_frame is frame:
 style opening_shell_window_inner_frame is frame:
     xfill True
     yfill True
-    background Solid(opening_color_border)
-    padding (4, 4, 4, 4)
+    background Solid("#d6dbd8")
+    padding (0, 0)
 
 style opening_shell_title_bar_frame is frame:
     xfill True
     ysize 38
-    background Solid("#d9e5f0")
+    background Solid(opening_color_border)
     padding (14, 6, 14, 6)
 
 style opening_shell_title_text is gui_text:
     size 22
-    color "#2d4659"
+    color "#f2f7fb"
     bold True
 
 style opening_shell_title_meta_text is gui_text:
-    size 18
-    color "#496276"
+    size 16
+    color "#dbe8f3"
+
+style opening_shell_window_control_frame is frame:
+    xsize 30
+    ysize 20
+    background Solid("#85a7c5")
+    padding (0, 0)
+
+style opening_shell_window_close_frame is frame:
+    xsize 30
+    ysize 20
+    background Solid("#b5707c")
+    padding (0, 0)
+
+style opening_shell_window_control_text is gui_text:
+    size 17
+    bold True
+    color "#f7fbff"
+    xalign 0.5
+    yalign 0.5
 
 style opening_shell_menu_bar_frame is frame:
     xfill True
@@ -242,7 +306,7 @@ style opening_shell_window_body_frame is frame:
     clipping True
 
 style opening_shell_preview_paper_frame is frame:
-    xsize 1008
+    xsize 1030
     yfill True
     background Solid(opening_color_paper)
     padding (34, 30, 34, 30)
@@ -289,3 +353,42 @@ style opening_shell_taskbar_frame is frame:
     ysize 44
     background Solid("#273138")
     padding (0, 0)
+
+style opening_shell_taskbar_content_frame is frame:
+    xfill True
+    yfill True
+    background None
+    padding (14, 6, 14, 6)
+
+style opening_shell_taskbar_start_frame is frame:
+    xsize 88
+    ysize 28
+    background Solid("#405560")
+    padding (10, 4, 10, 4)
+
+style opening_shell_taskbar_start_icon_text is gui_text:
+    size 20
+    bold True
+    color "#d8e7f3"
+
+style opening_shell_taskbar_start_text is gui_text:
+    size 17
+    color "#edf4f8"
+
+style opening_shell_taskbar_program_frame is frame:
+    xsize 228
+    ysize 28
+    background Solid("#39434b")
+    padding (12, 4, 12, 4)
+
+style opening_shell_taskbar_program_text is gui_text:
+    size 17
+    color "#dde8ee"
+
+style opening_shell_taskbar_status_text is gui_text:
+    size 14
+    color "#b8c7d2"
+
+style opening_shell_taskbar_time_text is gui_text:
+    size 16
+    color "#e7eff5"
