@@ -21,6 +21,38 @@ def function_block(source, function_name):
     return match.group(0)
 
 
+def block_with_header(source, stripped_header, start_line=0):
+    lines = source.splitlines()
+    for index in range(start_line, len(lines)):
+        if lines[index].strip() != stripped_header:
+            continue
+
+        indent = len(lines[index]) - len(lines[index].lstrip(" "))
+        block = [lines[index]]
+        for nested_index in range(index + 1, len(lines)):
+            line = lines[nested_index]
+            if line.strip():
+                nested_indent = len(line) - len(line.lstrip(" "))
+                if nested_indent <= indent:
+                    break
+            block.append(line)
+
+        return "\n".join(block), index
+
+    raise AssertionError(f"block {stripped_header!r} not found")
+
+
+def direct_child_lines(block):
+    lines = block.splitlines()
+    header_indent = len(lines[0]) - len(lines[0].lstrip(" "))
+    child_indent = header_indent + 4
+    return [
+        line.strip()
+        for line in lines[1:]
+        if line.strip() and len(line) - len(line.lstrip(" ")) == child_indent
+    ]
+
+
 def parse_renpy_dict(source, definition_name):
     match = re.search(
         rf"(?m)^\s*define\s+{re.escape(definition_name)}\s*=\s*",
@@ -29,14 +61,83 @@ def parse_renpy_dict(source, definition_name):
     if match is None:
         raise AssertionError(f"define {definition_name} = not found")
 
-    start = source.find("{", match.end())
+    start = -1
+    in_single_quote = False
+    in_double_quote = False
+    in_comment = False
+    escaped = False
+
+    for index in range(match.end(), len(source)):
+        char = source[index]
+        if in_comment:
+            if char == "\n":
+                in_comment = False
+            continue
+        if escaped:
+            escaped = False
+            continue
+        if char == "\\" and (in_single_quote or in_double_quote):
+            escaped = True
+            continue
+        if in_single_quote:
+            if char == "'":
+                in_single_quote = False
+            continue
+        if in_double_quote:
+            if char == '"':
+                in_double_quote = False
+            continue
+        if char == "#":
+            in_comment = True
+            continue
+        if char == "'":
+            in_single_quote = True
+            continue
+        if char == '"':
+            in_double_quote = True
+            continue
+        if char == "{":
+            start = index
+            break
+
     if start == -1:
         raise AssertionError(f"define {definition_name} = has no opening brace")
 
     depth = 0
     end = None
+    in_single_quote = False
+    in_double_quote = False
+    in_comment = False
+    escaped = False
     for index in range(start, len(source)):
         char = source[index]
+        if in_comment:
+            if char == "\n":
+                in_comment = False
+            continue
+        if escaped:
+            escaped = False
+            continue
+        if char == "\\" and (in_single_quote or in_double_quote):
+            escaped = True
+            continue
+        if in_single_quote:
+            if char == "'":
+                in_single_quote = False
+            continue
+        if in_double_quote:
+            if char == '"':
+                in_double_quote = False
+            continue
+        if char == "#":
+            in_comment = True
+            continue
+        if char == "'":
+            in_single_quote = True
+            continue
+        if char == '"':
+            in_double_quote = True
+            continue
         if char == "{":
             depth += 1
         elif char == "}":
@@ -186,6 +287,37 @@ define crt_mode_settings = {
         self.assertEqual(parsed["outer"]["flicker"], 0.56)
         self.assertEqual(parsed["tail"], 9)
 
+    def test_parse_renpy_dict_ignores_braces_inside_strings_comments_and_escapes(self):
+        sample_source = r'''
+define crt_mode_settings = {
+    "quoted": {
+        "text": "brace in string } and escaped quote \" { still string",
+        'single': 'literal { brace and escaped quote \' }',
+        "value": 7, # comment closes nothing }
+    },
+    # full line comment with stray brace {
+    "tail": {
+        "nested": 3,
+    },
+}
+'''
+
+        parsed = parse_renpy_dict(sample_source, "crt_mode_settings")
+
+        self.assertEqual(
+            {
+                "quoted": {
+                    "text": 'brace in string } and escaped quote " { still string',
+                    "single": "literal { brace and escaped quote ' }",
+                    "value": 7,
+                },
+                "tail": {
+                    "nested": 3,
+                },
+            },
+            parsed,
+        )
+
     def test_crt_screen_accepts_mode_and_keeps_overlay_behavior(self):
         self.assertIn('screen crt_effect(mode="subtle"):', self.source)
         self.assertRegex(
@@ -225,10 +357,61 @@ define crt_mode_settings = {
         self.assertRegex(self.source, r"(?m)^\s*xoffset\s+0\s*$")
         self.assertIn("xoffset amount", self.source)
         self.assertIn("xoffset -amount", self.source)
-        self.assertIn(
-            'at crt_horizontal_jitter(settings["jitter"])',
+
+    def test_crt_screen_wraps_jitter_in_clipped_outer_fixed_and_inner_overscan_fixed(self):
+        overscan_match = re.search(
+            r"(?m)^\s*define\s+crt_overscan\s*=\s*(\d+)\s*$",
             self.source,
         )
+        self.assertIsNotNone(overscan_match)
+        self.assertGreaterEqual(int(overscan_match.group(1)), 22)
+
+        screen_block, _ = block_with_header(
+            self.source,
+            'screen crt_effect(mode="subtle"):',
+        )
+        outer_fixed, outer_index = block_with_header(screen_block, "fixed:")
+        outer_children = direct_child_lines(outer_fixed)
+        self.assertEqual(
+            [
+                "xsize config.screen_width",
+                "ysize config.screen_height",
+                "clipping True",
+                "fixed:",
+            ],
+            outer_children[:4],
+        )
+        self.assertNotIn(
+            'at crt_horizontal_jitter(settings["jitter"])',
+            outer_children,
+        )
+
+        inner_fixed, _ = block_with_header(screen_block, "fixed:", start_line=outer_index + 1)
+        inner_children = direct_child_lines(inner_fixed)
+        self.assertEqual(
+            "xsize config.screen_width + crt_overscan * 2",
+            inner_children[0],
+        )
+        self.assertEqual("ysize config.screen_height", inner_children[1])
+        self.assertEqual("xpos -crt_overscan", inner_children[2])
+        self.assertEqual(
+            'at crt_horizontal_jitter(settings["jitter"])',
+            inner_children[3],
+        )
+
+    def test_crt_layers_render_inside_overscan_fixed(self):
+        screen_block, _ = block_with_header(
+            self.source,
+            'screen crt_effect(mode="subtle"):',
+        )
+        _, outer_fixed_index = block_with_header(screen_block, "fixed:")
+        inner_fixed, _ = block_with_header(screen_block, "fixed:", start_line=outer_fixed_index + 1)
+
+        self.assertIn('add "images/effects/crt_scanlines.png":', inner_fixed)
+        self.assertIn("xsize config.screen_width + crt_overscan * 2", inner_fixed)
+        self.assertIn("ysize config.screen_height", inner_fixed)
+        self.assertIn('add "crt_noise_cycle":', inner_fixed)
+        self.assertIn('add Solid("#ffffff"):', inner_fixed)
 
     def test_crt_noise_cycle_and_transforms_remain_wired_to_screen(self):
         expected_fragments = (

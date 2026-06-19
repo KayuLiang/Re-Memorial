@@ -3,6 +3,7 @@
 # hide screen crt_effect
 
 define crt_scroll_speed = 6.0
+define crt_overscan = 24
 define crt_mode_settings = {
     "subtle": {
         "scanline": 0.22,
@@ -70,16 +71,25 @@ screen crt_effect(mode="subtle"):
         xsize config.screen_width
         ysize config.screen_height
         clipping True
-        at crt_horizontal_jitter(settings["jitter"])
 
-        add "images/effects/crt_scanlines.png":
-            alpha settings["scanline"]
-            at crt_scanline_scroll(crt_scroll_speed)
-
-        add "crt_noise_cycle":
-            xsize config.screen_width
+        fixed:
+            xsize config.screen_width + crt_overscan * 2
             ysize config.screen_height
-            alpha settings["noise"]
+            xpos -crt_overscan
+            at crt_horizontal_jitter(settings["jitter"])
 
-        add Solid("#ffffff"):
-            at crt_flicker(settings["flicker"])
+            add "images/effects/crt_scanlines.png":
+                xsize config.screen_width + crt_overscan * 2
+                ysize config.screen_height
+                alpha settings["scanline"]
+                at crt_scanline_scroll(crt_scroll_speed)
+
+            add "crt_noise_cycle":
+                xsize config.screen_width + crt_overscan * 2
+                ysize config.screen_height
+                alpha settings["noise"]
+
+            add Solid("#ffffff"):
+                xsize config.screen_width + crt_overscan * 2
+                ysize config.screen_height
+                at crt_flicker(settings["flicker"])
