@@ -76,7 +76,93 @@ label opening_scene_06:
 
     hide screen opening_memory_overlay
     with Dissolve(0.30)
-    $ opening_active = False
+    jump opening_scene_07
+
+
+label opening_scene_07:
+    show screen crt_effect(mode="interference")
+    $ opening_play_sound("audio/opening/electrical_burst.ogg")
+    show screen opening_system_desktop("opening_notice_body", ("精神卫生系统已介入。",))
+    system "精神卫生系统已介入。"
+    pause 0.28
+    show screen opening_system_desktop("opening_notice_body", ("载入中。",))
+    system "载入中。"
+    jump opening_scene_08
+
+
+label opening_scene_08:
+    $ opening_play_sound("audio/opening/keyboard_fast.ogg")
+    show screen opening_system_desktop("opening_records_body", (12, "正在整理病历……"))
+    pause 0.34
+
+    show screen opening_system_desktop("opening_records_body", (31, "正在校准心境……"))
+    pause 0.32
+
+    $ opening_play_sound("audio/opening/paper_flip.ogg")
+    show screen opening_system_desktop("opening_records_body", (49, "正在归档记忆……"))
+    pause 0.36
+
+    show screen opening_system_desktop("opening_records_body", (68, "正在写入访谈记录……"))
+    pause 0.34
+
+    $ opening_play_sound("audio/opening/electronic_low.ogg")
+    show screen opening_system_desktop("opening_records_body", (91, "正在恢复基础认知……"))
+    pause 0.38
+
+    show screen opening_flash_once
+    pause 0.06
+    hide screen opening_flash_once
+    show screen opening_system_desktop("opening_records_body", (100, "载入完成。"))
+    pause 0.18
+    jump opening_scene_09
+
+
+label opening_scene_09:
+    $ lines = []
+
+    $ opening_play_sound("audio/opening/wind_gap.ogg")
+    $ lines.append("风掠过车窗缝隙的尖啸。")
+    show screen opening_memory_overlay(lines)
+    pause 0.48
+
+    $ opening_play_sound("audio/opening/stretcher_wheels.ogg")
+    $ opening_play_sound("audio/opening/metal_scrape.ogg")
+    $ lines.append("金属的滚轮快速摩擦地面的叮铃声，担架床吱呀好像就要散架。")
+    show screen opening_memory_overlay(lines)
+    pause 0.62
+
+    $ opening_play_sound("audio/opening/handoff_shout.ogg")
+    $ lines.append("“交接！手术室准备！”")
+    show screen opening_memory_overlay(lines)
+    pause 0.52
+
+    $ opening_play_sound("audio/opening/isolation_door.ogg")
+    $ lines.append("然后是厚实的隔离门缓缓关上。")
+    show screen opening_memory_overlay(lines)
+    pause 0.72
+
+    hide screen opening_memory_overlay
+    with Dissolve(0.34)
+    jump opening_scene_10
+
+
+label opening_scene_10:
+    show screen crt_effect(mode="subtle")
+    show screen opening_system_desktop("opening_notice_body", ("您好，这里是市立精神卫生中心服务系统，请仔细阅读术前须知。",))
+    system "您好，这里是市立精神卫生中心服务系统，请仔细阅读术前须知。"
+    jump opening_scene_11
+
+
+label opening_scene_11:
+    show screen opening_system_desktop("opening_consent_body")
+    fro "应该怎么做？"
+    system "请滑动滚轮以阅读全文。"
+    fro "然后呢？"
+    system "点击屏幕下方的‘下一页’按钮。"
+    call screen opening_consent_document
+    hide screen opening_memory_overlay
+    hide screen opening_flash_once
     hide screen crt_effect
     hide screen opening_system_desktop
+    $ opening_active = False
     return

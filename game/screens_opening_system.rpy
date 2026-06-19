@@ -9,6 +9,15 @@ define opening_color_phosphor = "#a8c7aa"
 define opening_scope_wave_span = 476
 
 
+init python:
+    def opening_play_sound(path, channel="sound", loop=False):
+        if renpy.loadable(path):
+            renpy.music.play(path, channel=channel, loop=loop)
+
+    def opening_consent_at_bottom(adjustment):
+        return adjustment.range <= 0 or adjustment.value >= adjustment.range - 4
+
+
 transform opening_scope_scroll(distance=opening_scope_wave_span):
     xoffset 0
     linear 4.8 xoffset -distance
@@ -574,6 +583,181 @@ screen opening_loading_body():
         use opening_oscilloscope
 
 
+screen opening_records_body(progress, status_text):
+    hbox:
+        xfill True
+        yfill True
+        spacing 24
+
+        frame:
+            style "opening_records_panel_frame"
+
+            fixed:
+                xfill True
+                yfill True
+
+                frame:
+                    style "opening_records_back_page_frame"
+                    xpos 52
+                    ypos 38
+
+                frame:
+                    style "opening_records_back_page_frame"
+                    xpos 26
+                    ypos 19
+
+                frame:
+                    style "opening_records_front_page_frame"
+
+                    vbox:
+                        xfill True
+                        yfill True
+                        spacing 18
+
+                        text "病历 / 访谈 / 诊断记录" style "opening_records_heading_text"
+                        text "CASE FILE  ████████" style "opening_records_meta_text"
+                        text "精神状态校准记录" style "opening_records_line_text"
+                        text "近期访谈归档" style "opening_records_line_text"
+                        text "基础认知恢复评估" style "opening_records_line_text"
+
+                        null height 0 yfill True
+
+                        text status_text style "opening_records_status_text"
+                        bar value StaticValue(progress, 100.0) style "opening_records_progress_bar"
+                        text "[progress]%" style "opening_records_percent_text"
+
+        use opening_oscilloscope
+
+
+screen opening_notice_body(message):
+    hbox:
+        xfill True
+        yfill True
+        spacing 24
+
+        frame:
+            style "opening_notice_panel_frame"
+
+            vbox:
+                xfill True
+                yfill True
+                spacing 24
+
+                text "SYSTEM NOTICE" style "opening_notice_meta_text"
+                add Solid(opening_color_border_dark) xsize 760 ysize 4
+                text message style "opening_notice_message_text"
+                null height 0 yfill True
+                text "市立精神卫生中心 / SERVICE TERMINAL" style "opening_notice_footer_text"
+
+        use opening_oscilloscope
+
+
+screen opening_consent_body():
+    hbox:
+        xfill True
+        yfill True
+        spacing 24
+
+        frame:
+            style "opening_consent_preview_frame"
+
+            vbox:
+                xfill True
+                yfill True
+                spacing 14
+
+                text "市立精神卫生中心" style "opening_consent_center_text"
+                text "特殊治疗知情同意书" style "opening_consent_title_text"
+                add Solid("#627168") xsize 850 ysize 2 xalign 0.5
+                text "姓名：弗洛　性别：男　年龄：24" style "opening_consent_preview_text"
+                text "病历号：████████" style "opening_consent_preview_text"
+                text "患者已知悉并理解以上信息。" style "opening_consent_note_text"
+                text "请核对个人信息。" style "opening_consent_note_text"
+                text "请确认签署。" style "opening_consent_note_text"
+
+        frame:
+            style "opening_consent_side_frame"
+
+            vbox:
+                spacing 20
+                xfill True
+
+                text "DOCUMENT STATUS" style "opening_notice_meta_text"
+                text "等待患者阅读全文" style "opening_consent_side_text"
+                text "滚轮 / 拖动滚动条" style "opening_consent_side_text"
+                null height 0 yfill True
+                use opening_oscilloscope
+
+
+screen opening_consent_document():
+    modal True
+    zorder 20
+    default consent_adjustment = ui.adjustment()
+
+    frame:
+        style "opening_consent_dialog_frame"
+
+        vbox:
+            xfill True
+            yfill True
+            spacing 12
+
+            viewport:
+                xfill True
+                ysize 572
+                yadjustment consent_adjustment
+                mousewheel True
+                draggable True
+                scrollbars "vertical"
+
+                vbox:
+                    xsize 1400
+                    spacing 14
+
+                    text "市立精神卫生中心" style "opening_consent_center_text"
+                    text "特殊治疗知情同意书" style "opening_consent_title_text"
+                    text "姓名：弗洛；性别：男；年龄：24；病历号：████████；诊断：█████████████████；拟行治疗：███████；治疗日期：████年██月██日" style "opening_consent_document_text"
+
+                    text "一、治疗目的" style "opening_consent_section_text"
+                    text "因患者目前存在████、████、████及████能力下降等情况，拟实施本次治疗，以稳定精神状态、降低风险，并协助患者恢复基本生活与认知功能。" style "opening_consent_document_text"
+
+                    text "二、治疗方式" style "opening_consent_section_text"
+                    text "治疗过程中可能使用镇静、监测、████、精神状态校准及必要的辅助药物。具体方案将由医师根据患者情况调整。" style "opening_consent_document_text"
+
+                    text "三、可能风险" style "opening_consent_section_text"
+                    text "本治疗可能出现以下情况：" style "opening_consent_document_text"
+                    text "头痛、恶心、乏力、嗜睡；" style "opening_consent_document_text"
+                    text "短暂████或███障碍；" style "opening_consent_document_text"
+                    text "近期或远期████；" style "opening_consent_document_text"
+                    text "情绪波动、焦虑、恐惧或抑郁加重；" style "opening_consent_document_text"
+                    text "对████、████或████产生混淆；" style "opening_consent_document_text"
+                    text "治疗效果不佳，需追加治疗或调整方案；" style "opening_consent_document_text"
+                    text "极少数情况下可能发生严重不良反应，甚至危及生命。" style "opening_consent_document_text"
+
+                    text "四、替代方案" style "opening_consent_section_text"
+                    text "患者及家属已知悉可选择药物治疗、心理治疗、观察治疗、转院治疗或暂缓治疗。但延误治疗可能导致病情加重或出现其他风险。" style "opening_consent_document_text"
+
+                    text "五、信息核对" style "opening_consent_section_text"
+                    text "患者确认，已如实提供并核对个人信息、病史资料、诊断信息、拟行治疗项目及初始评估结果。" style "opening_consent_document_text"
+                    text "上述信息一经签署，将作为本次治疗及后续系统评估的依据。如有遗漏、错误或隐瞒，患者及家属/监护人已知悉可能产生相应风险。" style "opening_consent_document_text"
+                    text "姓名：弗洛；性别：男；年龄：24；ID：██████████████████" style "opening_consent_document_text"
+                    text "初始属性（剩余可分配点数：x）" style "opening_consent_document_text"
+                    text "力量 敏捷 体质 智力 意志" style "opening_consent_document_text"
+                    text "患者已知悉并理解以上信息。" style "opening_consent_note_text"
+                    text "请核对个人信息。" style "opening_consent_note_text"
+
+                    text "六、患者声明" style "opening_consent_section_text"
+                    text "本人已阅读并理解以上内容。医务人员已向本人说明治疗目的、方式、风险、替代方案及可能后果。本人知悉本治疗不保证██████，不保证完全消除症状。" style "opening_consent_document_text"
+                    text "本人自愿接受本次治疗。" style "opening_consent_document_text"
+                    text "患者签名：______________；家属/监护人签名：______________；医师签名：______________；日期：████年██月██日" style "opening_consent_document_text"
+                    text "请确认签署。" style "opening_consent_note_text"
+
+            textbutton "下一页":
+                style "opening_consent_next_button"
+                sensitive opening_consent_at_bottom(consent_adjustment)
+                action Return()
+
+
 style opening_disclaimer_text is gui_text:
     xalign 0.5
     yalign 0.5
@@ -659,3 +843,147 @@ style opening_loading_status_text is gui_text:
     size 21
     color "#7c8380"
     kerning 2
+
+style opening_records_panel_frame is frame:
+    xsize 910
+    yfill True
+    background Solid("#b8c1bb")
+    padding (20, 20, 20, 20)
+
+style opening_records_back_page_frame is frame:
+    xsize 790
+    ysize 570
+    background Solid("#c9c8bb")
+    padding (0, 0)
+
+style opening_records_front_page_frame is frame:
+    xsize 790
+    ysize 570
+    background Solid(opening_color_paper)
+    padding (32, 28, 32, 28)
+
+style opening_records_heading_text is gui_text:
+    size 31
+    color "#46564d"
+    bold True
+
+style opening_records_meta_text is gui_text:
+    size 18
+    color "#7a817c"
+    kerning 1
+
+style opening_records_line_text is gui_text:
+    size 24
+    color "#56635b"
+
+style opening_records_status_text is gui_text:
+    size 25
+    color "#3f6552"
+    bold True
+
+style opening_records_progress_bar is bar:
+    xsize 710
+    ysize 26
+    left_bar Solid("#729b83")
+    right_bar Solid("#b9c1bb")
+
+style opening_records_percent_text is gui_text:
+    size 18
+    color "#65736a"
+    xalign 1.0
+
+style opening_notice_panel_frame is frame:
+    xsize 910
+    yfill True
+    background Solid("#d7ddd8")
+    padding (44, 40, 44, 40)
+
+style opening_notice_meta_text is gui_text:
+    size 19
+    color "#6f7c75"
+    bold True
+    kerning 2
+
+style opening_notice_message_text is gui_text:
+    size 34
+    color "#40574b"
+    line_spacing 8
+
+style opening_notice_footer_text is gui_text:
+    size 16
+    color "#7b8580"
+
+style opening_consent_preview_frame is frame:
+    xsize 1030
+    yfill True
+    background Solid(opening_color_paper)
+    padding (42, 30, 42, 30)
+
+style opening_consent_side_frame is frame:
+    xfill True
+    yfill True
+    background Solid("#5f6f68")
+    padding (20, 20, 20, 20)
+
+style opening_consent_side_text is gui_text:
+    size 20
+    color "#c3d1c6"
+
+style opening_consent_dialog_frame is frame:
+    xpos 153
+    ypos 178
+    xsize 1554
+    ysize 680
+    background Solid(opening_color_paper)
+    padding (34, 24, 34, 24)
+
+style opening_consent_center_text is gui_text:
+    size 23
+    color "#45564d"
+    bold True
+    xalign 0.5
+    text_align 0.5
+
+style opening_consent_title_text is gui_text:
+    size 34
+    color "#34483d"
+    bold True
+    xalign 0.5
+    text_align 0.5
+
+style opening_consent_preview_text is gui_text:
+    size 22
+    color "#4f5c54"
+
+style opening_consent_section_text is gui_text:
+    size 25
+    color "#3d5046"
+    bold True
+    top_margin 8
+
+style opening_consent_document_text is gui_text:
+    size 20
+    color "#4a564f"
+    line_spacing 5
+    xsize 1360
+
+style opening_consent_note_text is gui_text:
+    size 19
+    color "#667c70"
+    italic True
+
+style opening_consent_next_button is button:
+    xalign 1.0
+    xminimum 180
+    yminimum 48
+    background Solid("#617e6d")
+    hover_background Solid("#769682")
+    insensitive_background Solid("#a8aea9")
+    padding (24, 9, 24, 9)
+
+style opening_consent_next_button_text is gui_text:
+    size 23
+    color "#f4f2e8"
+    insensitive_color "#d8d8d1"
+    xalign 0.5
+    yalign 0.5
