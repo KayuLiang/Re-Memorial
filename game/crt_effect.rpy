@@ -80,7 +80,7 @@ screen crt_effect(mode="subtle"):
 
             add "images/effects/crt_scanlines.png":
                 xsize config.screen_width + crt_overscan * 2
-                ysize config.screen_height
+                ysize config.screen_height * 2
                 alpha settings["scanline"]
                 at crt_scanline_scroll(crt_scroll_speed)
 

@@ -413,6 +413,29 @@ define crt_mode_settings = {
         self.assertIn('add "crt_noise_cycle":', inner_fixed)
         self.assertIn('add Solid("#ffffff"):', inner_fixed)
 
+    def test_crt_scanlines_use_overscan_width_double_height_and_scroll_transform(self):
+        screen_block, _ = block_with_header(
+            self.source,
+            'screen crt_effect(mode="subtle"):',
+        )
+        _, outer_fixed_index = block_with_header(screen_block, "fixed:")
+        inner_fixed, _ = block_with_header(screen_block, "fixed:", start_line=outer_fixed_index + 1)
+        scanline_block, _ = block_with_header(
+            inner_fixed,
+            'add "images/effects/crt_scanlines.png":',
+        )
+        scanline_children = direct_child_lines(scanline_block)
+
+        self.assertEqual(
+            [
+                "xsize config.screen_width + crt_overscan * 2",
+                "ysize config.screen_height * 2",
+                'alpha settings["scanline"]',
+                "at crt_scanline_scroll(crt_scroll_speed)",
+            ],
+            scanline_children,
+        )
+
     def test_crt_noise_cycle_and_transforms_remain_wired_to_screen(self):
         expected_fragments = (
             "image crt_noise_cycle:",
