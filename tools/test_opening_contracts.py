@@ -8,6 +8,7 @@ PROJECT_DIR = Path(__file__).resolve().parents[1]
 GAME_DIR = PROJECT_DIR / "game"
 OPENING_STATS_PATH = GAME_DIR / "opening_stats.rpy"
 CRT_EFFECT_PATH = GAME_DIR / "crt_effect.rpy"
+OPENING_SYSTEM_PATH = GAME_DIR / "screens_opening_system.rpy"
 
 
 def function_block(source, function_name):
@@ -152,6 +153,25 @@ def parse_renpy_dict(source, definition_name):
         raise ValueError(f"define {definition_name} = has unbalanced braces")
 
     return ast.literal_eval(source[start:end])
+
+
+def parse_style_tuple(block, property_name):
+    match = re.search(
+        rf"(?m)^\s*{re.escape(property_name)}\s+(.+?)\s*$",
+        block,
+    )
+    if match is None:
+        raise AssertionError(f"{property_name} not found in block")
+
+    value = match.group(1).strip()
+    if value.startswith("Borders(") and value.endswith(")"):
+        parts = [part.strip() for part in value[8:-1].split(",") if part.strip()]
+        return tuple(int(part) for part in parts)
+
+    parsed = ast.literal_eval(value)
+    if isinstance(parsed, int):
+        return (parsed,)
+    return tuple(parsed)
 
 
 class OpeningStatsContractTests(unittest.TestCase):
@@ -462,6 +482,116 @@ define crt_mode_settings = {
         for expected_use in expected_uses:
             with self.subTest(expected_use=expected_use):
                 self.assertIn(expected_use, self.source)
+
+
+class OpeningSystemShellContractTests(unittest.TestCase):
+    def setUp(self):
+        self.assertTrue(
+            OPENING_SYSTEM_PATH.is_file(),
+            "game/screens_opening_system.rpy must exist",
+        )
+        self.source = OPENING_SYSTEM_PATH.read_text(encoding="utf-8")
+
+    def test_opening_shell_defines_exact_color_tokens(self):
+        expected_tokens = {
+            "opening_color_desktop": "#6f8078",
+            "opening_color_desktop_dark": "#46534f",
+            "opening_color_border": "#5b8db8",
+            "opening_color_border_dark": "#315f88",
+            "opening_color_paper": "#e7e4d9",
+            "opening_color_phosphor": "#a8c7aa",
+        }
+
+        for token_name, value in expected_tokens.items():
+            with self.subTest(token_name=token_name):
+                self.assertRegex(
+                    self.source,
+                    rf'(?m)^define {re.escape(token_name)} = "{re.escape(value)}"$',
+                )
+
+    def test_opening_shell_defines_core_screens_and_scope_transform(self):
+        expected_fragments = (
+            "screen opening_system_desktop(body_screen, body_args=None):",
+            "screen opening_window_frame(title, body_screen, body_args=None):",
+            "screen opening_oscilloscope():",
+            "screen opening_shell_preview_body():",
+            "transform opening_scope_scroll:",
+        )
+
+        for fragment in expected_fragments:
+            with self.subTest(fragment=fragment):
+                self.assertIn(fragment, self.source)
+
+    def test_opening_shell_window_uses_dynamic_body_screen(self):
+        window_block, _ = block_with_header(
+            self.source,
+            "screen opening_window_frame(title, body_screen, body_args=None):",
+        )
+
+        self.assertRegex(
+            window_block,
+            r"(?m)^\s*use\s+expression\s+body_screen\b",
+        )
+        self.assertIn("body_args", window_block)
+
+    def test_opening_shell_window_border_is_uniform_and_explicit(self):
+        style_block, _ = block_with_header(
+            self.source,
+            "style opening_shell_window_outer_frame is frame:",
+        )
+
+        self.assertIn("background Solid(opening_color_border_dark)", style_block)
+        padding = parse_style_tuple(style_block, "padding")
+        self.assertIn(padding, {(4, 4), (4, 4, 4, 4)})
+
+    def test_opening_shell_clips_main_body_region(self):
+        style_block, _ = block_with_header(
+            self.source,
+            "style opening_shell_window_body_frame is frame:",
+        )
+
+        self.assertIn("clipping True", style_block)
+        self.assertIn("xfill True", style_block)
+        self.assertIn("yfill True", style_block)
+
+    def test_taskbar_has_single_top_highlight_without_second_upper_border(self):
+        desktop_block, _ = block_with_header(
+            self.source,
+            "screen opening_system_desktop(body_screen, body_args=None):",
+        )
+
+        highlight_lines = re.findall(
+            r'(?m)^\s*add Solid\([^)\n]+\)\s+xpos 0 ypos 0 xsize config\.screen_width ysize 2\s*$',
+            desktop_block,
+        )
+        self.assertEqual(1, len(highlight_lines))
+        self.assertNotRegex(
+            desktop_block,
+            r'(?m)^\s*add Solid\([^)\n]+\)\s+xpos 0 ypos (?:1|2) xsize config\.screen_width ysize (?:1|2)\s*$',
+        )
+
+    def test_preview_body_keeps_paper_placeholder_and_scope_signature(self):
+        preview_block, _ = block_with_header(
+            self.source,
+            "screen opening_shell_preview_body():",
+        )
+
+        self.assertIn("opening_color_paper", preview_block)
+        self.assertIn("use opening_oscilloscope", preview_block)
+
+    def test_scope_screen_uses_local_scroll_transform_and_metrics(self):
+        scope_block, _ = block_with_header(
+            self.source,
+            "screen opening_oscilloscope():",
+        )
+
+        self.assertIn("opening_scope_scroll", scope_block)
+        self.assertIn('text "HR', scope_block)
+        self.assertIn('text "SpO2', scope_block)
+        self.assertIn('text "GAIN', scope_block)
+
+    def test_opening_shell_does_not_depend_on_legacy_medical_wave_scroll(self):
+        self.assertNotIn("medical_wave_scroll", self.source)
 
 
 if __name__ == "__main__":
