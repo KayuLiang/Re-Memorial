@@ -1,3 +1,4 @@
+import ast
 import re
 import unittest
 from pathlib import Path
@@ -18,6 +19,38 @@ def function_block(source, function_name):
     if match is None:
         return ""
     return match.group(0)
+
+
+def parse_renpy_dict(source, definition_name):
+    match = re.search(
+        rf"(?m)^\s*define\s+{re.escape(definition_name)}\s*=\s*",
+        source,
+    )
+    if match is None:
+        raise AssertionError(f"define {definition_name} = not found")
+
+    start = source.find("{", match.end())
+    if start == -1:
+        raise AssertionError(f"define {definition_name} = has no opening brace")
+
+    depth = 0
+    end = None
+    for index in range(start, len(source)):
+        char = source[index]
+        if char == "{":
+            depth += 1
+        elif char == "}":
+            depth -= 1
+            if depth < 0:
+                raise ValueError(f"define {definition_name} = has unbalanced braces")
+            if depth == 0:
+                end = index + 1
+                break
+
+    if end is None:
+        raise ValueError(f"define {definition_name} = has unbalanced braces")
+
+    return ast.literal_eval(source[start:end])
 
 
 class OpeningStatsContractTests(unittest.TestCase):
@@ -97,6 +130,62 @@ class CrtEffectContractTests(unittest.TestCase):
     def setUp(self):
         self.source = CRT_EFFECT_PATH.read_text(encoding="utf-8")
 
+    def test_parse_renpy_dict_preserves_extra_modes_and_keys(self):
+        sample_source = '''
+define crt_mode_settings = {
+    "subtle": {
+        "scanline": 0.22,
+        "noise": 0.18,
+        "flicker": 0.012,
+        "jitter": 0,
+    },
+    "interference": {
+        "scanline": 0.46,
+        "noise": 0.42,
+        "flicker": 0.045,
+        "jitter": 8,
+    },
+    "shutdown": {
+        "scanline": 0.75,
+        "noise": 0.78,
+        "flicker": 0.18,
+        "jitter": 22,
+    },
+    "bonus": {
+        "scanline": 0.91,
+        "noise": 0.33,
+        "flicker": 0.07,
+        "jitter": 3,
+        "phase": "extra",
+    },
+}
+'''
+
+        parsed = parse_renpy_dict(sample_source, "crt_mode_settings")
+
+        self.assertIn("bonus", parsed)
+        self.assertEqual(parsed["bonus"]["phase"], "extra")
+
+    def test_parse_renpy_dict_scans_nested_braces_without_stopping_early(self):
+        sample_source = '''
+define crt_mode_settings = {
+    "outer": {
+        "inner": {
+            "scanline": 0.12,
+            "noise": 0.34,
+        },
+        "flicker": 0.56,
+    },
+    "tail": 9,
+}
+'''
+
+        parsed = parse_renpy_dict(sample_source, "crt_mode_settings")
+
+        self.assertEqual(parsed["outer"]["inner"]["scanline"], 0.12)
+        self.assertEqual(parsed["outer"]["flicker"], 0.56)
+        self.assertEqual(parsed["tail"], 9)
+
     def test_crt_screen_accepts_mode_and_keeps_overlay_behavior(self):
         self.assertIn('screen crt_effect(mode="subtle"):', self.source)
         self.assertRegex(
@@ -107,41 +196,29 @@ class CrtEffectContractTests(unittest.TestCase):
         self.assertRegex(self.source, r"(?m)^\s*zorder\s+1000\s*$")
 
     def test_crt_mode_settings_define_all_presets_and_parameters(self):
-        self.assertIn("define crt_mode_settings =", self.source)
         expected_settings = {
             "subtle": {
-                "scanline": "0.22",
-                "noise": "0.18",
-                "flicker": "0.012",
-                "jitter": "0",
+                "scanline": 0.22,
+                "noise": 0.18,
+                "flicker": 0.012,
+                "jitter": 0,
             },
             "interference": {
-                "scanline": "0.46",
-                "noise": "0.42",
-                "flicker": "0.045",
-                "jitter": "8",
+                "scanline": 0.46,
+                "noise": 0.42,
+                "flicker": 0.045,
+                "jitter": 8,
             },
             "shutdown": {
-                "scanline": "0.75",
-                "noise": "0.78",
-                "flicker": "0.18",
-                "jitter": "22",
+                "scanline": 0.75,
+                "noise": 0.78,
+                "flicker": 0.18,
+                "jitter": 22,
             },
         }
 
-        for mode, settings in expected_settings.items():
-            with self.subTest(mode=mode):
-                mode_match = re.search(
-                    rf'(?ms)^\s*"{mode}"\s*:\s*\{{(.*?)^\s*\}},?\s*$',
-                    self.source,
-                )
-                self.assertIsNotNone(mode_match)
-                mode_block = mode_match.group(1)
-                for key, value in settings.items():
-                    self.assertRegex(
-                        mode_block,
-                        rf'(?m)^\s*"{key}"\s*:\s*{re.escape(value)}\s*,?\s*$',
-                    )
+        parsed_settings = parse_renpy_dict(self.source, "crt_mode_settings")
+        self.assertEqual(expected_settings, parsed_settings)
 
     def test_crt_horizontal_jitter_is_defined_and_applied(self):
         self.assertIn("transform crt_horizontal_jitter(amount=0):", self.source)
@@ -152,6 +229,22 @@ class CrtEffectContractTests(unittest.TestCase):
             'at crt_horizontal_jitter(settings["jitter"])',
             self.source,
         )
+
+    def test_crt_noise_cycle_and_transforms_remain_wired_to_screen(self):
+        expected_fragments = (
+            "image crt_noise_cycle:",
+            '"images/effects/crt_noise_01.png"',
+            '"images/effects/crt_noise_02.png"',
+            '"images/effects/crt_noise_03.png"',
+            "transform crt_scanline_scroll(speed=6.0):",
+            "transform crt_flicker(strength=0.025):",
+            "at crt_scanline_scroll(crt_scroll_speed)",
+            'at crt_flicker(settings["flicker"])',
+        )
+
+        for fragment in expected_fragments:
+            with self.subTest(fragment=fragment):
+                self.assertIn(fragment, self.source)
 
     def test_crt_screen_uses_each_mode_parameter(self):
         expected_uses = (
