@@ -6,6 +6,7 @@ from pathlib import Path
 PROJECT_DIR = Path(__file__).resolve().parents[1]
 GAME_DIR = PROJECT_DIR / "game"
 OPENING_STATS_PATH = GAME_DIR / "opening_stats.rpy"
+CRT_EFFECT_PATH = GAME_DIR / "crt_effect.rpy"
 
 
 def function_block(source, function_name):
@@ -90,6 +91,78 @@ class OpeningStatsContractTests(unittest.TestCase):
             block,
         )
         self.assertNotIn('"available": True', source)
+
+
+class CrtEffectContractTests(unittest.TestCase):
+    def setUp(self):
+        self.source = CRT_EFFECT_PATH.read_text(encoding="utf-8")
+
+    def test_crt_screen_accepts_mode_and_keeps_overlay_behavior(self):
+        self.assertIn('screen crt_effect(mode="subtle"):', self.source)
+        self.assertRegex(
+            self.source,
+            r'crt_mode_settings\.get\(\s*mode,\s*crt_mode_settings\["subtle"\]\s*\)',
+        )
+        self.assertRegex(self.source, r"(?m)^\s*modal\s+False\s*$")
+        self.assertRegex(self.source, r"(?m)^\s*zorder\s+1000\s*$")
+
+    def test_crt_mode_settings_define_all_presets_and_parameters(self):
+        self.assertIn("define crt_mode_settings =", self.source)
+        expected_settings = {
+            "subtle": {
+                "scanline": "0.22",
+                "noise": "0.18",
+                "flicker": "0.012",
+                "jitter": "0",
+            },
+            "interference": {
+                "scanline": "0.46",
+                "noise": "0.42",
+                "flicker": "0.045",
+                "jitter": "8",
+            },
+            "shutdown": {
+                "scanline": "0.75",
+                "noise": "0.78",
+                "flicker": "0.18",
+                "jitter": "22",
+            },
+        }
+
+        for mode, settings in expected_settings.items():
+            with self.subTest(mode=mode):
+                mode_match = re.search(
+                    rf'(?ms)^\s*"{mode}"\s*:\s*\{{(.*?)^\s*\}},?\s*$',
+                    self.source,
+                )
+                self.assertIsNotNone(mode_match)
+                mode_block = mode_match.group(1)
+                for key, value in settings.items():
+                    self.assertRegex(
+                        mode_block,
+                        rf'(?m)^\s*"{key}"\s*:\s*{re.escape(value)}\s*,?\s*$',
+                    )
+
+    def test_crt_horizontal_jitter_is_defined_and_applied(self):
+        self.assertIn("transform crt_horizontal_jitter(amount=0):", self.source)
+        self.assertRegex(self.source, r"(?m)^\s*xoffset\s+0\s*$")
+        self.assertIn("xoffset amount", self.source)
+        self.assertIn("xoffset -amount", self.source)
+        self.assertIn(
+            'at crt_horizontal_jitter(settings["jitter"])',
+            self.source,
+        )
+
+    def test_crt_screen_uses_each_mode_parameter(self):
+        expected_uses = (
+            'alpha settings["scanline"]',
+            'alpha settings["noise"]',
+            'crt_flicker(settings["flicker"])',
+            'crt_horizontal_jitter(settings["jitter"])',
+        )
+        for expected_use in expected_uses:
+            with self.subTest(expected_use=expected_use):
+                self.assertIn(expected_use, self.source)
 
 
 if __name__ == "__main__":
