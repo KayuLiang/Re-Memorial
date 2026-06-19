@@ -1,5 +1,6 @@
 import ast
 import re
+import textwrap
 import unittest
 from pathlib import Path
 
@@ -19,7 +20,7 @@ BASE_SCREENS_PATH = GAME_DIR / "screens.rpy"
 def function_block(source, function_name):
     match = re.search(
         rf"(?ms)^    def {re.escape(function_name)}\s*\([^)]*\):.*?"
-        rf"(?=^    def |\Z)",
+        rf"(?=^    def |^\S|\Z)",
         source,
     )
     if match is None:
@@ -1024,7 +1025,11 @@ class OpeningMedicalConsentContractTests(unittest.TestCase):
             self.system_source,
             "screen opening_consent_document():",
         )
-        self.assertIn("default consent_adjustment = ui.adjustment()", block)
+        self.assertIn(
+            "default consent_adjustment = ui.adjustment("
+            "raw_changed=opening_consent_adjustment_changed)",
+            block,
+        )
 
         viewport_block, _ = block_with_header(block, "viewport:")
         for setting in (
@@ -1043,6 +1048,45 @@ class OpeningMedicalConsentContractTests(unittest.TestCase):
         )
         self.assertIn("action Return()", button_block)
         self.assertNotIn("SetScreenVariable", button_block)
+
+    def test_consent_adjustment_callback_restarts_only_at_bottom_and_never_blocks_change(self):
+        block = function_block(
+            self.system_source,
+            "opening_consent_adjustment_changed",
+        )
+        self.assertTrue(block)
+
+        class FakeRenpy:
+            def __init__(self):
+                self.restart_count = 0
+
+            def restart_interaction(self):
+                self.restart_count += 1
+
+        class FakeAdjustment:
+            range = 100
+
+        fake_renpy = FakeRenpy()
+        namespace = {"renpy": fake_renpy}
+        exec(textwrap.dedent(block), namespace)
+        callback = namespace["opening_consent_adjustment_changed"]
+        adjustment = FakeAdjustment()
+
+        self.assertIsNone(callback(adjustment, 95))
+        self.assertEqual(0, fake_renpy.restart_count)
+        self.assertIsNone(callback(adjustment, 96))
+        self.assertEqual(1, fake_renpy.restart_count)
+        self.assertIsNone(callback(adjustment, 100))
+        self.assertEqual(2, fake_renpy.restart_count)
+
+    def test_opening_foley_channel_is_registered_in_init_for_non_looping_sfx(self):
+        init_block, _ = block_with_header(self.system_source, "init python:")
+
+        self.assertIn(
+            'renpy.music.register_channel('
+            '"opening_foley", mixer="sfx", loop=False)',
+            init_block,
+        )
 
     def test_consent_document_contains_all_six_sections_and_required_original_text(self):
         required_text = (
@@ -1153,6 +1197,73 @@ class OpeningMedicalConsentContractTests(unittest.TestCase):
         door_position = block.index("isolation_door.ogg")
         self.assertRegex(block[door_position:], r"pause\s+0\.\d+")
         self.assertIn("with Dissolve(", block)
+
+    def test_scene_03_plays_primary_then_two_soft_drops_without_changing_drop_count(self):
+        block, _ = block_with_header(self.sequence_source, "label opening_scene_03:")
+        wait_position = block.index("call screen opening_water_wait")
+        primary_call = 'opening_play_sound("audio/opening/water_drop_primary.ogg")'
+        soft_call = 'opening_play_sound("audio/opening/water_drop_soft.ogg")'
+        self.assertIn(primary_call, block)
+        self.assertEqual(2, block.count(soft_call))
+        primary_position = block.index(primary_call)
+        soft_positions = [
+            match.start()
+            for match in re.finditer(
+                re.escape(soft_call),
+                block,
+            )
+        ]
+        drop_positions = [
+            match.start()
+            for match in re.finditer(
+                re.escape("call screen opening_water_drop(auto=True)"),
+                block,
+            )
+        ]
+
+        self.assertEqual(2, len(soft_positions))
+        self.assertEqual(3, len(drop_positions))
+        self.assertLess(wait_position, primary_position)
+        self.assertLess(primary_position, drop_positions[0])
+        self.assertLess(drop_positions[0], soft_positions[0])
+        self.assertLess(soft_positions[0], drop_positions[1])
+        self.assertLess(drop_positions[1], soft_positions[1])
+        self.assertLess(soft_positions[1], drop_positions[2])
+
+    def test_scene_06_plays_each_memory_sound_before_its_matching_line(self):
+        block, _ = block_with_header(self.sequence_source, "label opening_scene_06:")
+        pairs = (
+            ("footsteps_urgent.ogg", "一阵急促的脚步声。"),
+            ("heavy_impact.ogg", "重物落地的闷响。"),
+            ("emergency_radio.ogg", "“现场安全，患者雄性，意识模糊——”"),
+        )
+
+        for sound, line in pairs:
+            with self.subTest(sound=sound):
+                sound_call = f'opening_play_sound("audio/opening/{sound}")'
+                self.assertIn(sound_call, block)
+                sound_position = block.index(sound_call)
+                line_position = block.index(f'lines.append("{line}")')
+                self.assertLess(sound_position, line_position)
+
+        self.assertEqual(3, block.count("lines.append("))
+        self.assertGreaterEqual(
+            block.count("show screen opening_memory_overlay(lines)"),
+            3,
+        )
+
+    def test_scene_09_overlapping_wheels_and_scrape_use_distinct_channels(self):
+        block, _ = block_with_header(self.sequence_source, "label opening_scene_09:")
+
+        self.assertIn(
+            'opening_play_sound("audio/opening/stretcher_wheels.ogg")',
+            block,
+        )
+        self.assertIn(
+            'opening_play_sound('
+            '"audio/opening/metal_scrape.ogg", channel="opening_foley")',
+            block,
+        )
 
     def test_scene_10_returns_to_subtle_crt_and_shows_exact_notice(self):
         block, _ = block_with_header(self.sequence_source, "label opening_scene_10:")

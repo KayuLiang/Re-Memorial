@@ -35,8 +35,11 @@ label opening_scene_02:
 label opening_scene_03:
     scene black
     call screen opening_water_wait
+    $ opening_play_sound("audio/opening/water_drop_primary.ogg")
     call screen opening_water_drop(auto=True)
+    $ opening_play_sound("audio/opening/water_drop_soft.ogg")
     call screen opening_water_drop(auto=True)
+    $ opening_play_sound("audio/opening/water_drop_soft.ogg")
     call screen opening_water_drop(auto=True)
     jump opening_scene_04
 
@@ -62,14 +65,17 @@ label opening_scene_05:
 label opening_scene_06:
     $ lines = []
 
+    $ opening_play_sound("audio/opening/footsteps_urgent.ogg")
     $ lines.append("一阵急促的脚步声。")
     show screen opening_memory_overlay(lines)
     pause 0.48
 
+    $ opening_play_sound("audio/opening/heavy_impact.ogg")
     $ lines.append("重物落地的闷响。")
     show screen opening_memory_overlay(lines)
     pause 0.52
 
+    $ opening_play_sound("audio/opening/emergency_radio.ogg")
     $ lines.append("“现场安全，患者雄性，意识模糊——”")
     show screen opening_memory_overlay(lines)
     pause 0.72
@@ -126,7 +132,7 @@ label opening_scene_09:
     pause 0.48
 
     $ opening_play_sound("audio/opening/stretcher_wheels.ogg")
-    $ opening_play_sound("audio/opening/metal_scrape.ogg")
+    $ opening_play_sound("audio/opening/metal_scrape.ogg", channel="opening_foley")
     $ lines.append("金属的滚轮快速摩擦地面的叮铃声，担架床吱呀好像就要散架。")
     show screen opening_memory_overlay(lines)
     pause 0.62

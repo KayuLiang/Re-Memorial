@@ -10,12 +10,18 @@ define opening_scope_wave_span = 476
 
 
 init python:
+    renpy.music.register_channel("opening_foley", mixer="sfx", loop=False)
+
     def opening_play_sound(path, channel="sound", loop=False):
         if renpy.loadable(path):
             renpy.music.play(path, channel=channel, loop=loop)
 
     def opening_consent_at_bottom(adjustment):
         return adjustment.range <= 0 or adjustment.value >= adjustment.range - 4
+
+    def opening_consent_adjustment_changed(adjustment, value):
+        if adjustment.range <= 0 or value >= adjustment.range - 4:
+            renpy.restart_interaction()
 
 
 transform opening_scope_scroll(distance=opening_scope_wave_span):
@@ -692,7 +698,7 @@ screen opening_consent_body():
 screen opening_consent_document():
     modal True
     zorder 20
-    default consent_adjustment = ui.adjustment()
+    default consent_adjustment = ui.adjustment(raw_changed=opening_consent_adjustment_changed)
 
     frame:
         style "opening_consent_dialog_frame"
