@@ -16,7 +16,7 @@ transform opening_scope_scroll(distance=opening_scope_wave_span):
 
 
 screen opening_system_desktop(body_screen, body_args=None):
-    zorder 8
+    zorder -10
     $ body_args = tuple(body_args or ())
 
     frame:
@@ -467,7 +467,7 @@ screen opening_disclaimer_two():
 
             textbutton "否":
                 style "opening_disclaimer_button"
-                action MainMenu(confirm=False)
+                action [SetVariable("opening_active", False), MainMenu(confirm=False)]
 
 
 screen opening_tap_to_start():

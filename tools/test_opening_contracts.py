@@ -10,6 +10,9 @@ OPENING_STATS_PATH = GAME_DIR / "opening_stats.rpy"
 CRT_EFFECT_PATH = GAME_DIR / "crt_effect.rpy"
 OPENING_SYSTEM_PATH = GAME_DIR / "screens_opening_system.rpy"
 OPENING_SEQUENCE_PATH = GAME_DIR / "opening_sequence.rpy"
+INVENTORY_SCREENS_PATH = GAME_DIR / "screens_inventory.rpy"
+PHONE_SCREENS_PATH = GAME_DIR / "screens_phone.rpy"
+BASE_SCREENS_PATH = GAME_DIR / "screens.rpy"
 
 
 def function_block(source, function_name):
@@ -705,6 +708,9 @@ class OpeningPreSystemSequenceContractTests(unittest.TestCase):
             if OPENING_SEQUENCE_PATH.is_file()
             else ""
         )
+        self.inventory_source = INVENTORY_SCREENS_PATH.read_text(encoding="utf-8")
+        self.phone_source = PHONE_SCREENS_PATH.read_text(encoding="utf-8")
+        self.base_screens_source = BASE_SCREENS_PATH.read_text(encoding="utf-8")
 
     def test_opening_sequence_file_and_required_labels_exist(self):
         self.assertTrue(
@@ -764,8 +770,9 @@ class OpeningPreSystemSequenceContractTests(unittest.TestCase):
         self.assertIn("show screen opening_disclaimer_one", block)
         self.assertRegex(
             block,
-            r"(pause\s+3(?:\.0)?\s+hard\b|renpy\.pause\(\s*3(?:\.0)?\s*,\s*hard\s*=\s*True\s*\))",
+            r"(pause\s+3(?:\.0)?\s+hard\b|renpy\.pause\(\s*3(?:\.0)?\s*,\s*hard\s*=\s*True\s*,\s*modal\s*=\s*False\s*\))",
         )
+        self.assertIn("modal=False", block)
         self.assertIn("hide screen opening_disclaimer_one", block)
         self.assertNotIn("call screen opening_disclaimer_one", block)
         self.assertNotIn("crt_effect", block)
@@ -780,7 +787,7 @@ class OpeningPreSystemSequenceContractTests(unittest.TestCase):
         self.assertIn('textbutton "是"', screen_block)
         self.assertIn("action Return(True)", screen_block)
         self.assertIn('textbutton "否"', screen_block)
-        self.assertIn("action MainMenu(confirm=False)", screen_block)
+        self.assertIn("MainMenu(confirm=False)", screen_block)
         self.assertIn("call screen opening_disclaimer_two", scene_block)
         self.assertNotIn("crt_effect", screen_block)
         self.assertNotIn("crt_effect", scene_block)
@@ -854,6 +861,91 @@ class OpeningPreSystemSequenceContractTests(unittest.TestCase):
         self.assertIn("call opening_scene_00", block)
         self.assertIn("hide screen crt_effect", block)
         self.assertIn("hide screen opening_system_desktop", block)
+
+    def test_opening_scene_00_pause_uses_modal_false_to_avoid_modal_deadlock(self):
+        block, _ = block_with_header(self.sequence_source, "label opening_scene_00:")
+        self.assertIn("renpy.pause(3.0, hard=True, modal=False)", block)
+
+    def test_opening_system_desktop_uses_negative_zorder_below_dialogue(self):
+        block, _ = block_with_header(
+            self.system_source,
+            "screen opening_system_desktop(body_screen, body_args=None):",
+        )
+        self.assertRegex(block, r"(?m)^\s*zorder\s+-\d+\s*$")
+        self.assertNotIn("zorder 8", block)
+
+    def test_opening_active_has_single_canonical_default(self):
+        all_rpy = "\n".join(
+            path.read_text(encoding="utf-8")
+            for path in sorted(GAME_DIR.glob("*.rpy"))
+        )
+        declarations = re.findall(
+            r"(?m)^\s*default\s+opening_active\s*=\s*(True|False)\s*$",
+            all_rpy,
+        )
+        self.assertEqual(["False"], declarations)
+
+    def test_complete_opening_sequence_sets_and_clears_opening_active(self):
+        block, _ = block_with_header(
+            self.sequence_source,
+            "label complete_opening_sequence:",
+        )
+        self.assertRegex(block, r"(?m)^\s*\$\s*opening_active\s*=\s*True\s*$")
+        self.assertRegex(block, r"(?m)^\s*\$\s*opening_active\s*=\s*False\s*$")
+
+    def test_opening_scene_06_return_path_clears_opening_active(self):
+        block, _ = block_with_header(
+            self.sequence_source,
+            "label opening_scene_06:",
+        )
+        self.assertRegex(block, r"(?m)^\s*\$\s*opening_active\s*=\s*False\s*$")
+
+    def test_scene_01_no_path_clears_opening_active_before_main_menu(self):
+        block, _ = block_with_header(
+            self.system_source,
+            "screen opening_disclaimer_two():",
+        )
+        self.assertIn('SetVariable("opening_active", False)', block)
+        self.assertIn("MainMenu(confirm=False)", block)
+
+    def test_quick_menu_variants_hide_during_opening(self):
+        quick_menu_blocks = []
+        start_line = 0
+
+        while True:
+            try:
+                block, index = block_with_header(
+                    self.base_screens_source,
+                    "screen quick_menu():",
+                    start_line=start_line,
+                )
+            except AssertionError:
+                break
+
+            quick_menu_blocks.append(block)
+            start_line = index + 1
+
+        self.assertEqual(2, len(quick_menu_blocks))
+
+        for block in quick_menu_blocks:
+            with self.subTest(header=block.splitlines()[0]):
+                self.assertRegex(
+                    block,
+                    r"if\s+quick_menu\s+and\s+not\s+opening_active\s*:",
+                )
+
+    def test_inventory_and_phone_overlay_buttons_hide_during_opening(self):
+        inventory_block, _ = block_with_header(
+            self.inventory_source,
+            "screen inventory_button():",
+        )
+        phone_block, _ = block_with_header(
+            self.phone_source,
+            "screen phone_button():",
+        )
+
+        self.assertIn("and not opening_active", inventory_block)
+        self.assertIn("and not opening_active", phone_block)
 
 
 if __name__ == "__main__":

@@ -1,5 +1,10 @@
+default opening_active = False
+
+
 label complete_opening_sequence:
+    $ opening_active = True
     call opening_scene_00
+    $ opening_active = False
     hide screen opening_memory_overlay
     hide screen opening_flash_once
     hide screen crt_effect
@@ -10,7 +15,7 @@ label complete_opening_sequence:
 label opening_scene_00:
     scene black
     show screen opening_disclaimer_one
-    $ renpy.pause(3.0, hard=True)
+    $ renpy.pause(3.0, hard=True, modal=False)
     hide screen opening_disclaimer_one
     jump opening_scene_01
 
@@ -71,6 +76,7 @@ label opening_scene_06:
 
     hide screen opening_memory_overlay
     with Dissolve(0.30)
+    $ opening_active = False
     hide screen crt_effect
     hide screen opening_system_desktop
     return
