@@ -39,33 +39,29 @@ init python:
     def opening_stats_complete():
         return stats_complete(_opening_stat_values())
 
+    def _validate_stat_name(stat_name):
+        if stat_name not in ("con", "str", "dex", "int", "pow"):
+            raise ValueError("Unknown attribute: {!r}".format(stat_name))
+        return stat_name
+
     def get_base_stat(stat_name):
-        store_names = {
+        _validate_stat_name(stat_name)
+        store_name = {
             "con": "stat_con",
             "str": "stat_str",
             "dex": "stat_dex",
             "int": "stat_int",
             "pow": "stat_pow",
-        }
-        try:
-            store_name = store_names[stat_name]
-        except (KeyError, TypeError):
-            raise ValueError("Unknown attribute: {!r}".format(stat_name))
+        }[stat_name]
         return getattr(store, store_name)
 
     def get_effective_stat(stat_name):
         return get_base_stat(stat_name)
 
     def get_attribute_dice(stat_name):
+        _validate_stat_name(stat_name)
         return _get_attribute_dice(stat_name)
 
     def perform_attribute_check(stat_name, energy=1):
-        dice = get_attribute_dice(stat_name)
-        if not dice:
-            return attribute_check_unavailable(stat_name)
-        return {
-            "available": True,
-            "stat": stat_name,
-            "energy": energy,
-            "rolls": tuple(),
-        }
+        _validate_stat_name(stat_name)
+        return attribute_check_unavailable(stat_name)

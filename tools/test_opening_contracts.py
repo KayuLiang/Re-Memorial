@@ -8,8 +8,19 @@ GAME_DIR = PROJECT_DIR / "game"
 OPENING_STATS_PATH = GAME_DIR / "opening_stats.rpy"
 
 
+def function_block(source, function_name):
+    match = re.search(
+        rf"(?ms)^    def {re.escape(function_name)}\s*\([^)]*\):.*?"
+        rf"(?=^    def |\Z)",
+        source,
+    )
+    if match is None:
+        return ""
+    return match.group(0)
+
+
 class OpeningStatsContractTests(unittest.TestCase):
-    def test_stat_defaults_exist_once_and_legacy_defaults_are_removed(self):
+    def test_stat_defaults_have_one_exact_canonical_value(self):
         source = "\n".join(
             path.read_text(encoding="utf-8")
             for path in sorted(GAME_DIR.glob("*.rpy"))
@@ -24,13 +35,11 @@ class OpeningStatsContractTests(unittest.TestCase):
         }
         for stat_name, value in expected_defaults.items():
             with self.subTest(stat_name=stat_name):
-                pattern = rf"(?m)^\s*default\s+stat_{stat_name}\s*=\s*{value}\s*$"
-                self.assertEqual(1, len(re.findall(pattern, source)))
-
-                legacy_pattern = (
-                    rf"(?m)^\s*default\s+stat_{stat_name}\s*=\s*30\s*$"
+                declarations = re.findall(
+                    rf"(?m)^\s*default\s+stat_{stat_name}\s*=\s*(.*?)\s*$",
+                    source,
                 )
-                self.assertNotRegex(source, legacy_pattern)
+                self.assertEqual([str(value)], declarations)
 
     def test_opening_stats_defines_public_wrappers(self):
         self.assertTrue(
@@ -47,6 +56,7 @@ class OpeningStatsContractTests(unittest.TestCase):
             "get_effective_stat",
             "get_attribute_dice",
             "perform_attribute_check",
+            "_validate_stat_name",
         )
 
         for function_name in function_names:
@@ -55,6 +65,31 @@ class OpeningStatsContractTests(unittest.TestCase):
                     source,
                     rf"(?m)^\s*def\s+{function_name}\s*\(",
                 )
+
+    def test_public_stat_readers_validate_names(self):
+        source = OPENING_STATS_PATH.read_text(encoding="utf-8")
+
+        for function_name in (
+            "get_base_stat",
+            "get_attribute_dice",
+            "perform_attribute_check",
+        ):
+            with self.subTest(function_name=function_name):
+                block = function_block(source, function_name)
+                self.assertIn(
+                    "_validate_stat_name(stat_name)",
+                    block,
+                )
+
+    def test_attribute_checks_remain_unavailable(self):
+        source = OPENING_STATS_PATH.read_text(encoding="utf-8")
+        block = function_block(source, "perform_attribute_check")
+
+        self.assertIn(
+            "return attribute_check_unavailable(stat_name)",
+            block,
+        )
+        self.assertNotIn('"available": True', source)
 
 
 if __name__ == "__main__":
