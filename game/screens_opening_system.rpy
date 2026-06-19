@@ -6,11 +6,12 @@ define opening_color_border = "#5b8db8"
 define opening_color_border_dark = "#315f88"
 define opening_color_paper = "#e7e4d9"
 define opening_color_phosphor = "#a8c7aa"
+define opening_scope_wave_span = 476
 
 
-transform opening_scope_scroll:
+transform opening_scope_scroll(distance=opening_scope_wave_span):
     xoffset 0
-    linear 4.8 xoffset -520
+    linear 4.8 xoffset -distance
     repeat
 
 
@@ -162,23 +163,23 @@ screen opening_oscilloscope():
                 add Solid(opening_color_phosphor + "24") xpos x ypos 54 xsize 1 ysize 180
 
             for y in range(54, 235, 24):
-                add Solid(opening_color_phosphor + "20") xpos 18 ypos y xsize 452 ysize 1
+                add Solid(opening_color_phosphor + "20") xpos 18 ypos y xsize 450 ysize 1
 
             viewport:
                 xpos 18
                 ypos 70
-                xsize 452
+                xsize 450
                 ysize 102
                 draggable False
                 mousewheel False
                 clipping True
 
                 fixed:
-                    xsize 960
+                    xsize opening_scope_wave_span * 2
                     ysize 102
 
                     text "▁▁▂▅▂▁▁▁▂▆▂▁▁▁▂▅▂▁▁▁▂▇▂▁▁▁▂▅▂▁▁▁▂▆▂▁▁▁▂▅▂▁▁▁▂▇▂▁" style "opening_shell_scope_wave_text" at opening_scope_scroll
-                    text "▁▁▂▅▂▁▁▁▂▆▂▁▁▁▂▅▂▁▁▁▂▇▂▁▁▁▂▅▂▁▁▁▂▆▂▁▁▁▂▅▂▁▁▁▂▇▂▁" style "opening_shell_scope_wave_text" xpos 476 at opening_scope_scroll
+                    text "▁▁▂▅▂▁▁▁▂▆▂▁▁▁▂▅▂▁▁▁▂▇▂▁▁▁▂▅▂▁▁▁▂▆▂▁▁▁▂▅▂▁▁▁▂▇▂▁" style "opening_shell_scope_wave_text" xpos opening_scope_wave_span at opening_scope_scroll
 
             hbox:
                 xpos 18
@@ -198,7 +199,6 @@ screen opening_shell_preview_body():
 
         frame:
             style "opening_shell_preview_paper_frame"
-            background Solid(opening_color_paper)
 
             vbox:
                 spacing 16
@@ -386,9 +386,9 @@ style opening_shell_taskbar_program_text is gui_text:
     color "#dde8ee"
 
 style opening_shell_taskbar_status_text is gui_text:
-    size 14
+    size 11
     color "#b8c7d2"
 
 style opening_shell_taskbar_time_text is gui_text:
-    size 16
+    size 14
     color "#e7eff5"

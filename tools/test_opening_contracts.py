@@ -174,6 +174,16 @@ def parse_style_tuple(block, property_name):
     return tuple(parsed)
 
 
+def parse_define_scalar(source, definition_name):
+    match = re.search(
+        rf"(?m)^\s*define\s+{re.escape(definition_name)}\s*=\s*(.+?)\s*$",
+        source,
+    )
+    if match is None:
+        raise AssertionError(f"define {definition_name} = not found")
+    return ast.literal_eval(match.group(1).strip())
+
+
 class OpeningStatsContractTests(unittest.TestCase):
     def test_stat_defaults_have_one_exact_canonical_value(self):
         source = "\n".join(
@@ -515,7 +525,7 @@ class OpeningSystemShellContractTests(unittest.TestCase):
             "screen opening_window_frame(title, body_screen, body_args=None):",
             "screen opening_oscilloscope():",
             "screen opening_shell_preview_body():",
-            "transform opening_scope_scroll:",
+            "transform opening_scope_scroll(distance=opening_scope_wave_span):",
         )
 
         for fragment in expected_fragments:
@@ -534,7 +544,11 @@ class OpeningSystemShellContractTests(unittest.TestCase):
         )
         self.assertRegex(
             window_block,
-            r"(?m)^\s*use\s+expression\s+body_screen\s+pass\s+\((?:\*{1,2})body_args\)\s*$",
+            r"(?m)^\s*use\s+expression\s+body_screen\s+pass\s+\(\*body_args\)\s*$",
+        )
+        self.assertNotRegex(
+            window_block,
+            r"(?m)^\s*use\s+expression\s+body_screen\s+pass\s+\(\*\*body_args\)\s*$",
         )
         self.assertNotIn("len(body_args)", window_block)
         self.assertNotIn("暂不支持超过四个", window_block)
@@ -587,6 +601,22 @@ class OpeningSystemShellContractTests(unittest.TestCase):
             self.source,
             "screen opening_system_desktop(body_screen, body_args=None):",
         )
+        taskbar_style_block, _ = block_with_header(
+            self.source,
+            "style opening_shell_taskbar_frame is frame:",
+        )
+        taskbar_content_style_block, _ = block_with_header(
+            self.source,
+            "style opening_shell_taskbar_content_frame is frame:",
+        )
+        time_style_block, _ = block_with_header(
+            self.source,
+            "style opening_shell_taskbar_time_text is gui_text:",
+        )
+        status_style_block, _ = block_with_header(
+            self.source,
+            "style opening_shell_taskbar_status_text is gui_text:",
+        )
 
         highlight_lines = re.findall(
             r'(?m)^\s*add Solid\([^)\n]+\)\s+xpos 0 ypos 0 xsize config\.screen_width ysize 2\s*$',
@@ -600,6 +630,11 @@ class OpeningSystemShellContractTests(unittest.TestCase):
         self.assertIn('text "⊕"', desktop_block)
         self.assertIn('text "特殊治疗管理系统"', desktop_block)
         self.assertIn('text "13:30"', desktop_block)
+        self.assertEqual((44,), parse_style_tuple(taskbar_style_block, "ysize"))
+        self.assertEqual((14, 6, 14, 6), parse_style_tuple(taskbar_content_style_block, "padding"))
+        time_size = parse_style_tuple(time_style_block, "size")[0]
+        status_size = parse_style_tuple(status_style_block, "size")[0]
+        self.assertLessEqual(time_size + status_size, 32)
 
     def test_preview_body_keeps_paper_placeholder_and_scope_signature(self):
         preview_block, _ = block_with_header(
@@ -611,8 +646,9 @@ class OpeningSystemShellContractTests(unittest.TestCase):
             "style opening_shell_preview_paper_frame is frame:",
         )
 
-        self.assertIn("opening_color_paper", preview_block)
         self.assertIn("use opening_oscilloscope", preview_block)
+        self.assertNotIn("background Solid(opening_color_paper)", preview_block)
+        self.assertIn("background Solid(opening_color_paper)", paper_style_block)
         paper_width = parse_style_tuple(paper_style_block, "xsize")
         self.assertEqual((1030,), paper_width)
 
@@ -626,6 +662,35 @@ class OpeningSystemShellContractTests(unittest.TestCase):
         self.assertIn('text "HR', scope_block)
         self.assertIn('text "SpO2', scope_block)
         self.assertIn('text "GAIN', scope_block)
+
+    def test_scope_wave_span_constant_drives_scroll_and_duplicate_segment(self):
+        transform_block, _ = block_with_header(
+            self.source,
+            "transform opening_scope_scroll(distance=opening_scope_wave_span):",
+        )
+        scope_block, _ = block_with_header(
+            self.source,
+            "screen opening_oscilloscope():",
+        )
+        wave_span = parse_define_scalar(self.source, "opening_scope_wave_span")
+
+        self.assertEqual(476, wave_span)
+        self.assertIn("linear 4.8 xoffset -distance", transform_block)
+        self.assertIn("xpos opening_scope_wave_span", scope_block)
+        self.assertIn("xsize opening_scope_wave_span * 2", scope_block)
+
+    def test_scope_geometry_uses_consistent_450_pixel_budget(self):
+        scope_block, _ = block_with_header(
+            self.source,
+            "screen opening_oscilloscope():",
+        )
+
+        self.assertIn("xsize 450", scope_block)
+        self.assertIn("xpos 18", scope_block)
+        self.assertIn("xsize 450 ysize 1", scope_block)
+        self.assertIn("xpos 18", scope_block)
+        self.assertIn("xsize opening_scope_wave_span * 2", scope_block)
+        self.assertNotIn("xsize 452", scope_block)
 
     def test_opening_shell_does_not_depend_on_legacy_medical_wave_scroll(self):
         self.assertNotIn("medical_wave_scroll", self.source)
