@@ -392,3 +392,270 @@ style opening_shell_taskbar_status_text is gui_text:
 style opening_shell_taskbar_time_text is gui_text:
     size 14
     color "#e7eff5"
+
+
+transform opening_prompt_blink:
+    alpha 0.28
+    linear 0.28 alpha 1.0
+    linear 0.28 alpha 0.28
+    repeat
+
+
+transform opening_loading_soft_pulse(delay=0.0):
+    alpha 0.2
+    pause delay
+    linear 0.24 alpha 1.0
+    linear 0.44 alpha 0.2
+    pause 0.24
+    repeat
+
+
+transform opening_drop_fall:
+    xalign 0.5
+    ypos -72
+    alpha 0.0
+    linear 0.08 alpha 1.0
+    linear 0.48 ypos 484
+    linear 0.06 alpha 0.0
+
+
+transform opening_ripple_expand:
+    xalign 0.5
+    ypos 474
+    alpha 0.0
+    zoom 0.18
+    pause 0.46
+    linear 0.06 alpha 0.82 zoom 0.34
+    linear 0.42 alpha 0.0 zoom 2.15
+
+
+screen opening_disclaimer_one():
+    modal True
+
+    add Solid("#000000")
+
+    text (
+        "【免责声明】\n\n"
+        "本作品为虚构故事。作品中的人物、团体、事件、医疗与心理描写均经过艺术加工；若与现实相似，均属巧合。\n\n"
+        "本作品涉及精神疾病、创伤记忆、失忆、血腥暴力、自伤意念、死亡及其他可能引起不适的内容。相关描写不构成医学、心理、法律或其他专业建议，也不应在现实中模仿或尝试。"
+    ) style "opening_disclaimer_text"
+
+
+screen opening_disclaimer_two():
+    modal True
+
+    add Solid("#000000")
+
+    vbox:
+        xalign 0.5
+        yalign 0.5
+        xsize 1320
+        spacing 42
+
+        text (
+            "本作品包含闪烁画面、快速转场、画面抖动、强对比图像等视觉刺激。若您曾有癫痫、晕厥、光敏反应或相关病史，请在游玩前咨询专业医师。游玩中如出现头晕、恶心、视物异常、抽搐、意识模糊或其他不适，请立即停止游玩并寻求帮助。\n\n"
+            "继续游玩即表示您已阅读并理解以上内容。"
+        ) style "opening_disclaimer_text"
+
+        hbox:
+            xalign 0.5
+            spacing 28
+
+            textbutton "是":
+                style "opening_disclaimer_button"
+                action Return(True)
+
+            textbutton "否":
+                style "opening_disclaimer_button"
+                action MainMenu(confirm=False)
+
+
+screen opening_tap_to_start():
+    modal True
+
+    add Solid("#000000")
+
+    button:
+        style "opening_clear_fullscreen_button"
+        action Return()
+
+    key "dismiss" action Return()
+
+    text "TAP TO START" at opening_prompt_blink:
+        style "opening_tap_prompt_text"
+
+
+screen opening_water_wait():
+    modal True
+
+    add Solid("#000000")
+
+    button:
+        style "opening_clear_fullscreen_button"
+        action Return()
+
+    key "dismiss" action Return()
+
+
+screen opening_water_drop(auto=True):
+    modal True
+
+    add Solid("#000000")
+
+    if auto:
+        timer 1.10 action Return()
+    else:
+        button:
+            style "opening_clear_fullscreen_button"
+            action Return()
+        key "dismiss" action Return()
+
+    text "●" at opening_drop_fall:
+        style "opening_water_drop_text"
+
+    text "○" at opening_ripple_expand:
+        style "opening_water_ripple_text"
+
+
+screen opening_flash_once():
+    zorder 120
+    add Solid("#ffffff")
+
+
+screen opening_memory_overlay(lines):
+    zorder 30
+
+    add Solid("#00000080")
+
+    vbox:
+        xalign 0.5
+        yalign 0.5
+        xsize 1280
+        spacing 18
+
+        for line in lines:
+            text line style "opening_memory_text"
+
+
+screen opening_loading_body():
+    hbox:
+        xfill True
+        yfill True
+        spacing 24
+
+        frame:
+            style "opening_loading_panel_frame"
+
+            vbox:
+                xfill True
+                yfill True
+                spacing 20
+
+                text "SYSTEM INITIAL LOAD" style "opening_loading_heading_text"
+
+                text "正在建立神经恢复链路。" style "opening_loading_body_text"
+                text "正在同步基础生命体征。" style "opening_loading_body_text"
+                text "正在加载记忆缓冲区……" style "opening_loading_body_text"
+
+                hbox:
+                    spacing 10
+
+                    text "■" at opening_loading_soft_pulse(0.00):
+                        style "opening_loading_indicator_text"
+
+                    text "■" at opening_loading_soft_pulse(0.12):
+                        style "opening_loading_indicator_text"
+
+                    text "■" at opening_loading_soft_pulse(0.24):
+                        style "opening_loading_indicator_text"
+
+                text "LOADING / LINKING / STABILIZING" style "opening_loading_status_text"
+
+        use opening_oscilloscope
+
+
+style opening_disclaimer_text is gui_text:
+    xalign 0.5
+    yalign 0.5
+    text_align 0.5
+    size 30
+    color "#f2f2f2"
+    line_spacing 10
+    xsize 1380
+    outlines [(2, "#000000", 0, 0)]
+
+style opening_disclaimer_button is button:
+    background Solid("#1f1f1f")
+    hover_background Solid("#343434")
+    xminimum 180
+    yminimum 62
+    padding (24, 12, 24, 12)
+
+style opening_disclaimer_button_text is gui_text:
+    size 28
+    color "#f8f8f8"
+    xalign 0.5
+    yalign 0.5
+
+style opening_clear_fullscreen_button is button:
+    background None
+    hover_background None
+    xfill True
+    yfill True
+    padding (0, 0, 0, 0)
+
+style opening_tap_prompt_text is gui_text:
+    xalign 0.5
+    yalign 0.5
+    size 54
+    color "#f3f3f3"
+    bold True
+    kerning 8
+    outlines [(3, "#000000", 0, 0)]
+
+style opening_water_drop_text is gui_text:
+    size 48
+    color "#f1f1f1"
+    outlines [(2, "#000000", 0, 0)]
+
+style opening_water_ripple_text is gui_text:
+    size 64
+    color "#d7d7d7"
+    outlines [(2, "#000000", 0, 0)]
+
+# SourceHanSansLite does not include 楷体, so this uses italic + wider kerning
+# and a softened gray-white color to approximate a drifting memory script.
+style opening_memory_text is gui_text:
+    size 33
+    color "#d8d2ca"
+    italic True
+    kerning 2
+    text_align 0.5
+    xalign 0.5
+    outlines [(2, "#00000060", 0, 0)]
+
+style opening_loading_panel_frame is frame:
+    xsize 910
+    yfill True
+    background Solid("#d8ddd8")
+    padding (34, 30, 34, 30)
+
+style opening_loading_heading_text is gui_text:
+    size 34
+    color "#5c6261"
+    bold True
+    kerning 2
+
+style opening_loading_body_text is gui_text:
+    size 24
+    color "#666d6a"
+    line_spacing 4
+
+style opening_loading_indicator_text is gui_text:
+    size 30
+    color "#909694"
+
+style opening_loading_status_text is gui_text:
+    size 21
+    color "#7c8380"
+    kerning 2

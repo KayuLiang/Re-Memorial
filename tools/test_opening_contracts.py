@@ -9,6 +9,7 @@ GAME_DIR = PROJECT_DIR / "game"
 OPENING_STATS_PATH = GAME_DIR / "opening_stats.rpy"
 CRT_EFFECT_PATH = GAME_DIR / "crt_effect.rpy"
 OPENING_SYSTEM_PATH = GAME_DIR / "screens_opening_system.rpy"
+OPENING_SEQUENCE_PATH = GAME_DIR / "opening_sequence.rpy"
 
 
 def function_block(source, function_name):
@@ -694,6 +695,165 @@ class OpeningSystemShellContractTests(unittest.TestCase):
 
     def test_opening_shell_does_not_depend_on_legacy_medical_wave_scroll(self):
         self.assertNotIn("medical_wave_scroll", self.source)
+
+
+class OpeningPreSystemSequenceContractTests(unittest.TestCase):
+    def setUp(self):
+        self.system_source = OPENING_SYSTEM_PATH.read_text(encoding="utf-8")
+        self.sequence_source = (
+            OPENING_SEQUENCE_PATH.read_text(encoding="utf-8")
+            if OPENING_SEQUENCE_PATH.is_file()
+            else ""
+        )
+
+    def test_opening_sequence_file_and_required_labels_exist(self):
+        self.assertTrue(
+            OPENING_SEQUENCE_PATH.is_file(),
+            "game/opening_sequence.rpy must exist",
+        )
+
+        for label_name in (
+            "complete_opening_sequence",
+            "opening_scene_00",
+            "opening_scene_01",
+            "opening_scene_02",
+            "opening_scene_03",
+            "opening_scene_04",
+            "opening_scene_05",
+            "opening_scene_06",
+        ):
+            with self.subTest(label_name=label_name):
+                self.assertIn(f"label {label_name}:", self.sequence_source)
+
+        for absent_label in (
+            "opening_scene_07",
+            "opening_scene_08",
+            "opening_scene_09",
+            "opening_scene_10",
+            "opening_scene_11",
+            "opening_scene_12",
+            "opening_scene_13",
+            "opening_scene_14",
+        ):
+            with self.subTest(absent_label=absent_label):
+                self.assertNotIn(f"label {absent_label}:", self.sequence_source)
+
+    def test_required_opening_text_is_present_exactly(self):
+        expected_fragments = (
+            "【免责声明】",
+            "本作品为虚构故事。作品中的人物、团体、事件、医疗与心理描写均经过艺术加工；若与现实相似，均属巧合。",
+            "本作品涉及精神疾病、创伤记忆、失忆、血腥暴力、自伤意念、死亡及其他可能引起不适的内容。相关描写不构成医学、心理、法律或其他专业建议，也不应在现实中模仿或尝试。",
+            "本作品包含闪烁画面、快速转场、画面抖动、强对比图像等视觉刺激。若您曾有癫痫、晕厥、光敏反应或相关病史，请在游玩前咨询专业医师。游玩中如出现头晕、恶心、视物异常、抽搐、意识模糊或其他不适，请立即停止游玩并寻求帮助。",
+            "继续游玩即表示您已阅读并理解以上内容。",
+            "TAP TO START",
+            "弗洛，弗洛——",
+            'fro "我听到有人在叫我的名字。"',
+            "一阵急促的脚步声。",
+            "重物落地的闷响。",
+            "“现场安全，患者雄性，意识模糊——”",
+        )
+
+        combined = self.system_source + "\n" + self.sequence_source
+
+        for fragment in expected_fragments:
+            with self.subTest(fragment=fragment):
+                self.assertIn(fragment, combined)
+
+    def test_opening_scene_00_uses_show_pause_hide_without_crt(self):
+        block, _ = block_with_header(self.sequence_source, "label opening_scene_00:")
+        self.assertIn("show screen opening_disclaimer_one", block)
+        self.assertRegex(
+            block,
+            r"(pause\s+3(?:\.0)?\s+hard\b|renpy\.pause\(\s*3(?:\.0)?\s*,\s*hard\s*=\s*True\s*\))",
+        )
+        self.assertIn("hide screen opening_disclaimer_one", block)
+        self.assertNotIn("call screen opening_disclaimer_one", block)
+        self.assertNotIn("crt_effect", block)
+
+    def test_opening_scene_01_routes_no_to_main_menu_and_keeps_crt_off(self):
+        screen_block, _ = block_with_header(
+            self.system_source,
+            "screen opening_disclaimer_two():",
+        )
+        scene_block, _ = block_with_header(self.sequence_source, "label opening_scene_01:")
+
+        self.assertIn('textbutton "是"', screen_block)
+        self.assertIn("action Return(True)", screen_block)
+        self.assertIn('textbutton "否"', screen_block)
+        self.assertIn("action MainMenu(confirm=False)", screen_block)
+        self.assertIn("call screen opening_disclaimer_two", scene_block)
+        self.assertNotIn("crt_effect", screen_block)
+        self.assertNotIn("crt_effect", scene_block)
+
+    def test_tap_to_start_supports_keyboard_and_mouse(self):
+        screen_block, _ = block_with_header(
+            self.system_source,
+            "screen opening_tap_to_start():",
+        )
+
+        self.assertIn('key "dismiss" action Return()', screen_block)
+        self.assertRegex(
+            screen_block,
+            r'(?m)^\s*(mousearea|button):\s*$',
+        )
+        self.assertIn("action Return()", screen_block)
+
+    def test_opening_scene_03_waits_once_then_plays_three_drops(self):
+        scene_block, _ = block_with_header(self.sequence_source, "label opening_scene_03:")
+
+        self.assertIn("call screen opening_water_wait", scene_block)
+        self.assertEqual(
+            3,
+            scene_block.count("call screen opening_water_drop(auto=True)"),
+        )
+        self.assertNotIn("call screen opening_water_drop(auto=False)", scene_block)
+
+    def test_scene_05_shows_loading_body_and_subtle_crt(self):
+        scene_block, _ = block_with_header(self.sequence_source, "label opening_scene_05:")
+        self.assertIn(
+            'show screen opening_system_desktop("opening_loading_body")',
+            scene_block,
+        )
+        self.assertIn('show screen crt_effect(mode="subtle")', scene_block)
+
+    def test_required_pre_system_screens_exist(self):
+        for header in (
+            "screen opening_disclaimer_one():",
+            "screen opening_disclaimer_two():",
+            "screen opening_tap_to_start():",
+            "screen opening_water_wait():",
+            "screen opening_water_drop(auto=True):",
+            "screen opening_memory_overlay(lines):",
+            "screen opening_loading_body():",
+        ):
+            with self.subTest(header=header):
+                self.assertIn(header, self.system_source)
+
+    def test_memory_overlay_uses_half_black_mask_and_accumulates_lines(self):
+        overlay_block, _ = block_with_header(
+            self.system_source,
+            "screen opening_memory_overlay(lines):",
+        )
+        scene_block, _ = block_with_header(self.sequence_source, "label opening_scene_06:")
+
+        self.assertIn('add Solid("#00000080")', overlay_block)
+        self.assertIn("for line in lines:", overlay_block)
+        self.assertIn("text line", overlay_block)
+        self.assertEqual(3, scene_block.count("lines.append("))
+        self.assertGreaterEqual(
+            scene_block.count("show screen opening_memory_overlay(lines)"),
+            3,
+        )
+
+    def test_complete_sequence_temporarily_cleans_up_crt_and_system_screens(self):
+        block, _ = block_with_header(
+            self.sequence_source,
+            "label complete_opening_sequence:",
+        )
+
+        self.assertIn("call opening_scene_00", block)
+        self.assertIn("hide screen crt_effect", block)
+        self.assertIn("hide screen opening_system_desktop", block)
 
 
 if __name__ == "__main__":
