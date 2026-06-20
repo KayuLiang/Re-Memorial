@@ -14,25 +14,10 @@ default ami_affection = 0
 
 label start:
 
-    scene black
+    jump complete_opening_sequence
 
-    centered "大病初愈"
 
-    show screen medical_system_panel(stage="name")
-
-    system "（滋滋的电流声）您好，这里是市立精神卫生中心服务系统，请问您还记得自己的姓名吗？"
-
-    $ player_name = "弗洛"
-
-    system "请根据系统提示，继续完善个人基本信息收集。"
-
-    hide screen medical_system_panel
-    show screen medical_system_panel(stage="confirm")
-    call screen medical_confirm
-
-    system "感谢您的配合，正在为您转接至医疗单元，请耐心等候——（滋滋的电流声）"
-
-    hide screen medical_system_panel
+label mountain_memory_start:
 
     wind "听北地的牧民说，如果在日出的时候在神山顶上向山神许愿，山神就会实现信徒的全部愿望。弗洛，等我们放假了，也去神山玩吧！"
 

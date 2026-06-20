@@ -3,13 +3,7 @@ default opening_active = False
 
 label complete_opening_sequence:
     $ opening_active = True
-    call opening_scene_00
-    $ opening_active = False
-    hide screen opening_memory_overlay
-    hide screen opening_flash_once
-    hide screen crt_effect
-    hide screen opening_system_desktop
-    return
+    jump opening_scene_00
 
 
 label opening_scene_00:
@@ -191,9 +185,62 @@ label opening_scene_12:
     system "个人信息确认无误后，请长按‘确认’按钮完成签名。"
     call screen opening_identity_document
 
+    jump opening_scene_13
+
+
+label opening_scene_13:
+    show screen crt_effect(mode="interference")
+    show screen opening_system_desktop("opening_verification_body", ("核验通过。", 35))
+    pause 0.35
+    show screen opening_system_desktop("opening_verification_body", ("医疗单元已就位。", 72))
+    pause 0.35
+    show screen opening_system_desktop("opening_verification_body", ("意识将在 3 秒内重启。", 100))
+    pause 0.35
+
+    hide screen crt_effect
+    show screen crt_effect(mode="shutdown")
+    pause 0.45
+
+    hide screen opening_verification_body
+    hide screen opening_system_desktop
     hide screen opening_memory_overlay
     hide screen opening_flash_once
+    hide screen opening_countdown
     hide screen crt_effect
+    scene black
+    jump opening_scene_14
+
+
+label opening_scene_14:
+    scene black
+    show screen opening_countdown(3)
+    pause 0.8
+    hide screen opening_countdown
+    show screen opening_countdown(2)
+    pause 0.8
+    hide screen opening_countdown
+    show screen opening_countdown(1)
+    pause 0.8
+    hide screen opening_countdown
+
+    scene black
+    $ renpy.pause(2.5, hard=True, modal=False)
+
+    hide screen opening_disclaimer_one
+    hide screen opening_disclaimer_two
+    hide screen opening_tap_to_start
+    hide screen opening_water_wait
+    hide screen opening_water_drop
+    hide screen opening_countdown
+    hide screen opening_memory_overlay
+    hide screen opening_flash_once
+    hide screen opening_consent_document
+    hide screen opening_name_insert
+    hide screen opening_date_insert
+    hide screen opening_identity_document
+    hide screen opening_verification_body
     hide screen opening_system_desktop
     $ opening_active = False
-    return
+    hide screen crt_effect
+    $ renpy.restart_interaction()
+    jump mountain_memory_start

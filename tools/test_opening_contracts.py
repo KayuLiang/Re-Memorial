@@ -11,6 +11,8 @@ OPENING_STATS_PATH = GAME_DIR / "opening_stats.rpy"
 CRT_EFFECT_PATH = GAME_DIR / "crt_effect.rpy"
 OPENING_SYSTEM_PATH = GAME_DIR / "screens_opening_system.rpy"
 OPENING_SEQUENCE_PATH = GAME_DIR / "opening_sequence.rpy"
+SCRIPT_PATH = GAME_DIR / "script.rpy"
+MEDICAL_SCREENS_PATH = GAME_DIR / "screens_medical.rpy"
 OPENING_AUDIO_README_PATH = GAME_DIR / "audio" / "opening" / "README.md"
 INVENTORY_SCREENS_PATH = GAME_DIR / "screens_inventory.rpy"
 PHONE_SCREENS_PATH = GAME_DIR / "screens_phone.rpy"
@@ -735,16 +737,11 @@ class OpeningPreSystemSequenceContractTests(unittest.TestCase):
             "opening_scene_10",
             "opening_scene_11",
             "opening_scene_12",
-        ):
-            with self.subTest(label_name=label_name):
-                self.assertIn(f"label {label_name}:", self.sequence_source)
-
-        for absent_label in (
             "opening_scene_13",
             "opening_scene_14",
         ):
-            with self.subTest(absent_label=absent_label):
-                self.assertNotIn(f"label {absent_label}:", self.sequence_source)
+            with self.subTest(label_name=label_name):
+                self.assertIn(f"label {label_name}:", self.sequence_source)
 
     def test_required_opening_text_is_present_exactly(self):
         expected_fragments = (
@@ -854,15 +851,16 @@ class OpeningPreSystemSequenceContractTests(unittest.TestCase):
             3,
         )
 
-    def test_complete_sequence_temporarily_cleans_up_crt_and_system_screens(self):
+    def test_complete_sequence_sets_active_and_jumps_to_scene_zero(self):
         block, _ = block_with_header(
             self.sequence_source,
             "label complete_opening_sequence:",
         )
 
-        self.assertIn("call opening_scene_00", block)
-        self.assertIn("hide screen crt_effect", block)
-        self.assertIn("hide screen opening_system_desktop", block)
+        self.assertEqual(
+            ["$ opening_active = True", "jump opening_scene_00"],
+            direct_child_lines(block),
+        )
 
     def test_opening_scene_00_pause_uses_modal_false_to_avoid_modal_deadlock(self):
         block, _ = block_with_header(self.sequence_source, "label opening_scene_00:")
@@ -887,13 +885,14 @@ class OpeningPreSystemSequenceContractTests(unittest.TestCase):
         )
         self.assertEqual(["False"], declarations)
 
-    def test_complete_opening_sequence_sets_and_clears_opening_active(self):
+    def test_complete_opening_sequence_does_not_call_return_or_clear_active(self):
         block, _ = block_with_header(
             self.sequence_source,
             "label complete_opening_sequence:",
         )
         self.assertRegex(block, r"(?m)^\s*\$\s*opening_active\s*=\s*True\s*$")
-        self.assertRegex(block, r"(?m)^\s*\$\s*opening_active\s*=\s*False\s*$")
+        self.assertNotIn("opening_active = False", block)
+        self.assertNotRegex(block, r"(?m)^\s*(call|return)\b")
 
     def test_opening_scene_06_continues_without_cleaning_desktop_or_crt(self):
         block, _ = block_with_header(
@@ -1156,7 +1155,7 @@ class OpeningMedicalConsentContractTests(unittest.TestCase):
             re.findall(r"[一二三四五六]、", self.system_source),
         )
 
-    def test_scene_flow_runs_sequentially_from_six_through_twelve(self):
+    def test_scene_flow_runs_sequentially_from_six_through_fourteen(self):
         expected_jumps = {
             "opening_scene_06": "opening_scene_07",
             "opening_scene_07": "opening_scene_08",
@@ -1164,13 +1163,18 @@ class OpeningMedicalConsentContractTests(unittest.TestCase):
             "opening_scene_09": "opening_scene_10",
             "opening_scene_10": "opening_scene_11",
             "opening_scene_11": "opening_scene_12",
+            "opening_scene_12": "opening_scene_13",
+            "opening_scene_13": "opening_scene_14",
         }
         for scene, destination in expected_jumps.items():
             with self.subTest(scene=scene):
                 block, _ = block_with_header(self.sequence_source, f"label {scene}:")
                 self.assertIn(f"jump {destination}", block)
-        self.assertIn("label opening_scene_12:", self.sequence_source)
-        self.assertNotIn("label opening_scene_13:", self.sequence_source)
+        scene_14, _ = block_with_header(
+            self.sequence_source,
+            "label opening_scene_14:",
+        )
+        self.assertIn("jump mountain_memory_start", scene_14)
 
     def test_scene_07_strengthens_crt_plays_burst_and_presents_both_notices(self):
         block, _ = block_with_header(self.sequence_source, "label opening_scene_07:")
@@ -1361,7 +1365,7 @@ class OpeningMedicalConsentContractTests(unittest.TestCase):
         self.assertEqual(sorted(positions), positions)
         self.assertGreaterEqual(block.count("pause 0."), 2)
 
-    def test_scene_12_temporarily_cleans_up_only_after_signature(self):
+    def test_scene_12_jumps_to_verification_without_cleanup_or_return(self):
         block, _ = block_with_header(self.sequence_source, "label opening_scene_12:")
         signature_position = block.index("call screen opening_identity_document")
         cleanup_lines = (
@@ -1374,9 +1378,8 @@ class OpeningMedicalConsentContractTests(unittest.TestCase):
         )
         for cleanup in cleanup_lines:
             with self.subTest(cleanup=cleanup):
-                self.assertIn(cleanup, block)
-                self.assertGreater(block.index(cleanup), signature_position)
-        self.assertNotIn("jump opening_scene_13", block)
+                self.assertNotIn(cleanup, block)
+        self.assertGreater(block.index("jump opening_scene_13"), signature_position)
 
     def test_identity_screens_use_native_inserts_and_required_personal_fields(self):
         for header in (
@@ -1602,6 +1605,158 @@ class OpeningMedicalConsentContractTests(unittest.TestCase):
                     self.system_source,
                     rf"(?m)^style\s+{re.escape(style_name)}\b",
                 )
+
+
+class OpeningHandoffContractTests(unittest.TestCase):
+    def setUp(self):
+        self.system_source = OPENING_SYSTEM_PATH.read_text(encoding="utf-8")
+        self.sequence_source = OPENING_SEQUENCE_PATH.read_text(encoding="utf-8")
+        self.script_source = SCRIPT_PATH.read_text(encoding="utf-8")
+
+    def test_start_only_jumps_to_complete_opening_sequence(self):
+        block, _ = block_with_header(self.script_source, "label start:")
+        self.assertEqual(
+            ["jump complete_opening_sequence"],
+            direct_child_lines(block),
+        )
+
+    def test_verification_and_countdown_screens_exist(self):
+        verification, _ = block_with_header(
+            self.system_source,
+            "screen opening_verification_body(status_text, progress):",
+        )
+        countdown, _ = block_with_header(
+            self.system_source,
+            "screen opening_countdown(number):",
+        )
+
+        self.assertIn("text status_text", verification)
+        self.assertIn("StaticValue(progress, 100.0)", verification)
+        self.assertIn("use opening_oscilloscope", verification)
+        self.assertNotIn("opening_system_desktop", verification)
+        self.assertIn('add Solid("#000000")', countdown)
+        self.assertIn("text number", countdown)
+        self.assertRegex(countdown, r"(?m)^\s*size\s+(?:[7-9]\d|1\d\d)\s*$")
+        self.assertRegex(countdown, r'(?m)^\s*color\s+"#(?:fff|ffffff)"\s*$')
+
+    def test_scene_13_runs_exact_verification_progress_and_crt_transition(self):
+        block, _ = block_with_header(
+            self.sequence_source,
+            "label opening_scene_13:",
+        )
+        ordered = (
+            'show screen crt_effect(mode="interference")',
+            '"核验通过。", 35',
+            '"医疗单元已就位。", 72',
+            '"意识将在 3 秒内重启。", 100',
+            "hide screen crt_effect",
+            'show screen crt_effect(mode="shutdown")',
+            "hide screen opening_system_desktop",
+            "hide screen crt_effect",
+            "scene black",
+            "jump opening_scene_14",
+        )
+        cursor = 0
+        for fragment in ordered:
+            with self.subTest(fragment=fragment):
+                position = block.index(fragment, cursor)
+                cursor = position + len(fragment)
+
+        self.assertEqual(
+            3,
+            block.count(
+                'show screen opening_system_desktop("opening_verification_body"'
+            ),
+        )
+        self.assertRegex(block, r"pause\s+0\.45\b")
+        self.assertNotIn("opening_active = False", block)
+        self.assertNotRegex(block, r"(?m)^\s*return\s*$")
+        for screen_name in (
+            "opening_verification_body",
+            "opening_memory_overlay",
+            "opening_flash_once",
+            "opening_countdown",
+        ):
+            with self.subTest(screen_name=screen_name):
+                self.assertIn(f"hide screen {screen_name}", block)
+
+    def test_scene_14_is_black_numeric_countdown_then_hard_silent_handoff(self):
+        block, _ = block_with_header(
+            self.sequence_source,
+            "label opening_scene_14:",
+        )
+        ordered = (
+            "scene black",
+            "show screen opening_countdown(3)",
+            "hide screen opening_countdown",
+            "show screen opening_countdown(2)",
+            "hide screen opening_countdown",
+            "show screen opening_countdown(1)",
+            "hide screen opening_countdown",
+            "scene black",
+            "renpy.pause(2.5, hard=True, modal=False)",
+            "opening_active = False",
+            "jump mountain_memory_start",
+        )
+        cursor = 0
+        for fragment in ordered:
+            with self.subTest(fragment=fragment):
+                position = block.index(fragment, cursor)
+                cursor = position + len(fragment)
+
+        for number in (3, 2, 1):
+            with self.subTest(number=number):
+                self.assertEqual(
+                    1,
+                    block.count(f"show screen opening_countdown({number})"),
+                )
+        self.assertEqual(3, len(re.findall(r"(?m)^\s*pause\s+0\.8\s*$", block)))
+        self.assertNotRegex(block, r"(?m)^\s*(show|image)\s+(?!screen opening_countdown)")
+        self.assertNotIn("opening_play_sound", block)
+        self.assertNotIn("renpy.music", block)
+        self.assertNotRegex(block, r"(?m)^\s*(play|queue|voice)\b")
+        self.assertNotRegex(block, r"(?m)^\s*return\s*$")
+        for screen_name in (
+            "opening_disclaimer_one",
+            "opening_disclaimer_two",
+            "opening_tap_to_start",
+            "opening_water_wait",
+            "opening_water_drop",
+            "opening_countdown",
+            "opening_memory_overlay",
+            "opening_flash_once",
+            "opening_consent_document",
+            "opening_name_insert",
+            "opening_date_insert",
+            "opening_identity_document",
+            "opening_system_desktop",
+            "crt_effect",
+        ):
+            with self.subTest(screen_name=screen_name):
+                self.assertIn(f"hide screen {screen_name}", block)
+
+    def test_mountain_handoff_label_is_unique_and_immediately_precedes_first_wind(self):
+        labels = re.findall(
+            r"(?m)^\s*label\s+mountain_memory_start\s*:\s*$",
+            self.script_source,
+        )
+        self.assertEqual(1, len(labels))
+        label_position = self.script_source.index("label mountain_memory_start:")
+        first_wind_position = self.script_source.index("    wind ")
+        self.assertLess(label_position, first_wind_position)
+        between = self.script_source[
+            label_position + len("label mountain_memory_start:"):first_wind_position
+        ]
+        self.assertEqual("", between.strip())
+
+    def test_legacy_medical_screen_file_and_all_rpy_references_are_gone(self):
+        self.assertFalse(MEDICAL_SCREENS_PATH.exists())
+        all_rpy = "\n".join(
+            path.read_text(encoding="utf-8")
+            for path in sorted(GAME_DIR.glob("*.rpy"))
+        )
+        self.assertNotIn("medical_system_panel", all_rpy)
+        self.assertNotIn("medical_confirm", all_rpy)
 
 
 if __name__ == "__main__":

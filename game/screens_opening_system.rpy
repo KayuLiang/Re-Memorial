@@ -673,6 +673,49 @@ screen opening_notice_body(message):
         use opening_oscilloscope
 
 
+screen opening_verification_body(status_text, progress):
+    hbox:
+        xfill True
+        yfill True
+        spacing 24
+
+        frame:
+            style "opening_verification_panel_frame"
+
+            vbox:
+                xfill True
+                yfill True
+                spacing 24
+
+                text "SYSTEM VERIFICATION" style "opening_verification_meta_text"
+                add Solid(opening_color_border_dark) xsize 760 ysize 4
+
+                null height 0 yfill True
+
+                text status_text style "opening_verification_status_text"
+                bar value StaticValue(progress, 100.0) style "opening_verification_progress_bar"
+                text "[progress]%" style "opening_verification_percent_text"
+
+                null height 0 yfill True
+
+                text "NEURAL LINK / MEDICAL UNIT / CONSCIOUSNESS" style "opening_verification_footer_text"
+
+        use opening_oscilloscope
+
+
+screen opening_countdown(number):
+    zorder 200
+
+    add Solid("#000000")
+
+    text number:
+        xalign 0.5
+        yalign 0.5
+        size 144
+        color "#ffffff"
+        bold True
+
+
 screen opening_consent_body():
     hbox:
         xfill True
@@ -1186,6 +1229,41 @@ style opening_notice_message_text is gui_text:
 style opening_notice_footer_text is gui_text:
     size 16
     color "#7b8580"
+
+style opening_verification_panel_frame is frame:
+    xsize 910
+    yfill True
+    background Solid("#d7ddd8")
+    padding (44, 40, 44, 40)
+
+style opening_verification_meta_text is gui_text:
+    size 19
+    color "#6f7c75"
+    bold True
+    kerning 2
+
+style opening_verification_status_text is gui_text:
+    size 38
+    color "#40574b"
+    bold True
+    xalign 0.5
+    text_align 0.5
+
+style opening_verification_progress_bar is bar:
+    xfill True
+    ysize 34
+    left_bar Solid("#729b83")
+    right_bar Solid("#b9c1bb")
+
+style opening_verification_percent_text is gui_text:
+    size 22
+    color "#65736a"
+    xalign 1.0
+
+style opening_verification_footer_text is gui_text:
+    size 16
+    color "#7b8580"
+    kerning 1
 
 style opening_consent_preview_frame is frame:
     xsize 1030
