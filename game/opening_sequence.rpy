@@ -166,6 +166,31 @@ label opening_scene_11:
     fro "然后呢？"
     system "点击屏幕下方的‘下一页’按钮。"
     call screen opening_consent_document
+    jump opening_scene_12
+
+
+label opening_scene_12:
+    show screen opening_system_desktop("opening_identity_preview_body")
+    system "请核对个人信息。"
+    fro "姓名——"
+
+    show screen opening_name_insert
+    pause 0.8
+    hide screen opening_name_insert
+    show screen opening_system_desktop("opening_identity_preview_body")
+
+    fro "日期——"
+
+    show screen opening_date_insert
+    pause 0.8
+    hide screen opening_date_insert
+    show screen opening_system_desktop("opening_identity_preview_body")
+
+    fro "上面的初始属性——这是什么？"
+    system "关于你在这场手术中物质的使用，一经确认无法更改，请保证你充分利用它们的价值。"
+    system "个人信息确认无误后，请长按‘确认’按钮完成签名。"
+    call screen opening_identity_document
+
     hide screen opening_memory_overlay
     hide screen opening_flash_once
     hide screen crt_effect

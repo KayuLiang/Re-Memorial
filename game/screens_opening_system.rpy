@@ -768,6 +768,239 @@ screen opening_consent_document():
                 action Return()
 
 
+screen opening_identity_preview_body():
+    hbox:
+        xfill True
+        yfill True
+        spacing 24
+
+        frame:
+            style "opening_identity_preview_frame"
+
+            vbox:
+                xfill True
+                yfill True
+                spacing 18
+
+                text "个人信息核对" style "opening_consent_title_text"
+                add Solid("#627168") xsize 850 ysize 2 xalign 0.5
+                text "姓名：弗洛" style "opening_identity_field_text"
+                text "性别：男" style "opening_identity_field_text"
+                text "年龄：24" style "opening_identity_field_text"
+                text "ID：████████" style "opening_identity_field_text"
+
+                hbox:
+                    spacing 18
+                    text "治疗日期：" style "opening_identity_field_text" yalign 0.5
+                    frame:
+                        background Solid("#526158")
+                        padding (3, 3, 3, 3)
+
+                        frame:
+                            xsize 170
+                            ysize 42
+                            background Solid(opening_color_paper)
+                            padding (0, 0, 0, 0)
+
+                null height 0 yfill True
+                text "请核对个人信息。" style "opening_consent_note_text"
+
+        frame:
+            style "opening_consent_side_frame"
+
+            vbox:
+                spacing 20
+                xfill True
+
+                text "IDENTITY VERIFICATION" style "opening_notice_meta_text"
+                text "等待患者确认" style "opening_consent_side_text"
+                text "术前资料 / 初始评估" style "opening_consent_side_text"
+                null height 0 yfill True
+                use opening_oscilloscope
+
+
+screen opening_name_insert():
+    modal True
+    zorder 50
+
+    add Solid("#000000")
+    text "弗洛":
+        xalign 0.5
+        yalign 0.5
+        size 58
+        color "#ffffff"
+
+
+screen opening_date_insert():
+    modal True
+    zorder 50
+
+    add Solid("#000000")
+
+    frame:
+        xalign 0.5
+        yalign 0.5
+        xsize 150
+        ysize 150
+        background Solid("#ffffff")
+        padding (5, 5, 5, 5)
+
+        frame:
+            xfill True
+            yfill True
+            background Solid("#000000")
+            padding (0, 0, 0, 0)
+
+
+screen opening_stat_row(label_text, stat_name, value, locked=False):
+    frame:
+        style "opening_stat_row_frame"
+
+        hbox:
+            xfill True
+            yalign 0.5
+            spacing 16
+
+            text label_text style "opening_stat_label_text"
+            text "[value]" style "opening_stat_value_text"
+            null width 0 xfill True
+
+            if locked:
+                text "固定" style "opening_stat_locked_text"
+            else:
+                textbutton "−":
+                    style "opening_stat_button"
+                    sensitive opening_can_adjust_stat(stat_name, -1)
+                    action Function(opening_adjust_stat, stat_name, -1)
+
+                textbutton "+":
+                    style "opening_stat_button"
+                    sensitive opening_can_adjust_stat(stat_name, 1)
+                    action Function(opening_adjust_stat, stat_name, 1)
+
+
+screen opening_identity_body():
+    default signature_hovered = False
+    default signature_holding = False
+    default signature_progress = 0.0
+    default signature_complete = False
+
+    key "mousedown_1" action If(
+        signature_hovered and opening_stats_complete() and not signature_complete,
+        SetScreenVariable("signature_holding", True),
+        NullAction(),
+    )
+    key "mouseup_1" action If(
+        signature_holding and not signature_complete,
+        [
+            SetScreenVariable("signature_holding", False),
+            SetScreenVariable("signature_progress", 0.0),
+        ],
+        SetScreenVariable("signature_holding", False),
+    )
+
+    timer 0.05 repeat True action If(
+        signature_holding and opening_stats_complete() and not signature_complete,
+        If(
+            signature_progress + 0.05 >= 1.5,
+            [
+                SetScreenVariable("signature_progress", 1.5),
+                SetScreenVariable("signature_holding", False),
+                SetScreenVariable("signature_complete", True),
+                Return(),
+            ],
+            SetScreenVariable(
+                "signature_progress",
+                signature_progress + 0.05,
+            ),
+        ),
+        If(
+            signature_holding or signature_progress > 0.0,
+            [
+                SetScreenVariable("signature_holding", False),
+                SetScreenVariable("signature_progress", 0.0),
+            ],
+            NullAction(),
+        ),
+    )
+
+    hbox:
+        xfill True
+        yfill True
+        spacing 30
+
+        vbox:
+            xsize 610
+            spacing 15
+
+            text "个人信息核对" style "opening_consent_title_text"
+            add Solid("#627168") xsize 600 ysize 2 xalign 0.5
+            text "姓名：弗洛" style "opening_identity_field_text"
+            text "性别：男" style "opening_identity_field_text"
+            text "年龄：24" style "opening_identity_field_text"
+            text "ID：████████" style "opening_identity_field_text"
+
+            hbox:
+                spacing 18
+                text "治疗日期：" style "opening_identity_field_text" yalign 0.5
+                frame:
+                    background Solid("#526158")
+                    padding (3, 3, 3, 3)
+
+                    frame:
+                        xsize 170
+                        ysize 42
+                        background Solid(opening_color_paper)
+                        padding (0, 0, 0, 0)
+
+            null height 0 yfill True
+            text "确认后，初始属性无法更改。" style "opening_consent_note_text"
+
+        vbox:
+            xfill True
+            yfill True
+            spacing 9
+
+            text "初始属性" style "opening_consent_section_text"
+            use opening_stat_row("体质", "con", stat_con, locked=True)
+            use opening_stat_row("力量", "str", stat_str)
+            use opening_stat_row("敏捷", "dex", stat_dex)
+            use opening_stat_row("智力", "int", stat_int)
+            use opening_stat_row("意志", "pow", stat_pow)
+            text "剩余可分配点数：[opening_stat_points_remaining()]" style "opening_identity_remaining_text"
+
+            button:
+                style "opening_signature_button"
+                hovered SetScreenVariable("signature_hovered", True)
+                unhovered [
+                    SetScreenVariable("signature_hovered", False),
+                    SetScreenVariable("signature_holding", False),
+                    SetScreenVariable("signature_progress", 0.0),
+                ]
+                action NullAction()
+
+                vbox:
+                    xfill True
+                    spacing 8
+
+                    if opening_stats_complete():
+                        text "按住确认 1.5 秒完成签名" style "opening_signature_text"
+                    else:
+                        text "请先分配全部属性点" style "opening_signature_text"
+
+                    bar value StaticValue(signature_progress, 1.5) style "opening_signature_progress_bar"
+
+
+screen opening_identity_document():
+    modal True
+    zorder 20
+
+    frame:
+        style "opening_identity_document_frame"
+
+        use opening_identity_body
+
+
 style opening_disclaimer_text is gui_text:
     xalign 0.5
     yalign 0.5
@@ -997,3 +1230,89 @@ style opening_consent_next_button_text is gui_text:
     insensitive_color "#d8d8d1"
     xalign 0.5
     yalign 0.5
+
+style opening_identity_preview_frame is frame:
+    xsize 1030
+    yfill True
+    background Solid(opening_color_paper)
+    padding (42, 30, 42, 30)
+
+style opening_identity_document_frame is frame:
+    xpos 153
+    ypos 142
+    xsize 1554
+    ysize 756
+    background Solid(opening_color_paper)
+    padding (38, 30, 38, 30)
+
+style opening_identity_field_text is gui_text:
+    size 25
+    color "#46574e"
+
+style opening_stat_row_frame is frame:
+    xfill True
+    ysize 57
+    background Solid("#d5d8ce")
+    padding (16, 7, 16, 7)
+
+style opening_stat_label_text is gui_text:
+    xsize 92
+    size 23
+    color "#405248"
+    bold True
+    yalign 0.5
+
+style opening_stat_value_text is gui_text:
+    xsize 58
+    size 25
+    color "#33493d"
+    bold True
+    text_align 0.5
+    yalign 0.5
+
+style opening_stat_locked_text is gui_text:
+    xsize 132
+    size 20
+    color "#7a827c"
+    text_align 0.5
+    yalign 0.5
+
+style opening_stat_button is button:
+    xsize 62
+    ysize 42
+    background Solid("#617e6d")
+    hover_background Solid("#769682")
+    insensitive_background Solid("#afb5b0")
+    padding (8, 3, 8, 3)
+
+style opening_stat_button_text is gui_text:
+    size 29
+    color "#f4f2e8"
+    insensitive_color "#d8d8d1"
+    xalign 0.5
+    yalign 0.5
+
+style opening_identity_remaining_text is gui_text:
+    size 22
+    color "#41584b"
+    bold True
+    xalign 1.0
+
+style opening_signature_button is button:
+    xfill True
+    yminimum 98
+    background Solid("#617e6d")
+    hover_background Solid("#6f8d79")
+    padding (22, 15, 22, 15)
+
+style opening_signature_text is gui_text:
+    size 22
+    color "#f4f2e8"
+    xalign 0.5
+    text_align 0.5
+
+style opening_signature_progress_bar is bar:
+    xfill True
+    ysize 18
+    left_bar Solid("#d7e4d8")
+    right_bar Solid("#40564a")

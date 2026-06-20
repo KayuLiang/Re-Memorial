@@ -734,12 +734,12 @@ class OpeningPreSystemSequenceContractTests(unittest.TestCase):
             "opening_scene_09",
             "opening_scene_10",
             "opening_scene_11",
+            "opening_scene_12",
         ):
             with self.subTest(label_name=label_name):
                 self.assertIn(f"label {label_name}:", self.sequence_source)
 
         for absent_label in (
-            "opening_scene_12",
             "opening_scene_13",
             "opening_scene_14",
         ):
@@ -1156,19 +1156,21 @@ class OpeningMedicalConsentContractTests(unittest.TestCase):
             re.findall(r"[一二三四五六]、", self.system_source),
         )
 
-    def test_scene_flow_runs_sequentially_from_six_through_eleven(self):
+    def test_scene_flow_runs_sequentially_from_six_through_twelve(self):
         expected_jumps = {
             "opening_scene_06": "opening_scene_07",
             "opening_scene_07": "opening_scene_08",
             "opening_scene_08": "opening_scene_09",
             "opening_scene_09": "opening_scene_10",
             "opening_scene_10": "opening_scene_11",
+            "opening_scene_11": "opening_scene_12",
         }
         for scene, destination in expected_jumps.items():
             with self.subTest(scene=scene):
                 block, _ = block_with_header(self.sequence_source, f"label {scene}:")
                 self.assertIn(f"jump {destination}", block)
-        self.assertNotIn("label opening_scene_12:", self.sequence_source)
+        self.assertIn("label opening_scene_12:", self.sequence_source)
+        self.assertNotIn("label opening_scene_13:", self.sequence_source)
 
     def test_scene_07_strengthens_crt_plays_burst_and_presents_both_notices(self):
         block, _ = block_with_header(self.sequence_source, "label opening_scene_07:")
@@ -1306,7 +1308,7 @@ class OpeningMedicalConsentContractTests(unittest.TestCase):
             block,
         )
 
-    def test_scene_11_dialogue_calls_consent_then_temporarily_cleans_up(self):
+    def test_scene_11_dialogue_calls_consent_then_jumps_without_cleanup(self):
         block, _ = block_with_header(self.sequence_source, "label opening_scene_11:")
         expected_dialogue = (
             'fro "应该怎么做？"',
@@ -1321,6 +1323,7 @@ class OpeningMedicalConsentContractTests(unittest.TestCase):
             block,
         )
         self.assertIn("call screen opening_consent_document", block)
+        self.assertIn("jump opening_scene_12", block)
         for cleanup in (
             "hide screen opening_memory_overlay",
             "hide screen crt_effect",
@@ -1329,7 +1332,187 @@ class OpeningMedicalConsentContractTests(unittest.TestCase):
             "return",
         ):
             with self.subTest(cleanup=cleanup):
+                self.assertNotIn(cleanup, block)
+
+    def test_scene_12_presents_exact_dialogue_and_inserts_in_order(self):
+        block, _ = block_with_header(self.sequence_source, "label opening_scene_12:")
+        ordered_lines = (
+            'show screen opening_system_desktop("opening_identity_preview_body")',
+            'system "请核对个人信息。"',
+            'fro "姓名——"',
+            "show screen opening_name_insert",
+            "hide screen opening_name_insert",
+            'show screen opening_system_desktop("opening_identity_preview_body")',
+            'fro "日期——"',
+            "show screen opening_date_insert",
+            "hide screen opening_date_insert",
+            'show screen opening_system_desktop("opening_identity_preview_body")',
+            'fro "上面的初始属性——这是什么？"',
+            'system "关于你在这场手术中物质的使用，一经确认无法更改，请保证你充分利用它们的价值。"',
+            'system "个人信息确认无误后，请长按‘确认’按钮完成签名。"',
+            "call screen opening_identity_document",
+        )
+        positions = []
+        cursor = 0
+        for line in ordered_lines:
+            position = block.index(line, cursor)
+            positions.append(position)
+            cursor = position + len(line)
+        self.assertEqual(sorted(positions), positions)
+        self.assertGreaterEqual(block.count("pause 0."), 2)
+
+    def test_scene_12_temporarily_cleans_up_only_after_signature(self):
+        block, _ = block_with_header(self.sequence_source, "label opening_scene_12:")
+        signature_position = block.index("call screen opening_identity_document")
+        cleanup_lines = (
+            "hide screen opening_memory_overlay",
+            "hide screen opening_flash_once",
+            "hide screen crt_effect",
+            "hide screen opening_system_desktop",
+            "opening_active = False",
+            "return",
+        )
+        for cleanup in cleanup_lines:
+            with self.subTest(cleanup=cleanup):
                 self.assertIn(cleanup, block)
+                self.assertGreater(block.index(cleanup), signature_position)
+        self.assertNotIn("jump opening_scene_13", block)
+
+    def test_identity_screens_use_native_inserts_and_required_personal_fields(self):
+        for header in (
+            "screen opening_identity_preview_body():",
+            "screen opening_identity_body():",
+            "screen opening_identity_document():",
+            "screen opening_name_insert():",
+            "screen opening_date_insert():",
+        ):
+            with self.subTest(header=header):
+                self.assertIn(header, self.system_source)
+
+        preview_block, _ = block_with_header(
+            self.system_source,
+            "screen opening_identity_preview_body():",
+        )
+        identity_block, _ = block_with_header(
+            self.system_source,
+            "screen opening_identity_body():",
+        )
+        combined = preview_block + identity_block
+        for text in ("姓名：弗洛", "性别：男", "年龄：24", "ID：████████"):
+            with self.subTest(text=text):
+                self.assertIn(text, combined)
+
+        name_block, _ = block_with_header(
+            self.system_source,
+            "screen opening_name_insert():",
+        )
+        date_block, _ = block_with_header(
+            self.system_source,
+            "screen opening_date_insert():",
+        )
+        self.assertIn('add Solid("#000000")', name_block)
+        self.assertIn('text "弗洛"', name_block)
+        self.assertIn('color "#ffffff"', name_block)
+        self.assertIn('add Solid("#000000")', date_block)
+        self.assertGreaterEqual(date_block.count("Solid("), 3)
+        self.assertNotRegex(date_block, r"(?m)^\s*text\s+")
+
+    def test_stat_rows_lock_constitution_and_use_existing_adjustment_actions(self):
+        row_block, _ = block_with_header(
+            self.system_source,
+            "screen opening_stat_row(label_text, stat_name, value, locked=False):",
+        )
+        identity_block, _ = block_with_header(
+            self.system_source,
+            "screen opening_identity_body():",
+        )
+
+        self.assertIn('text "固定"', row_block)
+        self.assertIn("if locked:", row_block)
+        self.assertIn("opening_can_adjust_stat(stat_name, -1)", row_block)
+        self.assertIn("opening_can_adjust_stat(stat_name, 1)", row_block)
+        self.assertIn("Function(opening_adjust_stat, stat_name, -1)", row_block)
+        self.assertIn("Function(opening_adjust_stat, stat_name, 1)", row_block)
+
+        required_rows = (
+            'use opening_stat_row("体质", "con", stat_con, locked=True)',
+            'use opening_stat_row("力量", "str", stat_str)',
+            'use opening_stat_row("敏捷", "dex", stat_dex)',
+            'use opening_stat_row("智力", "int", stat_int)',
+            'use opening_stat_row("意志", "pow", stat_pow)',
+        )
+        for row in required_rows:
+            with self.subTest(row=row):
+                self.assertIn(row, identity_block)
+        self.assertNotIn("opening_adjust_stat", identity_block)
+
+    def test_identity_ui_binds_existing_remaining_and_completion_rules(self):
+        identity_block, _ = block_with_header(
+            self.system_source,
+            "screen opening_identity_body():",
+        )
+        self.assertIn(
+            'text "剩余可分配点数：[opening_stat_points_remaining()]"',
+            identity_block,
+        )
+        self.assertGreaterEqual(identity_block.count("opening_stats_complete()"), 2)
+        self.assertNotRegex(identity_block, r"\b17\s*-")
+        self.assertNotRegex(identity_block, r"stat_(str|dex|int|pow)\s*[<>]=?\s*(1|20)")
+
+    def test_signature_requires_true_hold_with_reset_and_single_return(self):
+        identity_block, _ = block_with_header(
+            self.system_source,
+            "screen opening_identity_body():",
+        )
+        for state in (
+            "signature_hovered",
+            "signature_holding",
+            "signature_progress",
+            "signature_complete",
+        ):
+            with self.subTest(state=state):
+                self.assertIn(f"default {state} =", identity_block)
+
+        self.assertIn('key "mousedown_1"', identity_block)
+        self.assertIn('key "mouseup_1"', identity_block)
+        self.assertIn("hovered SetScreenVariable", identity_block)
+        self.assertIn("unhovered [", identity_block)
+        self.assertRegex(
+            identity_block,
+            r"(?s)key\s+\"mousedown_1\".*?signature_hovered.*?"
+            r"opening_stats_complete\(\).*?signature_holding",
+        )
+        self.assertRegex(
+            identity_block,
+            r"(?s)key\s+\"mouseup_1\".*?signature_holding.*?"
+            r"signature_progress.*?0\.0",
+        )
+        self.assertRegex(
+            identity_block,
+            r"(?s)unhovered\s+\[.*?signature_holding.*?False.*?"
+            r"signature_progress.*?0\.0",
+        )
+        self.assertRegex(identity_block, r"timer\s+0\.05\s+repeat\s+True")
+        self.assertIn("signature_progress + 0.05", identity_block)
+        self.assertIn(">= 1.5", identity_block)
+        self.assertIn("StaticValue(signature_progress, 1.5)", identity_block)
+        self.assertEqual(1, identity_block.count("Return()"))
+
+    def test_opening_identity_styles_exist(self):
+        for style_name in (
+            "opening_identity_preview_frame",
+            "opening_identity_document_frame",
+            "opening_identity_field_text",
+            "opening_stat_row_frame",
+            "opening_stat_button",
+            "opening_signature_button",
+            "opening_signature_progress_bar",
+        ):
+            with self.subTest(style_name=style_name):
+                self.assertRegex(
+                    self.system_source,
+                    rf"(?m)^style\s+{re.escape(style_name)}\b",
+                )
 
 
 if __name__ == "__main__":
