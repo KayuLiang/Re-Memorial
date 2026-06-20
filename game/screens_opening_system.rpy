@@ -7,6 +7,7 @@ define opening_color_border_dark = "#315f88"
 define opening_color_paper = "#e7e4d9"
 define opening_color_phosphor = "#a8c7aa"
 define opening_scope_wave_span = 476
+define opening_document_font = FontGroup().add("DejaVuSans.ttf", 0x2588, 0x2588).add("SourceHanSansLite.ttf", None, None)
 
 
 init python:
@@ -178,6 +179,22 @@ screen opening_window_frame(title, body_screen, body_args=None):
                     use expression body_screen pass (*body_args)
 
 
+screen opening_scope_wave_segment(segment_x):
+    fixed:
+        xpos segment_x
+        xsize opening_scope_wave_span
+        ysize 102
+
+        for beat_x in range(0, opening_scope_wave_span, 68):
+            add Solid(opening_color_phosphor + "b0") xpos beat_x ypos 62 xsize 28 ysize 2
+            add Solid(opening_color_phosphor + "b0") xpos beat_x + 28 ypos 58 xsize 2 ysize 6
+            add Solid(opening_color_phosphor + "b0") xpos beat_x + 30 ypos 58 xsize 8 ysize 2
+            add Solid(opening_color_phosphor + "b0") xpos beat_x + 38 ypos 22 xsize 2 ysize 38
+            add Solid(opening_color_phosphor + "b0") xpos beat_x + 40 ypos 22 xsize 3 ysize 2
+            add Solid(opening_color_phosphor + "b0") xpos beat_x + 43 ypos 22 xsize 2 ysize 42
+            add Solid(opening_color_phosphor + "b0") xpos beat_x + 45 ypos 62 xsize 23 ysize 2
+
+
 screen opening_oscilloscope():
     frame:
         style "opening_shell_scope_panel_frame"
@@ -207,9 +224,10 @@ screen opening_oscilloscope():
                 fixed:
                     xsize opening_scope_wave_span * 2
                     ysize 102
+                    at opening_scope_scroll
 
-                    text "▁▁▂▅▂▁▁▁▂▆▂▁▁▁▂▅▂▁▁▁▂▇▂▁▁▁▂▅▂▁▁▁▂▆▂▁▁▁▂▅▂▁▁▁▂▇▂▁" style "opening_shell_scope_wave_text" at opening_scope_scroll
-                    text "▁▁▂▅▂▁▁▁▂▆▂▁▁▁▂▅▂▁▁▁▂▇▂▁▁▁▂▅▂▁▁▁▂▆▂▁▁▁▂▅▂▁▁▁▂▇▂▁" style "opening_shell_scope_wave_text" xpos opening_scope_wave_span at opening_scope_scroll
+                    use opening_scope_wave_segment(0)
+                    use opening_scope_wave_segment(opening_scope_wave_span)
 
             hbox:
                 xpos 18
@@ -367,10 +385,6 @@ style opening_shell_scope_title_text is gui_text:
     size 20
     color opening_color_phosphor + "cc"
     bold True
-
-style opening_shell_scope_wave_text is gui_text:
-    size 34
-    color opening_color_phosphor + "c0"
 
 style opening_shell_scope_metric_text is gui_text:
     size 18
@@ -1185,6 +1199,7 @@ style opening_records_heading_text is gui_text:
     bold True
 
 style opening_records_meta_text is gui_text:
+    font opening_document_font
     size 18
     color "#7a817c"
     kerning 1
@@ -1304,6 +1319,7 @@ style opening_consent_title_text is gui_text:
     text_align 0.5
 
 style opening_consent_preview_text is gui_text:
+    font opening_document_font
     size 22
     color "#4f5c54"
 
@@ -1314,6 +1330,7 @@ style opening_consent_section_text is gui_text:
     top_margin 8
 
 style opening_consent_document_text is gui_text:
+    font opening_document_font
     size 20
     color "#4a564f"
     line_spacing 5
@@ -1348,13 +1365,14 @@ style opening_identity_preview_frame is frame:
 
 style opening_identity_document_frame is frame:
     xpos 153
-    ypos 142
+    ypos 178
     xsize 1554
-    ysize 756
+    ysize 680
     background Solid(opening_color_paper)
     padding (38, 30, 38, 30)
 
 style opening_identity_field_text is gui_text:
+    font opening_document_font
     size 25
     color "#46574e"
 

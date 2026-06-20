@@ -685,8 +685,36 @@ class OpeningSystemShellContractTests(unittest.TestCase):
 
         self.assertEqual(476, wave_span)
         self.assertIn("linear 4.8 xoffset -distance", transform_block)
-        self.assertIn("xpos opening_scope_wave_span", scope_block)
         self.assertIn("xsize opening_scope_wave_span * 2", scope_block)
+        self.assertIn("at opening_scope_scroll", scope_block)
+        self.assertEqual(
+            2,
+            scope_block.count("use opening_scope_wave_segment("),
+        )
+        self.assertIn(
+            "use opening_scope_wave_segment(0)",
+            scope_block,
+        )
+        self.assertIn(
+            "use opening_scope_wave_segment(opening_scope_wave_span)",
+            scope_block,
+        )
+
+    def test_scope_wave_is_code_native_solid_trace_without_glyphs(self):
+        segment_block, _ = block_with_header(
+            self.source,
+            "screen opening_scope_wave_segment(segment_x):",
+        )
+
+        self.assertGreaterEqual(
+            segment_block.count("add Solid(opening_color_phosphor"),
+            6,
+        )
+        self.assertIn("for beat_x in range(", segment_block)
+        self.assertRegex(segment_block, r"\bxsize\s+\d+\s+ysize\s+[12]\b")
+        self.assertRegex(segment_block, r"\bxsize\s+[12]\s+ysize\s+\d+\b")
+        self.assertNotIn("opening_shell_scope_wave_text", self.source)
+        self.assertNotRegex(self.source, r"[▁▂▃▄▅▆▇]")
 
     def test_scope_geometry_uses_consistent_450_pixel_budget(self):
         scope_block, _ = block_with_header(
@@ -703,6 +731,27 @@ class OpeningSystemShellContractTests(unittest.TestCase):
 
     def test_opening_shell_does_not_depend_on_legacy_medical_wave_scroll(self):
         self.assertNotIn("medical_wave_scroll", self.source)
+
+    def test_document_redactions_use_font_group_with_block_glyph_priority(self):
+        self.assertIn(
+            'define opening_document_font = FontGroup()'
+            '.add("DejaVuSans.ttf", 0x2588, 0x2588)'
+            '.add("SourceHanSansLite.ttf", None, None)',
+            self.source,
+        )
+
+        for style_name in (
+            "opening_records_meta_text",
+            "opening_consent_preview_text",
+            "opening_consent_document_text",
+            "opening_identity_field_text",
+        ):
+            with self.subTest(style_name=style_name):
+                style_block, _ = block_with_header(
+                    self.source,
+                    f"style {style_name} is gui_text:",
+                )
+                self.assertIn("font opening_document_font", style_block)
 
 
 class OpeningPreSystemSequenceContractTests(unittest.TestCase):
@@ -1606,6 +1655,49 @@ class OpeningMedicalConsentContractTests(unittest.TestCase):
                     self.system_source,
                     rf"(?m)^style\s+{re.escape(style_name)}\b",
                 )
+
+    def test_identity_document_stays_inside_window_with_body_height_budget(self):
+        document_style, _ = block_with_header(
+            self.system_source,
+            "style opening_identity_document_frame is frame:",
+        )
+        row_style, _ = block_with_header(
+            self.system_source,
+            "style opening_stat_row_frame is frame:",
+        )
+        signature_style, _ = block_with_header(
+            self.system_source,
+            "style opening_signature_frame is frame:",
+        )
+        section_style, _ = block_with_header(
+            self.system_source,
+            "style opening_consent_section_text is gui_text:",
+        )
+        remaining_style, _ = block_with_header(
+            self.system_source,
+            "style opening_identity_remaining_text is gui_text:",
+        )
+
+        xpos = parse_style_tuple(document_style, "xpos")[0]
+        ypos = parse_style_tuple(document_style, "ypos")[0]
+        xsize = parse_style_tuple(document_style, "xsize")[0]
+        ysize = parse_style_tuple(document_style, "ysize")[0]
+        padding = parse_style_tuple(document_style, "padding")
+        self.assertEqual((153, 1554), (xpos, xsize))
+        self.assertEqual((178, 680), (ypos, ysize))
+        self.assertLessEqual(ypos + ysize, 875)
+
+        top_padding = padding[1]
+        bottom_padding = padding[3]
+        available_body_height = ysize - top_padding - bottom_padding
+        right_column_budget = (
+            parse_style_tuple(section_style, "size")[0]
+            + 5 * parse_style_tuple(row_style, "ysize")[0]
+            + parse_style_tuple(remaining_style, "size")[0]
+            + parse_style_tuple(signature_style, "yminimum")[0]
+            + 7 * 9
+        )
+        self.assertGreaterEqual(available_body_height, right_column_budget)
 
 
 class OpeningHandoffContractTests(unittest.TestCase):
