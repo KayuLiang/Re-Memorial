@@ -1049,7 +1049,7 @@ class OpeningMedicalConsentContractTests(unittest.TestCase):
         self.assertIn("action Return()", button_block)
         self.assertNotIn("SetScreenVariable", button_block)
 
-    def test_consent_adjustment_callback_restarts_only_at_bottom_and_never_blocks_change(self):
+    def test_consent_adjustment_callback_restarts_only_on_bottom_state_boundaries(self):
         block = function_block(
             self.system_source,
             "opening_consent_adjustment_changed",
@@ -1076,8 +1076,41 @@ class OpeningMedicalConsentContractTests(unittest.TestCase):
         self.assertEqual(0, fake_renpy.restart_count)
         self.assertIsNone(callback(adjustment, 96))
         self.assertEqual(1, fake_renpy.restart_count)
+        self.assertIsNone(callback(adjustment, 97))
+        self.assertEqual(1, fake_renpy.restart_count)
         self.assertIsNone(callback(adjustment, 100))
+        self.assertEqual(1, fake_renpy.restart_count)
+        self.assertIsNone(callback(adjustment, 95))
         self.assertEqual(2, fake_renpy.restart_count)
+        self.assertIsNone(callback(adjustment, 95))
+        self.assertEqual(2, fake_renpy.restart_count)
+
+    def test_consent_adjustment_callback_treats_non_scrollable_document_as_bottom(self):
+        block = function_block(
+            self.system_source,
+            "opening_consent_adjustment_changed",
+        )
+
+        class FakeRenpy:
+            def __init__(self):
+                self.restart_count = 0
+
+            def restart_interaction(self):
+                self.restart_count += 1
+
+        class FakeAdjustment:
+            range = 0
+
+        fake_renpy = FakeRenpy()
+        namespace = {"renpy": fake_renpy}
+        exec(textwrap.dedent(block), namespace)
+        callback = namespace["opening_consent_adjustment_changed"]
+        adjustment = FakeAdjustment()
+
+        self.assertIsNone(callback(adjustment, 0))
+        self.assertEqual(1, fake_renpy.restart_count)
+        self.assertIsNone(callback(adjustment, 0))
+        self.assertEqual(1, fake_renpy.restart_count)
 
     def test_opening_foley_channel_is_registered_in_init_for_non_looping_sfx(self):
         init_block, _ = block_with_header(self.system_source, "init python:")

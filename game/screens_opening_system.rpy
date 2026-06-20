@@ -20,8 +20,12 @@ init python:
         return adjustment.range <= 0 or adjustment.value >= adjustment.range - 4
 
     def opening_consent_adjustment_changed(adjustment, value):
-        if adjustment.range <= 0 or value >= adjustment.range - 4:
+        at_bottom = adjustment.range <= 0 or value >= adjustment.range - 4
+        was_at_bottom = getattr(adjustment, "_opening_was_at_bottom", False)
+        if at_bottom != was_at_bottom:
+            adjustment._opening_was_at_bottom = at_bottom
             renpy.restart_interaction()
+        return None
 
 
 transform opening_scope_scroll(distance=opening_scope_wave_span):
