@@ -1505,6 +1505,40 @@ class OpeningMedicalConsentContractTests(unittest.TestCase):
         self.assertIn("hovered SetScreenVariable", body_block)
         self.assertIn("unhovered [", body_block)
 
+    def test_signature_hover_area_does_not_consume_mouse_button_events(self):
+        body_block, _ = block_with_header(
+            self.system_source,
+            "screen opening_identity_body(signature_hovered, signature_progress):",
+        )
+        signature_match = re.search(
+            r'(?m)^\s*frame:\s*\n\s*style "opening_signature_frame"',
+            body_block,
+        )
+        self.assertIsNotNone(signature_match)
+        signature_region = body_block[signature_match.start():]
+        document_block, _ = block_with_header(
+            self.system_source,
+            "screen opening_identity_document():",
+        )
+
+        self.assertRegex(signature_region, r"(?m)^\s*frame:\s*$")
+        self.assertIn('style "opening_signature_frame"', signature_region)
+        self.assertIn("mousearea:", signature_region)
+        self.assertRegex(
+            signature_region,
+            r"(?s)mousearea:\s+area\s+\(0,\s*0,\s*1\.0,\s*1\.0\)"
+            r".*?hovered SetScreenVariable.*?unhovered \[",
+        )
+        self.assertNotRegex(signature_region, r"(?m)^\s*button:\s*$")
+        self.assertNotIn("action NullAction()", signature_region)
+        style_block, _ = block_with_header(
+            self.system_source,
+            "style opening_signature_frame is frame:",
+        )
+        self.assertIn("padding (0, 0, 0, 0)", style_block)
+        self.assertIn('key "mousedown_1"', document_block)
+        self.assertIn('key "mouseup_1"', document_block)
+
     def test_signature_uses_runtime_elapsed_with_gate_and_early_reset(self):
         body_block, _ = block_with_header(
             self.system_source,
@@ -1560,7 +1594,7 @@ class OpeningMedicalConsentContractTests(unittest.TestCase):
             "opening_identity_field_text",
             "opening_stat_row_frame",
             "opening_stat_button",
-            "opening_signature_button",
+            "opening_signature_frame",
             "opening_signature_progress_bar",
         ):
             with self.subTest(style_name=style_name):

@@ -936,27 +936,40 @@ screen opening_identity_body(signature_hovered, signature_progress):
             use opening_stat_row("意志", "pow", stat_pow)
             text "剩余可分配点数：[opening_stat_points_remaining()]" style "opening_identity_remaining_text"
 
-            button:
-                style "opening_signature_button"
-                hovered SetScreenVariable("signature_hovered", True)
-                unhovered [
-                    SetScreenVariable("signature_hovered", False),
-                    SetScreenVariable("signature_holding", False),
-                    SetScreenVariable("signature_progress", 0.0),
-                    SetScreenVariable("signature_started_at", None),
-                ]
-                action NullAction()
+            frame:
+                style "opening_signature_frame"
+                background Solid("#6f8d79" if signature_hovered else "#617e6d")
 
-                vbox:
+                fixed:
                     xfill True
-                    spacing 8
+                    yfill True
 
-                    if opening_stats_complete():
-                        text "按住确认 1.5 秒完成签名" style "opening_signature_text"
-                    else:
-                        text "请先分配全部属性点" style "opening_signature_text"
+                    frame:
+                        xfill True
+                        yfill True
+                        background None
+                        padding (22, 15, 22, 15)
 
-                    bar value StaticValue(signature_progress, 1.5) style "opening_signature_progress_bar"
+                        vbox:
+                            xfill True
+                            spacing 8
+
+                            if opening_stats_complete():
+                                text "按住确认 1.5 秒完成签名" style "opening_signature_text"
+                            else:
+                                text "请先分配全部属性点" style "opening_signature_text"
+
+                            bar value StaticValue(signature_progress, 1.5) style "opening_signature_progress_bar"
+
+                    mousearea:
+                        area (0, 0, 1.0, 1.0)
+                        hovered SetScreenVariable("signature_hovered", True)
+                        unhovered [
+                            SetScreenVariable("signature_hovered", False),
+                            SetScreenVariable("signature_holding", False),
+                            SetScreenVariable("signature_progress", 0.0),
+                            SetScreenVariable("signature_started_at", None),
+                        ]
 
 
 screen opening_identity_document():
@@ -1316,12 +1329,11 @@ style opening_identity_remaining_text is gui_text:
     bold True
     xalign 1.0
 
-style opening_signature_button is button:
+style opening_signature_frame is frame:
     xfill True
     yminimum 98
     background Solid("#617e6d")
-    hover_background Solid("#6f8d79")
-    padding (22, 15, 22, 15)
+    padding (0, 0, 0, 0)
 
 style opening_signature_text is gui_text:
     size 22
