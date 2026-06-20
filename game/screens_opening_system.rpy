@@ -27,6 +27,17 @@ init python:
             renpy.restart_interaction()
         return None
 
+    def opening_start_signature_hold():
+        current_screen = renpy.current_screen()
+        if current_screen is None:
+            return
+
+        scope = current_screen.scope
+        scope["signature_started_at"] = renpy.get_game_runtime()
+        scope["signature_holding"] = True
+        scope["signature_progress"] = 0.0
+        renpy.restart_interaction()
+
 
 transform opening_scope_scroll(distance=opening_scope_wave_span):
     xoffset 0
@@ -879,51 +890,7 @@ screen opening_stat_row(label_text, stat_name, value, locked=False):
                     action Function(opening_adjust_stat, stat_name, 1)
 
 
-screen opening_identity_body():
-    default signature_hovered = False
-    default signature_holding = False
-    default signature_progress = 0.0
-    default signature_complete = False
-
-    key "mousedown_1" action If(
-        signature_hovered and opening_stats_complete() and not signature_complete,
-        SetScreenVariable("signature_holding", True),
-        NullAction(),
-    )
-    key "mouseup_1" action If(
-        signature_holding and not signature_complete,
-        [
-            SetScreenVariable("signature_holding", False),
-            SetScreenVariable("signature_progress", 0.0),
-        ],
-        SetScreenVariable("signature_holding", False),
-    )
-
-    timer 0.05 repeat True action If(
-        signature_holding and opening_stats_complete() and not signature_complete,
-        If(
-            signature_progress + 0.05 >= 1.5,
-            [
-                SetScreenVariable("signature_progress", 1.5),
-                SetScreenVariable("signature_holding", False),
-                SetScreenVariable("signature_complete", True),
-                Return(),
-            ],
-            SetScreenVariable(
-                "signature_progress",
-                signature_progress + 0.05,
-            ),
-        ),
-        If(
-            signature_holding or signature_progress > 0.0,
-            [
-                SetScreenVariable("signature_holding", False),
-                SetScreenVariable("signature_progress", 0.0),
-            ],
-            NullAction(),
-        ),
-    )
-
+screen opening_identity_body(signature_hovered, signature_progress):
     hbox:
         xfill True
         yfill True
@@ -976,6 +943,7 @@ screen opening_identity_body():
                     SetScreenVariable("signature_hovered", False),
                     SetScreenVariable("signature_holding", False),
                     SetScreenVariable("signature_progress", 0.0),
+                    SetScreenVariable("signature_started_at", None),
                 ]
                 action NullAction()
 
@@ -994,11 +962,61 @@ screen opening_identity_body():
 screen opening_identity_document():
     modal True
     zorder 20
+    default signature_hovered = False
+    default signature_holding = False
+    default signature_progress = 0.0
+    default signature_complete = False
+    default signature_started_at = None
+
+    $ signature_elapsed = 0.0
+    if signature_holding and signature_started_at is not None:
+        $ signature_elapsed = max(
+            0.0,
+            min(1.5, renpy.get_game_runtime() - signature_started_at),
+        )
+
+    key "mousedown_1" action If(
+        signature_hovered and opening_stats_complete() and not signature_complete,
+        Function(opening_start_signature_hold),
+        NullAction(),
+    )
+    key "mouseup_1" action If(
+        signature_holding and not signature_complete,
+        [
+            SetScreenVariable("signature_holding", False),
+            SetScreenVariable("signature_progress", 0.0),
+            SetScreenVariable("signature_started_at", None),
+        ],
+        SetScreenVariable("signature_holding", False),
+    )
+
+    if signature_holding:
+        timer 0.05 repeat True action If(
+            opening_stats_complete()
+            and signature_started_at is not None
+            and not signature_complete,
+            If(
+                renpy.get_game_runtime() - signature_started_at >= 1.5,
+                [
+                    SetScreenVariable("signature_progress", 1.5),
+                    SetScreenVariable("signature_holding", False),
+                    SetScreenVariable("signature_complete", True),
+                    SetScreenVariable("signature_started_at", None),
+                    Return(),
+                ],
+                SetScreenVariable("signature_progress", signature_elapsed),
+            ),
+            [
+                SetScreenVariable("signature_holding", False),
+                SetScreenVariable("signature_progress", 0.0),
+                SetScreenVariable("signature_started_at", None),
+            ],
+        )
 
     frame:
         style "opening_identity_document_frame"
 
-        use opening_identity_body
+        use opening_identity_body(signature_hovered, signature_progress)
 
 
 style opening_disclaimer_text is gui_text:

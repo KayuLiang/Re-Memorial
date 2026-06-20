@@ -1381,7 +1381,7 @@ class OpeningMedicalConsentContractTests(unittest.TestCase):
     def test_identity_screens_use_native_inserts_and_required_personal_fields(self):
         for header in (
             "screen opening_identity_preview_body():",
-            "screen opening_identity_body():",
+            "screen opening_identity_body(signature_hovered, signature_progress):",
             "screen opening_identity_document():",
             "screen opening_name_insert():",
             "screen opening_date_insert():",
@@ -1395,7 +1395,7 @@ class OpeningMedicalConsentContractTests(unittest.TestCase):
         )
         identity_block, _ = block_with_header(
             self.system_source,
-            "screen opening_identity_body():",
+            "screen opening_identity_body(signature_hovered, signature_progress):",
         )
         combined = preview_block + identity_block
         for text in ("姓名：弗洛", "性别：男", "年龄：24", "ID：████████"):
@@ -1424,7 +1424,7 @@ class OpeningMedicalConsentContractTests(unittest.TestCase):
         )
         identity_block, _ = block_with_header(
             self.system_source,
-            "screen opening_identity_body():",
+            "screen opening_identity_body(signature_hovered, signature_progress):",
         )
 
         self.assertIn('text "固定"', row_block)
@@ -1449,54 +1449,109 @@ class OpeningMedicalConsentContractTests(unittest.TestCase):
     def test_identity_ui_binds_existing_remaining_and_completion_rules(self):
         identity_block, _ = block_with_header(
             self.system_source,
-            "screen opening_identity_body():",
+            "screen opening_identity_body(signature_hovered, signature_progress):",
+        )
+        document_block, _ = block_with_header(
+            self.system_source,
+            "screen opening_identity_document():",
         )
         self.assertIn(
             'text "剩余可分配点数：[opening_stat_points_remaining()]"',
             identity_block,
         )
-        self.assertGreaterEqual(identity_block.count("opening_stats_complete()"), 2)
+        self.assertGreaterEqual(
+            identity_block.count("opening_stats_complete()")
+            + document_block.count("opening_stats_complete()"),
+            2,
+        )
         self.assertNotRegex(identity_block, r"\b17\s*-")
         self.assertNotRegex(identity_block, r"stat_(str|dex|int|pow)\s*[<>]=?\s*(1|20)")
 
-    def test_signature_requires_true_hold_with_reset_and_single_return(self):
-        identity_block, _ = block_with_header(
+    def test_signature_state_machine_is_owned_by_outer_document_scope(self):
+        body_block, _ = block_with_header(
             self.system_source,
-            "screen opening_identity_body():",
+            "screen opening_identity_body(signature_hovered, signature_progress):",
+        )
+        document_block, _ = block_with_header(
+            self.system_source,
+            "screen opening_identity_document():",
         )
         for state in (
             "signature_hovered",
             "signature_holding",
             "signature_progress",
             "signature_complete",
+            "signature_started_at",
         ):
             with self.subTest(state=state):
-                self.assertIn(f"default {state} =", identity_block)
+                self.assertIn(f"default {state} =", document_block)
+                self.assertNotIn(f"default {state} =", body_block)
 
-        self.assertIn('key "mousedown_1"', identity_block)
-        self.assertIn('key "mouseup_1"', identity_block)
-        self.assertIn("hovered SetScreenVariable", identity_block)
-        self.assertIn("unhovered [", identity_block)
+        self.assertIn('key "mousedown_1"', document_block)
+        self.assertIn('key "mouseup_1"', document_block)
+        self.assertIn("timer 0.05 repeat True", document_block)
         self.assertRegex(
-            identity_block,
+            document_block,
+            r"(?m)^    if signature_holding:\s*\n"
+            r"        timer 0\.05 repeat True",
+        )
+        self.assertNotIn('key "mousedown_1"', body_block)
+        self.assertNotIn('key "mouseup_1"', body_block)
+        self.assertNotIn("timer 0.05", body_block)
+        self.assertIn(
+            "use opening_identity_body(signature_hovered, signature_progress)",
+            document_block,
+        )
+        self.assertIn("hovered SetScreenVariable", body_block)
+        self.assertIn("unhovered [", body_block)
+
+    def test_signature_uses_runtime_elapsed_with_gate_and_early_reset(self):
+        body_block, _ = block_with_header(
+            self.system_source,
+            "screen opening_identity_body(signature_hovered, signature_progress):",
+        )
+        document_block, _ = block_with_header(
+            self.system_source,
+            "screen opening_identity_document():",
+        )
+        start_helper = function_block(
+            self.system_source,
+            "opening_start_signature_hold",
+        )
+        self.assertRegex(
+            document_block,
             r"(?s)key\s+\"mousedown_1\".*?signature_hovered.*?"
-            r"opening_stats_complete\(\).*?signature_holding",
+            r"opening_stats_complete\(\).*?"
+            r"Function\(opening_start_signature_hold\)",
         )
+        self.assertIn("renpy.current_screen()", start_helper)
+        self.assertIn('scope["signature_started_at"] = renpy.get_game_runtime()', start_helper)
+        self.assertIn('scope["signature_holding"] = True', start_helper)
+        self.assertIn('scope["signature_progress"] = 0.0', start_helper)
+        self.assertIn("renpy.restart_interaction()", start_helper)
         self.assertRegex(
-            identity_block,
+            document_block,
             r"(?s)key\s+\"mouseup_1\".*?signature_holding.*?"
-            r"signature_progress.*?0\.0",
+            r"signature_progress.*?0\.0.*?signature_started_at.*?None",
         )
         self.assertRegex(
-            identity_block,
+            body_block,
             r"(?s)unhovered\s+\[.*?signature_holding.*?False.*?"
-            r"signature_progress.*?0\.0",
+            r"signature_progress.*?0\.0.*?signature_started_at.*?None",
         )
-        self.assertRegex(identity_block, r"timer\s+0\.05\s+repeat\s+True")
-        self.assertIn("signature_progress + 0.05", identity_block)
-        self.assertIn(">= 1.5", identity_block)
-        self.assertIn("StaticValue(signature_progress, 1.5)", identity_block)
-        self.assertEqual(1, identity_block.count("Return()"))
+        self.assertRegex(
+            document_block,
+            r"renpy\.get_game_runtime\(\)\s*-\s*signature_started_at",
+        )
+        self.assertRegex(
+            document_block,
+            r"(?s)max\(\s*0\.0\s*,\s*min\(\s*1\.5\s*,\s*"
+            r"renpy\.get_game_runtime\(\)\s*-\s*signature_started_at",
+        )
+        self.assertIn(">= 1.5", document_block)
+        self.assertNotIn("signature_progress + 0.05", self.system_source)
+        self.assertIn("StaticValue(signature_progress, 1.5)", body_block)
+        self.assertEqual(1, document_block.count("Return()"))
 
     def test_opening_identity_styles_exist(self):
         for style_name in (
