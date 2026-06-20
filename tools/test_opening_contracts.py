@@ -9,6 +9,15 @@ PROJECT_DIR = Path(__file__).resolve().parents[1]
 GAME_DIR = PROJECT_DIR / "game"
 OPENING_STATS_PATH = GAME_DIR / "opening_stats.rpy"
 CRT_EFFECT_PATH = GAME_DIR / "crt_effect.rpy"
+CRT_EFFECT_ASSET_PATHS = tuple(
+    GAME_DIR / "images" / "effects" / filename
+    for filename in (
+        "crt_scanlines.png",
+        "crt_noise_01.png",
+        "crt_noise_02.png",
+        "crt_noise_03.png",
+    )
+)
 OPENING_SYSTEM_PATH = GAME_DIR / "screens_opening_system.rpy"
 OPENING_SEQUENCE_PATH = GAME_DIR / "opening_sequence.rpy"
 SCRIPT_PATH = GAME_DIR / "script.rpy"
@@ -490,6 +499,12 @@ define crt_mode_settings = {
         for fragment in expected_fragments:
             with self.subTest(fragment=fragment):
                 self.assertIn(fragment, self.source)
+
+    def test_all_crt_assets_referenced_by_the_filter_are_deliverable_files(self):
+        for asset_path in CRT_EFFECT_ASSET_PATHS:
+            with self.subTest(asset_path=asset_path):
+                self.assertTrue(asset_path.is_file(), asset_path)
+                self.assertGreater(asset_path.stat().st_size, 0)
 
     def test_crt_screen_uses_each_mode_parameter(self):
         expected_uses = (
@@ -1062,12 +1077,13 @@ class OpeningMedicalConsentContractTests(unittest.TestCase):
         self.assertIn("progress", records_block)
         self.assertRegex(records_block, r"(bar\s+value|xsize\s+int\()[^\n]*progress")
 
-    def test_consent_bottom_helper_uses_range_edge_and_four_pixel_tolerance(self):
+    def test_consent_bottom_helper_requires_measured_range_and_uses_four_pixel_tolerance(self):
         block = function_block(self.system_source, "opening_consent_at_bottom")
 
+        self.assertIn('getattr(adjustment, "_opening_range_measured", False)', block)
         self.assertIn("adjustment.range <= 0", block)
         self.assertIn("adjustment.value >= adjustment.range - 4", block)
-        self.assertRegex(block, r"return\s+.*\bor\b")
+        self.assertRegex(block, r"(?s)return\s+\(.*\band\b")
 
     def test_consent_screen_binds_local_adjustment_and_gates_return_on_live_position(self):
         block, _ = block_with_header(
@@ -1077,7 +1093,8 @@ class OpeningMedicalConsentContractTests(unittest.TestCase):
         self.assertIn('style_prefix "opening_consent"', block)
         self.assertIn(
             "default consent_adjustment = ui.adjustment("
-            "raw_changed=opening_consent_adjustment_changed)",
+            "raw_changed=opening_consent_adjustment_changed, "
+            "ranged=opening_consent_adjustment_ranged)",
             block,
         )
 
@@ -1098,6 +1115,15 @@ class OpeningMedicalConsentContractTests(unittest.TestCase):
         )
         self.assertIn("action Return()", button_block)
         self.assertNotIn("SetScreenVariable", button_block)
+
+    def test_consent_range_callback_unlocks_only_after_viewport_measurement(self):
+        block = function_block(
+            self.system_source,
+            "opening_consent_adjustment_ranged",
+        )
+        self.assertIn('getattr(adjustment, "_opening_range_measured", False)', block)
+        self.assertIn("adjustment._opening_range_measured = True", block)
+        self.assertIn("renpy.restart_interaction()", block)
 
     def test_consent_vertical_scrollbar_uses_muted_medical_palette(self):
         style_block, _ = block_with_header(
@@ -1650,9 +1676,15 @@ class OpeningMedicalConsentContractTests(unittest.TestCase):
             r"renpy\.get_game_runtime\(\)\s*-\s*signature_started_at",
         )
         self.assertIn(">= 1.5", document_block)
+        self.assertRegex(
+            document_block,
+            r'(?s)key "mouseup_1".*?'
+            r"renpy\.get_game_runtime\(\) - signature_started_at >= 1\.5.*?"
+            r'SetScreenVariable\("signature_complete", True\).*?Return\(\)',
+        )
         self.assertNotIn("signature_progress + 0.05", self.system_source)
         self.assertIn("StaticValue(signature_progress, 1.5)", body_block)
-        self.assertEqual(1, document_block.count("Return()"))
+        self.assertEqual(2, document_block.count("Return()"))
 
     def test_opening_identity_styles_exist(self):
         for style_name in (
@@ -1836,7 +1868,8 @@ class OpeningHandoffContractTests(unittest.TestCase):
         )
         self.assertNotRegex(block, r"(?m)^\s*(show|image)\s+(?!screen opening_countdown)")
         self.assertNotIn("opening_play_sound", block)
-        self.assertNotIn("renpy.music", block)
+        self.assertIn('renpy.music.stop(channel="sound")', block)
+        self.assertIn('renpy.music.stop(channel="opening_foley")', block)
         self.assertNotIn("renpy.restart_interaction()", block)
         self.assertNotIn("hide screen opening_verification_body", block)
         self.assertNotRegex(block, r"(?m)^\s*(play|queue|voice)\b")

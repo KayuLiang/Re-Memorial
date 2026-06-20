@@ -211,6 +211,8 @@ label opening_scene_13:
 
 
 label opening_scene_14:
+    $ renpy.music.stop(channel="sound")
+    $ renpy.music.stop(channel="opening_foley")
     scene black
     show screen opening_countdown(3)
     pause 0.8

@@ -18,7 +18,26 @@ init python:
             renpy.music.play(path, channel=channel, loop=loop)
 
     def opening_consent_at_bottom(adjustment):
-        return adjustment.range <= 0 or adjustment.value >= adjustment.range - 4
+        return (
+            getattr(adjustment, "_opening_range_measured", False)
+            and (
+                adjustment.range <= 0
+                or adjustment.value >= adjustment.range - 4
+            )
+        )
+
+    def opening_consent_adjustment_ranged(adjustment):
+        was_measured = getattr(adjustment, "_opening_range_measured", False)
+        was_at_bottom = getattr(adjustment, "_opening_was_at_bottom", None)
+        at_bottom = (
+            adjustment.range <= 0
+            or adjustment.value >= adjustment.range - 4
+        )
+        adjustment._opening_range_measured = True
+        adjustment._opening_was_at_bottom = at_bottom
+        if not was_measured or at_bottom != was_at_bottom:
+            renpy.restart_interaction()
+        return None
 
     def opening_consent_adjustment_changed(adjustment, value):
         at_bottom = adjustment.range <= 0 or value >= adjustment.range - 4
@@ -771,7 +790,7 @@ screen opening_consent_document():
     modal True
     zorder 20
     style_prefix "opening_consent"
-    default consent_adjustment = ui.adjustment(raw_changed=opening_consent_adjustment_changed)
+    default consent_adjustment = ui.adjustment(raw_changed=opening_consent_adjustment_changed, ranged=opening_consent_adjustment_ranged)
 
     frame:
         style "opening_consent_dialog_frame"
@@ -1052,13 +1071,23 @@ screen opening_identity_document():
         NullAction(),
     )
     key "mouseup_1" action If(
-        signature_holding and not signature_complete,
+        signature_holding
+        and signature_started_at is not None
+        and opening_stats_complete()
+        and not signature_complete
+        and renpy.get_game_runtime() - signature_started_at >= 1.5,
+        [
+            SetScreenVariable("signature_holding", False),
+            SetScreenVariable("signature_progress", 1.5),
+            SetScreenVariable("signature_complete", True),
+            SetScreenVariable("signature_started_at", None),
+            Return(),
+        ],
         [
             SetScreenVariable("signature_holding", False),
             SetScreenVariable("signature_progress", 0.0),
             SetScreenVariable("signature_started_at", None),
         ],
-        SetScreenVariable("signature_holding", False),
     )
 
     if signature_holding:
