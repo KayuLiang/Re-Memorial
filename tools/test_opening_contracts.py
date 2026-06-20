@@ -1671,9 +1671,9 @@ class OpeningHandoffContractTests(unittest.TestCase):
         )
         self.assertRegex(block, r"pause\s+0\.45\b")
         self.assertNotIn("opening_active = False", block)
+        self.assertNotIn("hide screen opening_verification_body", block)
         self.assertNotRegex(block, r"(?m)^\s*return\s*$")
         for screen_name in (
-            "opening_verification_body",
             "opening_memory_overlay",
             "opening_flash_once",
             "opening_countdown",
@@ -1712,9 +1712,17 @@ class OpeningHandoffContractTests(unittest.TestCase):
                     block.count(f"show screen opening_countdown({number})"),
                 )
         self.assertEqual(3, len(re.findall(r"(?m)^\s*pause\s+0\.8\s*$", block)))
+        scene_lines = re.findall(r"(?m)^\s*scene\s+.*$", block)
+        self.assertGreaterEqual(len(scene_lines), 2)
+        self.assertTrue(
+            all(line.strip() == "scene black" for line in scene_lines),
+            scene_lines,
+        )
         self.assertNotRegex(block, r"(?m)^\s*(show|image)\s+(?!screen opening_countdown)")
         self.assertNotIn("opening_play_sound", block)
         self.assertNotIn("renpy.music", block)
+        self.assertNotIn("renpy.restart_interaction()", block)
+        self.assertNotIn("hide screen opening_verification_body", block)
         self.assertNotRegex(block, r"(?m)^\s*(play|queue|voice)\b")
         self.assertNotRegex(block, r"(?m)^\s*return\s*$")
         for screen_name in (

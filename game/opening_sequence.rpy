@@ -201,7 +201,6 @@ label opening_scene_13:
     show screen crt_effect(mode="shutdown")
     pause 0.45
 
-    hide screen opening_verification_body
     hide screen opening_system_desktop
     hide screen opening_memory_overlay
     hide screen opening_flash_once
@@ -238,9 +237,7 @@ label opening_scene_14:
     hide screen opening_name_insert
     hide screen opening_date_insert
     hide screen opening_identity_document
-    hide screen opening_verification_body
     hide screen opening_system_desktop
     $ opening_active = False
     hide screen crt_effect
-    $ renpy.restart_interaction()
     jump mountain_memory_start
