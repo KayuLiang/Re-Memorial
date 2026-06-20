@@ -13,6 +13,7 @@ OPENING_SYSTEM_PATH = GAME_DIR / "screens_opening_system.rpy"
 OPENING_SEQUENCE_PATH = GAME_DIR / "opening_sequence.rpy"
 SCRIPT_PATH = GAME_DIR / "script.rpy"
 MEDICAL_SCREENS_PATH = GAME_DIR / "screens_medical.rpy"
+MEDICAL_SCREENS_COMPILED_PATH = GAME_DIR / "screens_medical.rpyc"
 OPENING_AUDIO_README_PATH = GAME_DIR / "audio" / "opening" / "README.md"
 INVENTORY_SCREENS_PATH = GAME_DIR / "screens_inventory.rpy"
 PHONE_SCREENS_PATH = GAME_DIR / "screens_phone.rpy"
@@ -1751,6 +1752,7 @@ class OpeningHandoffContractTests(unittest.TestCase):
 
     def test_legacy_medical_screen_file_and_all_rpy_references_are_gone(self):
         self.assertFalse(MEDICAL_SCREENS_PATH.exists())
+        self.assertFalse(MEDICAL_SCREENS_COMPILED_PATH.exists())
         all_rpy = "\n".join(
             path.read_text(encoding="utf-8")
             for path in sorted(GAME_DIR.glob("*.rpy"))
