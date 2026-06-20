@@ -1074,6 +1074,7 @@ class OpeningMedicalConsentContractTests(unittest.TestCase):
             self.system_source,
             "screen opening_consent_document():",
         )
+        self.assertIn('style_prefix "opening_consent"', block)
         self.assertIn(
             "default consent_adjustment = ui.adjustment("
             "raw_changed=opening_consent_adjustment_changed)",
@@ -1097,6 +1098,19 @@ class OpeningMedicalConsentContractTests(unittest.TestCase):
         )
         self.assertIn("action Return()", button_block)
         self.assertNotIn("SetScreenVariable", button_block)
+
+    def test_consent_vertical_scrollbar_uses_muted_medical_palette(self):
+        style_block, _ = block_with_header(
+            self.system_source,
+            "style opening_consent_vscrollbar is vscrollbar:",
+        )
+
+        width = parse_style_tuple(style_block, "xsize")[0]
+        self.assertGreaterEqual(width, 18)
+        self.assertLessEqual(width, 20)
+        self.assertIn('base_bar Solid("#4d5a52")', style_block)
+        self.assertIn('thumb Solid("#617e6d")', style_block)
+        self.assertNotRegex(style_block.lower(), r"(cyan|#00ffff|#00b8ff)")
 
     def test_consent_adjustment_callback_restarts_only_on_bottom_state_boundaries(self):
         block = function_block(
@@ -1656,6 +1670,16 @@ class OpeningMedicalConsentContractTests(unittest.TestCase):
                     rf"(?m)^style\s+{re.escape(style_name)}\b",
                 )
 
+    def test_signature_frame_has_fixed_compact_height(self):
+        style_block, _ = block_with_header(
+            self.system_source,
+            "style opening_signature_frame is frame:",
+        )
+
+        self.assertEqual((98,), parse_style_tuple(style_block, "ysize"))
+        self.assertNotRegex(style_block, r"(?m)^\s*yfill\b")
+        self.assertNotRegex(style_block, r"(?m)^\s*yminimum\b")
+
     def test_identity_document_stays_inside_window_with_body_height_budget(self):
         document_style, _ = block_with_header(
             self.system_source,
@@ -1694,7 +1718,7 @@ class OpeningMedicalConsentContractTests(unittest.TestCase):
             parse_style_tuple(section_style, "size")[0]
             + 5 * parse_style_tuple(row_style, "ysize")[0]
             + parse_style_tuple(remaining_style, "size")[0]
-            + parse_style_tuple(signature_style, "yminimum")[0]
+            + parse_style_tuple(signature_style, "ysize")[0]
             + 7 * 9
         )
         self.assertGreaterEqual(available_body_height, right_column_budget)

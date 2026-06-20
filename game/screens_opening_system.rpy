@@ -770,6 +770,7 @@ screen opening_consent_body():
 screen opening_consent_document():
     modal True
     zorder 20
+    style_prefix "opening_consent"
     default consent_adjustment = ui.adjustment(raw_changed=opening_consent_adjustment_changed)
 
     frame:
@@ -1304,6 +1305,11 @@ style opening_consent_dialog_frame is frame:
     background Solid(opening_color_paper)
     padding (34, 24, 34, 24)
 
+style opening_consent_vscrollbar is vscrollbar:
+    xsize 18
+    base_bar Solid("#4d5a52")
+    thumb Solid("#617e6d")
+
 style opening_consent_center_text is gui_text:
     size 23
     color "#45564d"
@@ -1427,7 +1433,7 @@ style opening_identity_remaining_text is gui_text:
 
 style opening_signature_frame is frame:
     xfill True
-    yminimum 98
+    ysize 98
     background Solid("#617e6d")
     padding (0, 0, 0, 0)
 
