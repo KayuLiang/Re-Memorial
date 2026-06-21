@@ -51,6 +51,7 @@ label opening_scene_05:
     pause 0.08
     hide screen opening_flash_once
     show screen opening_system_desktop("opening_loading_body")
+    $ hue_separation_start("glitch", scope="fullscreen")
     show screen crt_effect(mode="subtle")
     fro "我听到有人在叫我的名字。"
     jump opening_scene_06
@@ -201,6 +202,7 @@ label opening_scene_13:
     show screen crt_effect(mode="shutdown")
     pause 0.45
 
+    $ hue_separation_stop()
     hide screen opening_system_desktop
     hide screen opening_memory_overlay
     hide screen opening_flash_once

@@ -5,6 +5,8 @@
 # Stop with:
 # $ hue_separation_stop()
 
+default persistent.hue_separation_enabled = True
+
 define hue_separation_baseline_pixels = 3.0
 define hue_separation_peak_pixels_min = 8.0
 define hue_separation_peak_pixels_max = 18.0
@@ -71,7 +73,10 @@ init python:
         )
 
     def _hue_separation_refresh_cameras():
-        if not hue_separation_active:
+        if (
+            not hue_separation_active
+            or not persistent.hue_separation_enabled
+        ):
             return
 
         _hue_separation_apply_camera("master")
@@ -91,7 +96,11 @@ init python:
         global hue_separation_peak_duration
         global hue_separation_pixels
 
-        if not hue_separation_active or hue_separation_mode != "glitch":
+        if (
+            not hue_separation_active
+            or hue_separation_mode != "glitch"
+            or not persistent.hue_separation_enabled
+        ):
             return
 
         hue_separation_pixels = renpy.random.uniform(
@@ -110,7 +119,11 @@ init python:
         global hue_separation_peak_active
         global hue_separation_pixels
 
-        if not hue_separation_active or hue_separation_mode != "glitch":
+        if (
+            not hue_separation_active
+            or hue_separation_mode != "glitch"
+            or not persistent.hue_separation_enabled
+        ):
             return
 
         hue_separation_pixels = hue_separation_baseline_pixels
@@ -150,13 +163,39 @@ init python:
         hue_separation_peak_active = False
         hue_separation_peak_duration = 0.0
 
-        _hue_separation_apply_camera("master")
-        if scope == "fullscreen":
-            _hue_separation_apply_camera("screens")
+        if persistent.hue_separation_enabled:
+            _hue_separation_apply_camera("master")
+            if scope == "fullscreen":
+                _hue_separation_apply_camera("screens")
 
-        if mode == "glitch":
-            _hue_separation_schedule_next()
-            renpy.show_screen("hue_separation_glitch_controller")
+            if mode == "glitch":
+                _hue_separation_schedule_next()
+                renpy.show_screen("hue_separation_glitch_controller")
+
+        renpy.restart_interaction()
+
+    def set_hue_separation_enabled(enabled):
+        global hue_separation_pixels
+        global hue_separation_peak_active
+        global hue_separation_peak_duration
+
+        persistent.hue_separation_enabled = bool(enabled)
+        renpy.hide_screen("hue_separation_glitch_controller")
+        _hue_separation_clear_camera("master")
+        _hue_separation_clear_camera("screens")
+
+        hue_separation_peak_active = False
+        hue_separation_peak_duration = 0.0
+        if hue_separation_active:
+            hue_separation_pixels = hue_separation_baseline_pixels
+        else:
+            hue_separation_pixels = 0.0
+
+        if persistent.hue_separation_enabled and hue_separation_active:
+            _hue_separation_refresh_cameras()
+            if hue_separation_mode == "glitch":
+                _hue_separation_schedule_next()
+                renpy.show_screen("hue_separation_glitch_controller")
 
         renpy.restart_interaction()
 

@@ -735,6 +735,22 @@ screen preferences():
 
                 vbox:
                     style_prefix "check"
+                    label _("显示效果")
+                    textbutton _("CRT 滤镜"):
+                        action Function(
+                            set_crt_effect_enabled,
+                            not persistent.crt_effect_enabled,
+                        )
+                        selected persistent.crt_effect_enabled
+                    textbutton _("色相差滤镜"):
+                        action Function(
+                            set_hue_separation_enabled,
+                            not persistent.hue_separation_enabled,
+                        )
+                        selected persistent.hue_separation_enabled
+
+                vbox:
+                    style_prefix "check"
                     label _("快进")
                     textbutton _("未读文本") action Preference("skip", "toggle")
                     textbutton _("选项后继续") action Preference("after choices", "toggle")

@@ -2,6 +2,8 @@
 # show screen crt_effect
 # hide screen crt_effect
 
+default persistent.crt_effect_enabled = True
+
 define crt_scroll_speed = 6.0
 define crt_overscan = 24
 define crt_mode_settings = {
@@ -24,6 +26,11 @@ define crt_mode_settings = {
         "jitter": 22,
     },
 }
+
+init python:
+    def set_crt_effect_enabled(enabled):
+        persistent.crt_effect_enabled = bool(enabled)
+        renpy.restart_interaction()
 
 image crt_noise_cycle:
     "images/effects/crt_noise_01.png"
@@ -67,29 +74,30 @@ screen crt_effect(mode="subtle"):
 
     $ settings = crt_mode_settings.get(mode, crt_mode_settings["subtle"])
 
-    fixed:
-        xsize config.screen_width
-        ysize config.screen_height
-        clipping True
-
+    if persistent.crt_effect_enabled:
         fixed:
-            xsize config.screen_width + crt_overscan * 2
+            xsize config.screen_width
             ysize config.screen_height
-            xpos -crt_overscan
-            at crt_horizontal_jitter(settings["jitter"])
+            clipping True
 
-            add "images/effects/crt_scanlines.png":
-                xsize config.screen_width + crt_overscan * 2
-                ysize config.screen_height * 2
-                alpha settings["scanline"]
-                at crt_scanline_scroll(crt_scroll_speed)
-
-            add "crt_noise_cycle":
+            fixed:
                 xsize config.screen_width + crt_overscan * 2
                 ysize config.screen_height
-                alpha settings["noise"]
+                xpos -crt_overscan
+                at crt_horizontal_jitter(settings["jitter"])
 
-            add Solid("#ffffff"):
-                xsize config.screen_width + crt_overscan * 2
-                ysize config.screen_height
-                at crt_flicker(settings["flicker"])
+                add "images/effects/crt_scanlines.png":
+                    xsize config.screen_width + crt_overscan * 2
+                    ysize config.screen_height * 2
+                    alpha settings["scanline"]
+                    at crt_scanline_scroll(crt_scroll_speed)
+
+                add "crt_noise_cycle":
+                    xsize config.screen_width + crt_overscan * 2
+                    ysize config.screen_height
+                    alpha settings["noise"]
+
+                add Solid("#ffffff"):
+                    xsize config.screen_width + crt_overscan * 2
+                    ysize config.screen_height
+                    at crt_flicker(settings["flicker"])

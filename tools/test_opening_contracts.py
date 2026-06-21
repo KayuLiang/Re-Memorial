@@ -628,6 +628,120 @@ class HueSeparationEffectContractTests(unittest.TestCase):
         )
 
 
+class FilterPreferenceContractTests(unittest.TestCase):
+    def setUp(self):
+        self.crt_source = CRT_EFFECT_PATH.read_text(encoding="utf-8")
+        self.hue_source = HUE_SEPARATION_EFFECT_PATH.read_text(encoding="utf-8")
+        self.screens_source = BASE_SCREENS_PATH.read_text(encoding="utf-8")
+        self.sequence_source = OPENING_SEQUENCE_PATH.read_text(encoding="utf-8")
+
+    def test_filter_preferences_default_to_enabled(self):
+        self.assertIn(
+            "default persistent.crt_effect_enabled = True",
+            self.crt_source,
+        )
+        self.assertIn(
+            "default persistent.hue_separation_enabled = True",
+            self.hue_source,
+        )
+
+    def test_crt_screen_keeps_request_but_gates_visual_layers(self):
+        self.assertIn("def set_crt_effect_enabled(enabled):", self.crt_source)
+        screen_block, _ = block_with_header(
+            self.crt_source,
+            'screen crt_effect(mode="subtle"):',
+        )
+        self.assertIn("if persistent.crt_effect_enabled:", screen_block)
+        self.assertIn(
+            "$ settings = crt_mode_settings.get(",
+            screen_block,
+        )
+
+    def test_hue_preference_setter_clears_and_restores_active_request(self):
+        setter = function_block(
+            self.hue_source,
+            "set_hue_separation_enabled",
+        )
+
+        self.assertIn("persistent.hue_separation_enabled = bool(enabled)", setter)
+        self.assertIn('renpy.hide_screen("hue_separation_glitch_controller")', setter)
+        self.assertIn('_hue_separation_clear_camera("master")', setter)
+        self.assertIn('_hue_separation_clear_camera("screens")', setter)
+        self.assertIn("if persistent.hue_separation_enabled", setter)
+        self.assertIn("and hue_separation_active", setter)
+        self.assertIn("_hue_separation_refresh_cameras()", setter)
+        self.assertIn("_hue_separation_schedule_next()", setter)
+        self.assertIn(
+            'renpy.show_screen("hue_separation_glitch_controller")',
+            setter,
+        )
+
+    def test_hue_start_records_request_without_rendering_when_disabled(self):
+        start = function_block(self.hue_source, "hue_separation_start")
+
+        self.assertIn("if persistent.hue_separation_enabled:", start)
+        active_position = start.index("hue_separation_active = True")
+        preference_position = start.index(
+            "if persistent.hue_separation_enabled:"
+        )
+        apply_position = start.index(
+            '_hue_separation_apply_camera("master")'
+        )
+        self.assertLess(active_position, preference_position)
+        self.assertLess(preference_position, apply_position)
+        self.assertIn(
+            'renpy.show_screen("hue_separation_glitch_controller")',
+            start[preference_position:],
+        )
+
+    def test_preferences_display_has_selected_filter_toggles(self):
+        preferences, _ = block_with_header(
+            self.screens_source,
+            "screen preferences():",
+        )
+
+        for label_text, helper, state in (
+            (
+                "CRT 滤镜",
+                "set_crt_effect_enabled",
+                "persistent.crt_effect_enabled",
+            ),
+            (
+                "色相差滤镜",
+                "set_hue_separation_enabled",
+                "persistent.hue_separation_enabled",
+            ),
+        ):
+            with self.subTest(label_text=label_text):
+                self.assertIn(f'textbutton _("{label_text}"):', preferences)
+                self.assertRegex(
+                    preferences,
+                    rf"(?s)action Function\(\s*{helper},\s*"
+                    rf"not {re.escape(state)},?\s*\)",
+                )
+                self.assertIn(f"selected {state}", preferences)
+
+    def test_medical_system_starts_and_stops_fullscreen_glitch_hue(self):
+        scene_05, _ = block_with_header(
+            self.sequence_source,
+            "label opening_scene_05:",
+        )
+        scene_13, _ = block_with_header(
+            self.sequence_source,
+            "label opening_scene_13:",
+        )
+
+        self.assertIn(
+            '$ hue_separation_start("glitch", scope="fullscreen")',
+            scene_05,
+        )
+        self.assertIn("$ hue_separation_stop()", scene_13)
+        self.assertLess(
+            scene_13.index("$ hue_separation_stop()"),
+            scene_13.index("hide screen opening_system_desktop"),
+        )
+
+
 class OpeningSystemShellContractTests(unittest.TestCase):
     def setUp(self):
         self.assertTrue(
