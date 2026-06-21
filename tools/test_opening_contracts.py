@@ -9,6 +9,7 @@ PROJECT_DIR = Path(__file__).resolve().parents[1]
 GAME_DIR = PROJECT_DIR / "game"
 OPENING_STATS_PATH = GAME_DIR / "opening_stats.rpy"
 CRT_EFFECT_PATH = GAME_DIR / "crt_effect.rpy"
+HUE_SEPARATION_EFFECT_PATH = GAME_DIR / "hue_separation_effect.rpy"
 CRT_EFFECT_ASSET_PATHS = tuple(
     GAME_DIR / "images" / "effects" / filename
     for filename in (
@@ -516,6 +517,115 @@ define crt_mode_settings = {
         for expected_use in expected_uses:
             with self.subTest(expected_use=expected_use):
                 self.assertIn(expected_use, self.source)
+
+
+class HueSeparationEffectContractTests(unittest.TestCase):
+    def setUp(self):
+        self.assertTrue(
+            HUE_SEPARATION_EFFECT_PATH.is_file(),
+            "game/hue_separation_effect.rpy must exist",
+        )
+        self.source = HUE_SEPARATION_EFFECT_PATH.read_text(encoding="utf-8")
+
+    def test_public_api_and_modes_exist(self):
+        self.assertIn(
+            'def hue_separation_start(mode="steady", scope="scene"):',
+            self.source,
+        )
+        self.assertIn("def hue_separation_stop():", self.source)
+        self.assertIn('("steady", "glitch")', self.source)
+        self.assertIn('("scene", "fullscreen")', self.source)
+
+    def test_shader_and_camera_transform_exist(self):
+        self.assertIn(
+            'renpy.register_shader("rememorial.hue_separation"',
+            self.source,
+        )
+        self.assertIn(
+            "uniform float u_hue_separation_pixels;",
+            self.source,
+        )
+        self.assertIn("uniform vec2 u_model_size;", self.source)
+        self.assertIn("transform hue_separation_camera:", self.source)
+        self.assertIn('shader "rememorial.hue_separation"', self.source)
+        self.assertIn("function hue_separation_camera_update", self.source)
+
+    def test_camera_redraws_only_when_strength_changes(self):
+        camera_update = function_block(
+            self.source,
+            "hue_separation_camera_update",
+        )
+        begin_peak = function_block(
+            self.source,
+            "_hue_separation_begin_peak",
+        )
+        end_peak = function_block(
+            self.source,
+            "_hue_separation_end_peak",
+        )
+
+        self.assertNotIn("return 0", camera_update)
+        self.assertIn("_hue_separation_refresh_cameras()", begin_peak)
+        self.assertIn("_hue_separation_refresh_cameras()", end_peak)
+
+    def test_strength_and_random_bounds_are_explicit(self):
+        expected_fragments = (
+            "define hue_separation_baseline_pixels = 3.0",
+            "define hue_separation_peak_pixels_min = 8.0",
+            "define hue_separation_peak_pixels_max = 18.0",
+            "define hue_separation_wait_min = 6.0",
+            "define hue_separation_wait_max = 12.0",
+            "define hue_separation_peak_duration_min = 0.1",
+            "define hue_separation_peak_duration_max = 0.5",
+        )
+        for fragment in expected_fragments:
+            with self.subTest(fragment=fragment):
+                self.assertIn(fragment, self.source)
+
+    def test_start_replaces_controller_and_applies_requested_layers(self):
+        start_block = function_block(self.source, "hue_separation_start")
+
+        self.assertIn(
+            'renpy.hide_screen("hue_separation_glitch_controller")',
+            start_block,
+        )
+        self.assertIn('_hue_separation_clear_camera("master")', start_block)
+        self.assertIn('_hue_separation_clear_camera("screens")', start_block)
+        self.assertIn('_hue_separation_apply_camera("master")', start_block)
+        self.assertIn('if scope == "fullscreen":', start_block)
+        self.assertIn('_hue_separation_apply_camera("screens")', start_block)
+        self.assertIn(
+            'renpy.show_screen("hue_separation_glitch_controller")',
+            start_block,
+        )
+
+    def test_stop_clears_all_runtime_state(self):
+        stop_block = function_block(self.source, "hue_separation_stop")
+
+        self.assertIn(
+            'renpy.hide_screen("hue_separation_glitch_controller")',
+            stop_block,
+        )
+        self.assertIn('_hue_separation_clear_camera("master")', stop_block)
+        self.assertIn('_hue_separation_clear_camera("screens")', stop_block)
+        self.assertIn("hue_separation_active = False", stop_block)
+        self.assertIn("hue_separation_pixels = 0.0", stop_block)
+
+    def test_glitch_controller_uses_one_shared_peak_state(self):
+        self.assertIn(
+            "screen hue_separation_glitch_controller():",
+            self.source,
+        )
+        self.assertIn("timer hue_separation_next_delay", self.source)
+        self.assertIn("timer hue_separation_peak_duration", self.source)
+        self.assertIn(
+            "Function(_hue_separation_begin_peak)",
+            self.source,
+        )
+        self.assertIn(
+            "Function(_hue_separation_end_peak)",
+            self.source,
+        )
 
 
 class OpeningSystemShellContractTests(unittest.TestCase):
