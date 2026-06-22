@@ -1,9 +1,13 @@
 default opening_active = False
 
 
-label complete_opening_sequence:
+label story_0_1_0:
     $ opening_active = True
     jump opening_scene_00
+
+
+label complete_opening_sequence:
+    jump story_0_1_0
 
 
 label opening_scene_00:
@@ -240,4 +244,4 @@ label opening_scene_14:
     hide screen opening_system_desktop
     $ opening_active = False
     hide screen crt_effect
-    jump mountain_memory_start
+    jump story_1_1_1

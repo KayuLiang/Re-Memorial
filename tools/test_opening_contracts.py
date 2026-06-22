@@ -7,6 +7,11 @@ from pathlib import Path
 
 PROJECT_DIR = Path(__file__).resolve().parents[1]
 GAME_DIR = PROJECT_DIR / "game"
+STORY_DIR = GAME_DIR / "story"
+STORY_OPENING_PATH = STORY_DIR / "0-1-0.rpy"
+STORY_DREAM_PATH = STORY_DIR / "1-1-1.rpy"
+STORY_HOSPITAL_PATH = STORY_DIR / "1-1-2.rpy"
+STORY_APARTMENT_PATH = STORY_DIR / "1-1-3.rpy"
 OPENING_STATS_PATH = GAME_DIR / "opening_stats.rpy"
 CRT_EFFECT_PATH = GAME_DIR / "crt_effect.rpy"
 HUE_SEPARATION_EFFECT_PATH = GAME_DIR / "hue_separation_effect.rpy"
@@ -20,7 +25,7 @@ CRT_EFFECT_ASSET_PATHS = tuple(
     )
 )
 OPENING_SYSTEM_PATH = GAME_DIR / "screens_opening_system.rpy"
-OPENING_SEQUENCE_PATH = GAME_DIR / "opening_sequence.rpy"
+OPENING_SEQUENCE_PATH = STORY_OPENING_PATH
 SCRIPT_PATH = GAME_DIR / "script.rpy"
 MEDICAL_SCREENS_PATH = GAME_DIR / "screens_medical.rpy"
 MEDICAL_SCREENS_COMPILED_PATH = GAME_DIR / "screens_medical.rpyc"
@@ -30,6 +35,12 @@ INVENTORY_SCREENS_PATH = GAME_DIR / "screens_inventory.rpy"
 PHONE_SCREENS_PATH = GAME_DIR / "screens_phone.rpy"
 BASE_SCREENS_PATH = GAME_DIR / "screens.rpy"
 OPTIONS_PATH = GAME_DIR / "options.rpy"
+STORY_FILE_PATHS = {
+    "0-1-0": STORY_OPENING_PATH,
+    "1-1-1": STORY_DREAM_PATH,
+    "1-1-2": STORY_HOSPITAL_PATH,
+    "1-1-3": STORY_APARTMENT_PATH,
+}
 
 
 def function_block(source, function_name):
@@ -215,11 +226,70 @@ class ProjectVersionContractTests(unittest.TestCase):
         )
 
 
+class StoryFileOrganizationContractTests(unittest.TestCase):
+    def test_numbered_story_files_exist(self):
+        for story_id, story_path in STORY_FILE_PATHS.items():
+            with self.subTest(story_id=story_id):
+                self.assertTrue(story_path.is_file(), story_path)
+
+    def test_script_contains_only_shared_declarations_and_entry(self):
+        source = SCRIPT_PATH.read_text(encoding="utf-8")
+
+        self.assertIn("label start:", source)
+        self.assertIn("jump story_0_1_0", source)
+        self.assertNotIn("label mountain_memory_start:", source)
+        self.assertNotIn('centered "20XX年', source)
+        self.assertNotIn("opening_scene_00", source)
+
+    def test_story_segments_use_stable_entry_labels_and_explicit_jumps(self):
+        expected = {
+            "0-1-0": (
+                "label story_0_1_0:",
+                "jump story_1_1_1",
+            ),
+            "1-1-1": (
+                "label story_1_1_1:",
+                "jump story_1_1_2",
+            ),
+            "1-1-2": (
+                "label story_1_1_2:",
+                "jump story_1_1_3",
+            ),
+            "1-1-3": (
+                "label story_1_1_3:",
+                "return",
+            ),
+        }
+
+        for story_id, fragments in expected.items():
+            source = STORY_FILE_PATHS[story_id].read_text(encoding="utf-8")
+            with self.subTest(story_id=story_id):
+                for fragment in fragments:
+                    self.assertIn(fragment, source)
+
+    def test_known_story_openings_belong_to_their_numbered_files(self):
+        dream = STORY_FILE_PATHS["1-1-1"].read_text(encoding="utf-8")
+        hospital = STORY_FILE_PATHS["1-1-2"].read_text(encoding="utf-8")
+        apartment = STORY_FILE_PATHS["1-1-3"].read_text(encoding="utf-8")
+
+        self.assertIn("label mountain_memory_start:", dream)
+        self.assertIn(
+            'centered "20XX年8月18日 星期一 下午 13:30"',
+            hospital,
+        )
+        self.assertIn(
+            'centered "20XX年8月18日 星期一 下午 15：30"',
+            apartment,
+        )
+        self.assertNotIn('centered "20XX年8月18日 星期一 下午 13:30"', dream)
+        self.assertNotIn('centered "20XX年8月18日 星期一 下午 15：30"', hospital)
+
+
 class OpeningStatsContractTests(unittest.TestCase):
     def test_stat_defaults_have_one_exact_canonical_value(self):
         source = "\n".join(
             path.read_text(encoding="utf-8")
-            for path in sorted(GAME_DIR.glob("*.rpy"))
+            for path in sorted(GAME_DIR.rglob("*.rpy"))
         )
 
         expected_defaults = {
@@ -1212,12 +1282,21 @@ class OpeningPreSystemSequenceContractTests(unittest.TestCase):
     def test_complete_sequence_sets_active_and_jumps_to_scene_zero(self):
         block, _ = block_with_header(
             self.sequence_source,
-            "label complete_opening_sequence:",
+            "label story_0_1_0:",
         )
 
         self.assertEqual(
             ["$ opening_active = True", "jump opening_scene_00"],
             direct_child_lines(block),
+        )
+
+        compatibility_block, _ = block_with_header(
+            self.sequence_source,
+            "label complete_opening_sequence:",
+        )
+        self.assertEqual(
+            ["jump story_0_1_0"],
+            direct_child_lines(compatibility_block),
         )
 
     def test_opening_scene_00_pause_uses_modal_false_to_avoid_modal_deadlock(self):
@@ -1235,7 +1314,7 @@ class OpeningPreSystemSequenceContractTests(unittest.TestCase):
     def test_opening_active_has_single_canonical_default(self):
         all_rpy = "\n".join(
             path.read_text(encoding="utf-8")
-            for path in sorted(GAME_DIR.glob("*.rpy"))
+            for path in sorted(GAME_DIR.rglob("*.rpy"))
         )
         declarations = re.findall(
             r"(?m)^\s*default\s+opening_active\s*=\s*(True|False)\s*$",
@@ -1246,7 +1325,7 @@ class OpeningPreSystemSequenceContractTests(unittest.TestCase):
     def test_complete_opening_sequence_does_not_call_return_or_clear_active(self):
         block, _ = block_with_header(
             self.sequence_source,
-            "label complete_opening_sequence:",
+            "label story_0_1_0:",
         )
         self.assertRegex(block, r"(?m)^\s*\$\s*opening_active\s*=\s*True\s*$")
         self.assertNotIn("opening_active = False", block)
@@ -1557,7 +1636,7 @@ class OpeningMedicalConsentContractTests(unittest.TestCase):
             self.sequence_source,
             "label opening_scene_14:",
         )
-        self.assertIn("jump mountain_memory_start", scene_14)
+        self.assertIn("jump story_1_1_1", scene_14)
 
     def test_scene_07_strengthens_crt_plays_burst_and_presents_both_notices(self):
         block, _ = block_with_header(self.sequence_source, "label opening_scene_07:")
@@ -2084,11 +2163,12 @@ class OpeningHandoffContractTests(unittest.TestCase):
         self.system_source = OPENING_SYSTEM_PATH.read_text(encoding="utf-8")
         self.sequence_source = OPENING_SEQUENCE_PATH.read_text(encoding="utf-8")
         self.script_source = SCRIPT_PATH.read_text(encoding="utf-8")
+        self.dream_source = STORY_DREAM_PATH.read_text(encoding="utf-8")
 
-    def test_start_only_jumps_to_complete_opening_sequence(self):
+    def test_start_only_jumps_to_numbered_opening_segment(self):
         block, _ = block_with_header(self.script_source, "label start:")
         self.assertEqual(
-            ["jump complete_opening_sequence"],
+            ["jump story_0_1_0"],
             direct_child_lines(block),
         )
 
@@ -2169,7 +2249,7 @@ class OpeningHandoffContractTests(unittest.TestCase):
             "scene black",
             "renpy.pause(2.5, hard=True, modal=False)",
             "opening_active = False",
-            "jump mountain_memory_start",
+            "jump story_1_1_1",
         )
         cursor = 0
         for fragment in ordered:
@@ -2217,17 +2297,26 @@ class OpeningHandoffContractTests(unittest.TestCase):
             with self.subTest(screen_name=screen_name):
                 self.assertIn(f"hide screen {screen_name}", block)
 
-    def test_mountain_handoff_label_is_unique_and_immediately_precedes_first_wind(self):
+    def test_mountain_compatibility_label_and_story_entry_are_wired(self):
         labels = re.findall(
             r"(?m)^\s*label\s+mountain_memory_start\s*:\s*$",
-            self.script_source,
+            self.dream_source,
         )
         self.assertEqual(1, len(labels))
-        label_position = self.script_source.index("label mountain_memory_start:")
-        first_wind_position = self.script_source.index("    wind ")
+        compatibility_block, _ = block_with_header(
+            self.dream_source,
+            "label mountain_memory_start:",
+        )
+        self.assertEqual(
+            ["jump story_1_1_1"],
+            direct_child_lines(compatibility_block),
+        )
+
+        label_position = self.dream_source.index("label story_1_1_1:")
+        first_wind_position = self.dream_source.index("    wind ")
         self.assertLess(label_position, first_wind_position)
-        between = self.script_source[
-            label_position + len("label mountain_memory_start:"):first_wind_position
+        between = self.dream_source[
+            label_position + len("label story_1_1_1:"):first_wind_position
         ]
         self.assertEqual("", between.strip())
 
@@ -2236,7 +2325,7 @@ class OpeningHandoffContractTests(unittest.TestCase):
         self.assertFalse(MEDICAL_SCREENS_COMPILED_PATH.exists())
         all_rpy = "\n".join(
             path.read_text(encoding="utf-8")
-            for path in sorted(GAME_DIR.glob("*.rpy"))
+            for path in sorted(GAME_DIR.rglob("*.rpy"))
         )
         self.assertNotIn("medical_system_panel", all_rpy)
         self.assertNotIn("medical_confirm", all_rpy)
