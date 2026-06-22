@@ -4,24 +4,24 @@
 
 default persistent.crt_effect_enabled = True
 
-define crt_scroll_speed = 6.0
+define crt_scroll_speed = 18.0
 define crt_overscan = 24
 define crt_mode_settings = {
     "subtle": {
-        "scanline": 0.22,
-        "noise": 0.18,
+        "scanline": 0.40,
+        "noise": 0.30,
         "flicker": 0.012,
         "jitter": 0,
     },
     "interference": {
-        "scanline": 0.46,
-        "noise": 0.42,
+        "scanline": 0.62,
+        "noise": 0.50,
         "flicker": 0.045,
         "jitter": 8,
     },
     "shutdown": {
-        "scanline": 0.75,
-        "noise": 0.78,
+        "scanline": 0.82,
+        "noise": 0.80,
         "flicker": 0.18,
         "jitter": 22,
     },
@@ -41,7 +41,7 @@ image crt_noise_cycle:
     pause 0.11
     repeat
 
-transform crt_scanline_scroll(speed=6.0):
+transform crt_scanline_scroll(speed=18.0):
     subpixel True
     ypos -config.screen_height
     linear speed ypos 0

@@ -9,7 +9,8 @@ ROOT = Path(__file__).resolve().parents[1]
 GUI_FILE = ROOT / "game" / "gui.rpy"
 OUTPUT_DIR = ROOT / "game" / "images" / "effects"
 
-SCANLINE_SPACING = 4
+SCANLINE_SPACING = 8
+SCANLINE_THICKNESS = 4
 SCANLINE_ALPHA = 36
 NOISE_ALPHA_MAX = 22
 NOISE_DENSITY = 0.018
@@ -39,7 +40,10 @@ def write_rgba_png(path, width, height, rows):
 def generate_scanlines(width, height):
     clear = bytes(width * 4)
     line = bytes((224, 230, 232, SCANLINE_ALPHA)) * width
-    rows = (line if y % SCANLINE_SPACING == 0 else clear for y in range(height * 2))
+    rows = (
+        line if y % SCANLINE_SPACING < SCANLINE_THICKNESS else clear
+        for y in range(height * 2)
+    )
     write_rgba_png(OUTPUT_DIR / "crt_scanlines.png", width, height * 2, rows)
 
 

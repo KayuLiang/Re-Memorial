@@ -63,17 +63,17 @@ label opening_scene_06:
     $ opening_play_sound("audio/opening/footsteps_urgent.ogg")
     $ lines.append("一阵急促的脚步声。")
     show screen opening_memory_overlay(lines)
-    pause 0.48
+    pause
 
     $ opening_play_sound("audio/opening/heavy_impact.ogg")
     $ lines.append("重物落地的闷响。")
     show screen opening_memory_overlay(lines)
-    pause 0.52
+    pause
 
     $ opening_play_sound("audio/opening/emergency_radio.ogg")
     $ lines.append("“现场安全，患者雄性，意识模糊——”")
     show screen opening_memory_overlay(lines)
-    pause 0.72
+    pause
 
     hide screen opening_memory_overlay
     with Dissolve(0.30)
@@ -124,23 +124,23 @@ label opening_scene_09:
     $ opening_play_sound("audio/opening/wind_gap.ogg")
     $ lines.append("风掠过车窗缝隙的尖啸。")
     show screen opening_memory_overlay(lines)
-    pause 0.48
+    pause
 
     $ opening_play_sound("audio/opening/stretcher_wheels.ogg")
     $ opening_play_sound("audio/opening/metal_scrape.ogg", channel="opening_foley")
     $ lines.append("金属的滚轮快速摩擦地面的叮铃声，担架床吱呀好像就要散架。")
     show screen opening_memory_overlay(lines)
-    pause 0.62
+    pause
 
     $ opening_play_sound("audio/opening/handoff_shout.ogg")
     $ lines.append("“交接！手术室准备！”")
     show screen opening_memory_overlay(lines)
-    pause 0.52
+    pause
 
     $ opening_play_sound("audio/opening/isolation_door.ogg")
     $ lines.append("然后是厚实的隔离门缓缓关上。")
     show screen opening_memory_overlay(lines)
-    pause 0.72
+    pause
 
     hide screen opening_memory_overlay
     with Dissolve(0.34)
@@ -169,16 +169,12 @@ label opening_scene_12:
     system "请核对个人信息。"
     fro "姓名——"
 
-    show screen opening_name_insert
-    pause 0.8
-    hide screen opening_name_insert
+    call screen opening_name_insert
     show screen opening_system_desktop("opening_identity_preview_body")
 
     fro "日期——"
 
-    show screen opening_date_insert
-    pause 0.8
-    hide screen opening_date_insert
+    call screen opening_date_insert
     show screen opening_system_desktop("opening_identity_preview_body")
 
     fro "上面的初始属性——这是什么？"

@@ -65,12 +65,17 @@ transform opening_scope_scroll(distance=opening_scope_wave_span):
     repeat
 
 
+transform opening_ui_dimmed:
+    matrixcolor TintMatrix("#b3b3b3")
+
+
 screen opening_system_desktop(body_screen, body_args=None):
     zorder -10
     $ body_args = tuple(body_args or ())
 
     frame:
         style "opening_shell_desktop_frame"
+        at opening_ui_dimmed
 
         add Solid(opening_color_desktop_dark) alpha 0.24
 
@@ -459,8 +464,8 @@ style opening_shell_taskbar_time_text is gui_text:
 
 transform opening_prompt_blink:
     alpha 0.28
-    linear 0.28 alpha 1.0
-    linear 0.28 alpha 0.28
+    linear 0.56 alpha 1.0
+    linear 0.56 alpha 0.28
     repeat
 
 
@@ -741,7 +746,7 @@ screen opening_countdown(number):
 
     add Solid("#000000")
 
-    text number:
+    text "[number]":
         xalign 0.5
         yalign 0.5
         size 144
@@ -912,6 +917,15 @@ screen opening_name_insert():
     zorder 50
 
     add Solid("#000000")
+
+    timer 0.8 action Return()
+
+    button:
+        style "opening_clear_fullscreen_button"
+        action Return()
+
+    key "dismiss" action Return()
+
     text "弗洛":
         xalign 0.5
         yalign 0.5
@@ -924,6 +938,14 @@ screen opening_date_insert():
     zorder 50
 
     add Solid("#000000")
+
+    timer 0.8 action Return()
+
+    button:
+        style "opening_clear_fullscreen_button"
+        action Return()
+
+    key "dismiss" action Return()
 
     frame:
         xalign 0.5

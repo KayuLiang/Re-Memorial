@@ -25,6 +25,7 @@ SCRIPT_PATH = GAME_DIR / "script.rpy"
 MEDICAL_SCREENS_PATH = GAME_DIR / "screens_medical.rpy"
 MEDICAL_SCREENS_COMPILED_PATH = GAME_DIR / "screens_medical.rpyc"
 OPENING_AUDIO_README_PATH = GAME_DIR / "audio" / "opening" / "README.md"
+CRT_ASSET_GENERATOR_PATH = PROJECT_DIR / "tools" / "generate_crt_assets.py"
 INVENTORY_SCREENS_PATH = GAME_DIR / "screens_inventory.rpy"
 PHONE_SCREENS_PATH = GAME_DIR / "screens_phone.rpy"
 BASE_SCREENS_PATH = GAME_DIR / "screens.rpy"
@@ -379,20 +380,20 @@ define crt_mode_settings = {
     def test_crt_mode_settings_define_all_presets_and_parameters(self):
         expected_settings = {
             "subtle": {
-                "scanline": 0.22,
-                "noise": 0.18,
+                "scanline": 0.40,
+                "noise": 0.30,
                 "flicker": 0.012,
                 "jitter": 0,
             },
             "interference": {
-                "scanline": 0.46,
-                "noise": 0.42,
+                "scanline": 0.62,
+                "noise": 0.50,
                 "flicker": 0.045,
                 "jitter": 8,
             },
             "shutdown": {
-                "scanline": 0.75,
-                "noise": 0.78,
+                "scanline": 0.82,
+                "noise": 0.80,
                 "flicker": 0.18,
                 "jitter": 22,
             },
@@ -400,6 +401,41 @@ define crt_mode_settings = {
 
         parsed_settings = parse_renpy_dict(self.source, "crt_mode_settings")
         self.assertEqual(expected_settings, parsed_settings)
+        for parameter in ("scanline", "noise"):
+            self.assertLess(
+                parsed_settings["subtle"][parameter],
+                parsed_settings["interference"][parameter],
+            )
+            self.assertLess(
+                parsed_settings["interference"][parameter],
+                parsed_settings["shutdown"][parameter],
+            )
+
+    def test_crt_scanline_generator_uses_four_pixel_lines_and_gaps(self):
+        generator_source = CRT_ASSET_GENERATOR_PATH.read_text(encoding="utf-8")
+
+        self.assertRegex(
+            generator_source,
+            r"(?m)^SCANLINE_SPACING\s*=\s*8\s*$",
+        )
+        self.assertRegex(
+            generator_source,
+            r"(?m)^SCANLINE_THICKNESS\s*=\s*4\s*$",
+        )
+        self.assertIn(
+            "y % SCANLINE_SPACING < SCANLINE_THICKNESS",
+            generator_source,
+        )
+
+    def test_crt_scanlines_scroll_at_one_third_speed(self):
+        self.assertRegex(
+            self.source,
+            r"(?m)^define crt_scroll_speed = 18\.0$",
+        )
+        self.assertIn(
+            "transform crt_scanline_scroll(speed=18.0):",
+            self.source,
+        )
 
     def test_crt_horizontal_jitter_is_defined_and_applied(self):
         self.assertIn("transform crt_horizontal_jitter(amount=0):", self.source)
@@ -491,7 +527,7 @@ define crt_mode_settings = {
             '"images/effects/crt_noise_01.png"',
             '"images/effects/crt_noise_02.png"',
             '"images/effects/crt_noise_03.png"',
-            "transform crt_scanline_scroll(speed=6.0):",
+            "transform crt_scanline_scroll(speed=18.0):",
             "transform crt_flicker(strength=0.025):",
             "at crt_scanline_scroll(crt_scroll_speed)",
             'at crt_flicker(settings["flicker"])',
@@ -779,6 +815,19 @@ class OpeningSystemShellContractTests(unittest.TestCase):
         for fragment in expected_fragments:
             with self.subTest(fragment=fragment):
                 self.assertIn(fragment, self.source)
+
+    def test_opening_medical_desktop_dims_all_child_colors_to_seventy_percent(self):
+        transform_block, _ = block_with_header(
+            self.source,
+            "transform opening_ui_dimmed:",
+        )
+        desktop_block, _ = block_with_header(
+            self.source,
+            "screen opening_system_desktop(body_screen, body_args=None):",
+        )
+
+        self.assertIn('matrixcolor TintMatrix("#b3b3b3")', transform_block)
+        self.assertIn("at opening_ui_dimmed", desktop_block)
 
     def test_opening_shell_window_uses_dynamic_body_screen(self):
         window_block, _ = block_with_header(
@@ -1092,6 +1141,15 @@ class OpeningPreSystemSequenceContractTests(unittest.TestCase):
             r'(?m)^\s*(mousearea|button):\s*$',
         )
         self.assertIn("action Return()", screen_block)
+
+    def test_tap_to_start_blinks_at_half_speed(self):
+        transform_block, _ = block_with_header(
+            self.system_source,
+            "transform opening_prompt_blink:",
+        )
+
+        self.assertEqual(2, transform_block.count("linear 0.56"))
+        self.assertNotIn("linear 0.28", transform_block)
 
     def test_opening_scene_03_waits_once_then_plays_three_drops(self):
         scene_block, _ = block_with_header(self.sequence_source, "label opening_scene_03:")
@@ -1547,8 +1605,11 @@ class OpeningMedicalConsentContractTests(unittest.TestCase):
         ):
             with self.subTest(sound=sound):
                 self.assertIn(f'audio/opening/{sound}', block)
-        door_position = block.index("isolation_door.ogg")
-        self.assertRegex(block[door_position:], r"pause\s+0\.\d+")
+        self.assertEqual(
+            4,
+            len(re.findall(r"(?m)^\s*pause\s*$", block)),
+        )
+        self.assertNotRegex(block, r"(?m)^\s*pause\s+\d")
         self.assertIn("with Dissolve(", block)
 
     def test_scene_03_plays_primary_then_two_soft_drops_without_changing_drop_count(self):
@@ -1604,6 +1665,11 @@ class OpeningMedicalConsentContractTests(unittest.TestCase):
             block.count("show screen opening_memory_overlay(lines)"),
             3,
         )
+        self.assertEqual(
+            3,
+            len(re.findall(r"(?m)^\s*pause\s*$", block)),
+        )
+        self.assertNotRegex(block, r"(?m)^\s*pause\s+\d")
 
     def test_scene_09_overlapping_wheels_and_scrape_use_distinct_channels(self):
         block, _ = block_with_header(self.sequence_source, "label opening_scene_09:")
@@ -1658,12 +1724,10 @@ class OpeningMedicalConsentContractTests(unittest.TestCase):
             'show screen opening_system_desktop("opening_identity_preview_body")',
             'system "请核对个人信息。"',
             'fro "姓名——"',
-            "show screen opening_name_insert",
-            "hide screen opening_name_insert",
+            "call screen opening_name_insert",
             'show screen opening_system_desktop("opening_identity_preview_body")',
             'fro "日期——"',
-            "show screen opening_date_insert",
-            "hide screen opening_date_insert",
+            "call screen opening_date_insert",
             'show screen opening_system_desktop("opening_identity_preview_body")',
             'fro "上面的初始属性——这是什么？"',
             'system "关于你在这场手术中物质的使用，一经确认无法更改，请保证你充分利用它们的价值。"',
@@ -1677,7 +1741,31 @@ class OpeningMedicalConsentContractTests(unittest.TestCase):
             positions.append(position)
             cursor = position + len(line)
         self.assertEqual(sorted(positions), positions)
-        self.assertGreaterEqual(block.count("pause 0."), 2)
+        self.assertNotIn("show screen opening_name_insert", block)
+        self.assertNotIn("show screen opening_date_insert", block)
+        self.assertNotIn("pause 0.8", block)
+
+    def test_scene_12_identity_inserts_allow_mouse_keyboard_and_timeout_progression(self):
+        scene_block, _ = block_with_header(
+            self.sequence_source,
+            "label opening_scene_12:",
+        )
+        self.assertIn("call screen opening_name_insert", scene_block)
+        self.assertIn("call screen opening_date_insert", scene_block)
+
+        for screen_header in (
+            "screen opening_name_insert():",
+            "screen opening_date_insert():",
+        ):
+            with self.subTest(screen_header=screen_header):
+                screen_block, _ = block_with_header(
+                    self.system_source,
+                    screen_header,
+                )
+                self.assertIn("timer 0.8 action Return()", screen_block)
+                self.assertIn('key "dismiss" action Return()', screen_block)
+                self.assertIn('style "opening_clear_fullscreen_button"', screen_block)
+                self.assertIn("action Return()", screen_block)
 
     def test_scene_12_jumps_to_verification_without_cleanup_or_return(self):
         block, _ = block_with_header(self.sequence_source, "label opening_scene_12:")
@@ -2008,7 +2096,8 @@ class OpeningHandoffContractTests(unittest.TestCase):
         self.assertIn("use opening_oscilloscope", verification)
         self.assertNotIn("opening_system_desktop", verification)
         self.assertIn('add Solid("#000000")', countdown)
-        self.assertIn("text number", countdown)
+        self.assertIn('text "[number]"', countdown)
+        self.assertNotRegex(countdown, r"(?m)^\s*text\s+number\s*:")
         self.assertRegex(countdown, r"(?m)^\s*size\s+(?:[7-9]\d|1\d\d)\s*$")
         self.assertRegex(countdown, r'(?m)^\s*color\s+"#(?:fff|ffffff)"\s*$')
 
