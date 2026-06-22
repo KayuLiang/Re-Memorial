@@ -15,7 +15,14 @@
 **Files:**
 - Modify: `tools/test_opening_contracts.py`
 
-- [ ] Add contracts requiring persistent defaults, effect gates, settings controls, and opening calls.
+- [ ] Add contracts requiring:
+  - `default persistent.crt_effect_enabled = True`
+  - `default persistent.hue_separation_enabled = True`
+  - CRT screen conditional rendering and `set_crt_effect_enabled`
+  - hue preference setter, disable cleanup, active-request restoration, and disabled start behavior
+  - two selected Display controls in `screen preferences()`
+  - opening scene 05 starts `glitch + fullscreen`
+  - opening scene 13 stops hue before final cleanup
 - [ ] Run focused classes and verify failures are caused by missing preference integration.
 
 ### Task 2: Implement effect preference gates
@@ -24,9 +31,13 @@
 - Modify: `game/crt_effect.rpy`
 - Modify: `game/hue_separation_effect.rpy`
 
-- [ ] Add persistent defaults and effect-specific setter functions.
-- [ ] Gate CRT rendering while retaining the screen request.
-- [ ] Preserve hue request state while disabled and restore active requests when enabled.
+- [ ] Add both persistent defaults.
+- [ ] Add `set_crt_effect_enabled(enabled)` and gate CRT visual children with `if persistent.crt_effect_enabled`.
+- [ ] Add `set_hue_separation_enabled(enabled)`:
+  - disabling clears both cameras, hides controller, and restores baseline state without clearing the request;
+  - enabling restores active cameras and reschedules/restarts glitch;
+  - inactive requests remain hidden.
+- [ ] Make `hue_separation_start` record request state but skip cameras/controller while disabled.
 - [ ] Run focused tests and verify GREEN.
 
 ### Task 3: Add settings controls and opening calls
@@ -35,15 +46,27 @@
 - Modify: `game/screens.rpy`
 - Modify: `game/opening_sequence.rpy`
 
-- [ ] Add selected CRT and hue filter toggles under display settings.
-- [ ] Start fullscreen glitch hue in opening scene 05.
-- [ ] Stop hue during scene 13 cleanup.
+- [ ] Add `CRT 滤镜` and `色相差滤镜` buttons under Display using:
+
+```renpy
+action Function(set_crt_effect_enabled, not persistent.crt_effect_enabled)
+selected persistent.crt_effect_enabled
+```
+
+and the equivalent hue helper.
+
+- [ ] Start hue separation after the medical desktop appears in `opening_scene_05`.
+- [ ] Stop hue separation in `opening_scene_13` before the desktop/effect cleanup and black handoff.
 - [ ] Run focused tests and verify GREEN.
 
 ### Task 4: Verify, sync, and commit
 
+**Files:**
+- Sync feature patches to matching paths under `E:\Re-Memorial`.
+
 - [ ] Run the complete unittest suite.
 - [ ] Run Ren'Py compile and lint.
+- [ ] Sync only the four runtime files, relevant test hunks, and this plan.
 - [ ] Stage only feature-related hunks in dirty shared files.
-- [ ] Commit from `E:\Re-Memorial`.
-- [ ] Push `main`; preserve the local commit if the network is unavailable.
+- [ ] Commit from `E:\Re-Memorial` with `feat: add filter display preferences`.
+- [ ] Push `main`; if the network is unavailable, preserve and report the local commit.

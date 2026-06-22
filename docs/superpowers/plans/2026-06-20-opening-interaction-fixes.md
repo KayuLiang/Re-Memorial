@@ -19,6 +19,14 @@
 - [x] **Step 2: Add a test requiring both identity inserts to be called screens with fullscreen mouse, dismiss-key, and `0.8`-second timer return actions.**
 - [x] **Step 3: Run the two tests and verify they fail against the current implementation.**
 
+Run:
+
+```powershell
+py -m unittest tools.test_opening_contracts.OpeningPreSystemSequenceContractTests.test_tap_to_start_blinks_at_half_speed tools.test_opening_contracts.OpeningMedicalConsentContractTests.test_scene_12_identity_inserts_allow_mouse_keyboard_and_timeout_progression -v
+```
+
+Expected: both tests fail because the transform still uses `0.28` seconds and the modal inserts do not own return actions.
+
 ### Task 2: Implement the interaction fixes
 
 **Files:**
@@ -37,4 +45,13 @@
 - Test: `tools/test_opening_stats.py`
 
 - [x] **Step 1: Run all opening tests: 101 tests passed.**
+
+```powershell
+py -m unittest discover -s tools -p 'test_opening_*.py' -v
+```
+
 - [x] **Step 2: Run Ren'Py lint: exit code 0.**
+
+```powershell
+& 'E:\renpy-8.5.3-sdk\renpy.exe' 'E:\RenpyProject\ReMemorial' lint
+```
