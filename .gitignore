@@ -1,11 +1,14 @@
 # Directories that Ren'Py changes files in.
 /game/saves
 /game/cache
+**/__pycache__/
 
 # Compiled script files. These are important for saving, and so should
 # be preserved by developer and build systems after the game has been released.
 /game/**/*.rpyc
 /game/**/*.rpymc
+**/*.pyc
+/game/bytecode.rpyb
 
 # Files Ren'Py can generate.
 /game/**/*.bak
@@ -24,3 +27,10 @@
 /dialogue.tab
 /dialogue.txt
 /strings.json
+
+# Local editor and Superpowers runtime state.
+/.vscode
+/.superpowers
+
+# Ren'Py distribution output.
+/ReMemorial-*-dists

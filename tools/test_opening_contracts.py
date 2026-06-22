@@ -29,6 +29,7 @@ CRT_ASSET_GENERATOR_PATH = PROJECT_DIR / "tools" / "generate_crt_assets.py"
 INVENTORY_SCREENS_PATH = GAME_DIR / "screens_inventory.rpy"
 PHONE_SCREENS_PATH = GAME_DIR / "screens_phone.rpy"
 BASE_SCREENS_PATH = GAME_DIR / "screens.rpy"
+OPTIONS_PATH = GAME_DIR / "options.rpy"
 
 
 def function_block(source, function_name):
@@ -202,6 +203,16 @@ def parse_define_scalar(source, definition_name):
     if match is None:
         raise AssertionError(f"define {definition_name} = not found")
     return ast.literal_eval(match.group(1).strip())
+
+
+class ProjectVersionContractTests(unittest.TestCase):
+    def test_project_version_is_initial_stable_baseline(self):
+        source = OPTIONS_PATH.read_text(encoding="utf-8")
+
+        self.assertRegex(
+            source,
+            r'(?m)^define config\.version = "0\.0\.0"$',
+        )
 
 
 class OpeningStatsContractTests(unittest.TestCase):
