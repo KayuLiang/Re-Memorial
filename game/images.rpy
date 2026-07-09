@@ -3,24 +3,32 @@
 transform fro_left:
     xalign 0.08
     yalign 1.0
-    yoffset 350
-    zoom 0.62
+    yoffset 600
+    zoom 0.42
 
 transform fro_underwear_left:
     xalign 0.08
     yalign 1.0
-    yoffset 350
-    zoom 0.27
+    yoffset 600
+    zoom 0.42
 
 transform fro_casual_left:
     xalign 0.08
     yalign 1.0
-    yoffset 180
+    yoffset 600
+    zoom 0.42
 
 transform ami_casual_right:
     xalign 0.92
     yalign 1.0
-    yoffset 180
+    yoffset 600
+    zoom 0.42
+
+transform pal_casual_right:
+    xalign 0.92
+    yalign 1.0
+    yoffset 490
+    zoom 1.85
 
 image fro underwear default = "images/sprites/fro/spr_fro_underwear_default.png"
 image fro hospital_pajamas default = "images/sprites/fro/spr_fro_hospital_pajamas_default.png"
