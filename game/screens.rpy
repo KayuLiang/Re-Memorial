@@ -291,6 +291,8 @@ screen navigation():
         if main_menu:
 
             textbutton _("开始游戏") action Start()
+            textbutton _("开始测试") action Start("rm_test_flow_start")
+            textbutton _("UI测试") action Start("rm_ui_test_menu")
 
         else:
 
