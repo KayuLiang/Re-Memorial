@@ -612,7 +612,7 @@ style rm_test_schedule_frame is frame:
     xalign 0.5
     yalign 0.5
     xsize 520
-    background "#eee7d8f4"
+    background ConditionSwitch("rm_ui_test_skin_active", Frame("gui/ui_test_skin/dice_list.png", 62, 34), "True", "#eee7d8f4")
     padding (30, 28)
 
 style rm_test_schedule_title_text is gui_text:
@@ -627,8 +627,8 @@ style rm_test_schedule_hint_text is gui_text:
 style rm_test_schedule_button is button:
     xfill True
     ysize 56
-    background "#d9cdbb"
-    hover_background "#eadfcc"
+    background ConditionSwitch("rm_ui_test_skin_active", Frame("gui/ui_test_skin/option_button.png", 40, 16), "True", "#d9cdbb")
+    hover_background ConditionSwitch("rm_ui_test_skin_active", Frame("gui/ui_test_skin/option_button.png", 40, 16), "True", "#eadfcc")
     padding (18, 0)
 
 style rm_test_schedule_button_text is button_text:
@@ -640,8 +640,8 @@ style rm_test_schedule_button_text is button_text:
 style rm_test_reward_card_button is button:
     xsize 300
     ysize 260
-    background "#f7f0e4"
-    hover_background "#fff2d8"
+    background ConditionSwitch("rm_ui_test_skin_active", Frame("gui/ui_test_skin/dice_card.png", 34, 34), "True", "#f7f0e4")
+    hover_background ConditionSwitch("rm_ui_test_skin_active", Frame("gui/ui_test_skin/dice_card.png", 34, 34), "True", "#fff2d8")
     padding (20, 18)
 
 style rm_test_reward_card_title_text is gui_text:

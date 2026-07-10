@@ -2,19 +2,33 @@ label rm_ui_test_menu:
     menu:
         "接下来要测试什么呢？"
 
+        "对话框UI":
+            $ rm_ui_test_skin_active = True
+            call screen rm_ui_test_dialogue_preview
+            jump rm_ui_test_menu
+
+        "时钟与心境条":
+            $ rm_ui_test_skin_active = True
+            call screen rm_ui_test_hud_preview
+            jump rm_ui_test_menu
+
         "检定界面":
+            $ rm_ui_test_skin_active = True
             $ rm_test_start_flow()
             jump rm_test_flow_loop
 
         "奖励选择":
+            $ rm_ui_test_skin_active = True
             call rm_ui_test_reward_choice
             jump rm_ui_test_menu
 
         "返回标题菜单":
+            $ rm_ui_test_skin_active = False
             return
 
 
 label rm_ui_test_reward_choice:
+    $ rm_ui_test_skin_active = True
     $ rm_test_start_flow()
     $ rm_test_reward_request = rm_test_prepare_growth_reward_test()
     if rm_test_reward_request:
@@ -27,6 +41,7 @@ label rm_ui_test_reward_choice:
 
 label rm_test_flow_start:
     # 测试行动轮：上午1，上午2，下午1，下午2，晚上1，晚上2，深夜。
+    $ rm_ui_test_skin_active = False
     $ rm_test_start_flow()
     jump rm_test_flow_loop
 
