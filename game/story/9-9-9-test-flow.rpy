@@ -130,3 +130,8 @@ label rm_test_resolve_pending_cards:
         "[rm_test_pending_result_text]"
         $ rm_test_pending_request = rm_test_pending_card_request()
     return
+
+
+label test_rm_ui_layout_editor:
+    call screen rm_ui_layout_editor("dice_select")
+    return
