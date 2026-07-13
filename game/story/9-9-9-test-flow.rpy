@@ -55,6 +55,10 @@ label rm_test_flow_loop:
     call screen rm_test_schedule_select
     $ selected_schedule = _return
 
+    if selected_schedule == "__rm_ui_test_exit__":
+        $ rm_ui_test_skin_active = False
+        jump rm_ui_test_menu
+
     if rm_test_schedule_uses_check(selected_schedule):
         call rm_test_schedule_check_flow(selected_schedule)
     else:
@@ -81,6 +85,10 @@ label rm_test_schedule_check_flow(schedule_id):
         call screen attribute_dice_select(rm_test_required_stat, min_dice=1, max_dice=3, requirement=rm_test_requirement, check_kind=rm_test_check_kind, action_type=rm_core.ACTION_SCHEDULE, allowed_stats=rm_test_allowed_stats, required_die_stats=rm_test_required_die_stats)
         $ selected_die_ids = _return
 
+        if selected_die_ids == "__rm_ui_test_exit__":
+            $ rm_ui_test_skin_active = False
+            jump rm_ui_test_menu
+
     $ rm_test_check_result = rm_test_perform_schedule_check(schedule_id, selected_die_ids, rm_test_requirement)
 
     call screen attribute_check_roll_animation(rm_test_check_result)
@@ -97,14 +105,26 @@ label rm_test_resolve_pending_cards:
         "[rm_test_pending_card_title(rm_test_pending_request)]"
         call screen rm_test_pending_card_choice(rm_test_pending_request)
         $ rm_test_pending_card = _return
+        if rm_test_pending_card == "__rm_ui_test_exit__":
+            $ rm_ui_test_skin_active = False
+            jump rm_ui_test_menu
+
         $ rm_test_pending_die_id = None
         $ rm_test_pending_face_index = None
         if rm_test_card_needs_die_choice(rm_test_pending_card):
             call screen rm_test_pending_die_choice(rm_test_pending_request, rm_test_pending_card)
             $ rm_test_pending_die_id = _return
+            if rm_test_pending_die_id == "__rm_ui_test_exit__":
+                $ rm_ui_test_skin_active = False
+                jump rm_ui_test_menu
+
         if rm_test_card_needs_face_choice(rm_test_pending_card):
             call screen rm_test_pending_face_choice(rm_test_pending_die_id)
             $ rm_test_pending_face_index = _return
+            if rm_test_pending_face_index == "__rm_ui_test_exit__":
+                $ rm_ui_test_skin_active = False
+                jump rm_ui_test_menu
+
         $ rm_test_pending_card = rm_test_apply_card_selection(rm_test_pending_card, rm_test_pending_die_id, rm_test_pending_face_index)
         $ rm_test_pending_result_text = rm_test_apply_pending_card(rm_test_pending_request, rm_test_pending_card)
         "[rm_test_pending_result_text]"

@@ -39,9 +39,10 @@ class UiTestSkinTests(unittest.TestCase):
             "dialogue_photo_avatar.png",
             "dialogue_paper.png",
             "name_tape.png",
+            "prominent_tab.png",
+            "close_circle.png",
             "clock_face.png",
             "clock_hand.png",
-            "mood_bar.png",
             "mood_cursor.png",
             "dice_check_panel.png",
             "check_stage.png",
@@ -71,17 +72,25 @@ class UiTestSkinTests(unittest.TestCase):
         self.assertIn("screen rm_ui_test_dialogue_preview():", source)
         self.assertIn("screen rm_ui_test_hud_preview():", source)
         self.assertIn("screen rm_ui_test_skin_hud():", source)
+        self.assertIn("screen rm_ui_test_close_button", source)
         self.assertIn("def rm_ui_test_mood_cursor_offset(value):", source)
+        self.assertIn("def rm_ui_test_energy_cursor_offset(points, maximum):", source)
         self.assertIn("rm_status_mood_value()", source)
+        self.assertIn("rm_status_energy_points()", source)
+        self.assertIn("rm_status_energy_max()", source)
         self.assertIn("story_hud_clock_rotation(current_time_minutes)", source)
+        self.assertIn("gui/story_ui/ui_mood_bar_canvas.png", source)
+        self.assertIn("gui/story_ui/ui_energy_empty_canvas.png", source)
+        self.assertIn("gui/story_ui/ui_energy_full_canvas.png", source)
+        self.assertNotIn("gui/ui_test_skin/mood_bar.png", source)
 
         for filename in (
             "dialogue_photo_avatar.png",
-            "dialogue_paper.png",
             "name_tape.png",
+            "prominent_tab.png",
+            "close_circle.png",
             "clock_face.png",
             "clock_hand.png",
-            "mood_bar.png",
             "mood_cursor.png",
         ):
             with self.subTest(filename=filename):
@@ -101,6 +110,43 @@ class UiTestSkinTests(unittest.TestCase):
         self.assertIn('"检定界面":', menu_block)
         self.assertIn("jump rm_test_flow_loop", menu_block)
         self.assertIn("$ rm_ui_test_skin_active = False", regular_test_block)
+
+    def test_ui_test_dialogue_uses_bottom_backdrop_and_old_notebook(self):
+        source = UI_TEST_SKIN_PATH.read_text(encoding="utf-8")
+        dialogue_block = block_with_header(source, "screen rm_ui_test_dialogue_preview():")
+
+        self.assertIn("ypos 810", dialogue_block)
+        self.assertIn("ysize 270", dialogue_block)
+        self.assertIn("gui/story_ui/ui_notebook_canvas.png", dialogue_block)
+        self.assertIn("gui/ui_test_skin/dialogue_photo_avatar.png", dialogue_block)
+        self.assertIn("gui/ui_test_skin/name_tape.png", dialogue_block)
+        self.assertIn("use rm_ui_test_close_button", dialogue_block)
+
+    def test_ui_test_buttons_use_prominent_single_and_option_pair_assets(self):
+        skin_source = UI_TEST_SKIN_PATH.read_text(encoding="utf-8")
+        attribute_source = ATTRIBUTE_CHECKS_PATH.read_text(encoding="utf-8")
+        schedule_source = TEST_SCHEDULES_PATH.read_text(encoding="utf-8")
+        combined = skin_source + attribute_source + schedule_source
+
+        self.assertIn("style rm_ui_test_prominent_button is button:", skin_source)
+        self.assertIn("gui/ui_test_skin/prominent_tab.png", combined)
+        self.assertIn("style rm_ui_test_option_button is button:", skin_source)
+        self.assertIn("gui/ui_test_skin/option_button.png", combined)
+        self.assertIn('color "#211b15"', skin_source)
+        self.assertIn('color "#f3eadb"', skin_source)
+
+    def test_secondary_ui_test_screens_expose_close_button(self):
+        skin_source = UI_TEST_SKIN_PATH.read_text(encoding="utf-8")
+        attribute_source = ATTRIBUTE_CHECKS_PATH.read_text(encoding="utf-8")
+        schedule_source = TEST_SCHEDULES_PATH.read_text(encoding="utf-8")
+        story_source = TEST_STORY_PATH.read_text(encoding="utf-8")
+
+        self.assertIn("gui/ui_test_skin/close_circle.png", skin_source)
+        self.assertGreaterEqual((skin_source + attribute_source + schedule_source).count("use rm_ui_test_close_button"), 7)
+        self.assertIn('Return("__rm_ui_test_exit__")', skin_source)
+        self.assertIn('if selected_schedule == "__rm_ui_test_exit__":', story_source)
+        self.assertIn('if selected_die_ids == "__rm_ui_test_exit__":', story_source)
+        self.assertIn('if rm_test_pending_card == "__rm_ui_test_exit__":', story_source)
 
     def test_formal_say_and_top_status_do_not_directly_use_test_skin_assets(self):
         say_source = SCREENS_PATH.read_text(encoding="utf-8")

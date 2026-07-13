@@ -258,9 +258,14 @@ screen attribute_dice_select(required_stat, min_dice=1, max_dice=3, requirement=
                 xalign 1.0
                 spacing 14
 
-                textbutton "确认骰子":
-                    style "attribute_check_button"
-                    action If(len(selected_die_ids) >= min_dice and required_selection_met, [SetScreenVariable("invalid_open", False), SetScreenVariable("confirm_open", True)], [SetScreenVariable("confirm_open", False), SetScreenVariable("invalid_open", True)])
+                if rm_ui_test_skin_active:
+                    textbutton "确认骰子":
+                        style "rm_ui_test_prominent_button"
+                        action If(len(selected_die_ids) >= min_dice and required_selection_met, [SetScreenVariable("invalid_open", False), SetScreenVariable("confirm_open", True)], [SetScreenVariable("confirm_open", False), SetScreenVariable("invalid_open", True)])
+                else:
+                    textbutton "确认骰子":
+                        style "attribute_check_button"
+                        action If(len(selected_die_ids) >= min_dice and required_selection_met, [SetScreenVariable("invalid_open", False), SetScreenVariable("confirm_open", True)], [SetScreenVariable("confirm_open", False), SetScreenVariable("invalid_open", True)])
 
     if confirm_open:
         button:
@@ -281,13 +286,22 @@ screen attribute_dice_select(required_stat, min_dice=1, max_dice=3, requirement=
                     xalign 1.0
                     spacing 14
 
-                    textbutton "取消":
-                        style "attribute_check_button"
-                        action SetScreenVariable("confirm_open", False)
+                    if rm_ui_test_skin_active:
+                        textbutton "取消":
+                            style "rm_ui_test_option_button"
+                            action SetScreenVariable("confirm_open", False)
 
-                    textbutton "确认":
-                        style "attribute_check_button"
-                        action Return(selected_die_ids)
+                        textbutton "确认":
+                            style "rm_ui_test_option_button"
+                            action Return(selected_die_ids)
+                    else:
+                        textbutton "取消":
+                            style "attribute_check_button"
+                            action SetScreenVariable("confirm_open", False)
+
+                        textbutton "确认":
+                            style "attribute_check_button"
+                            action Return(selected_die_ids)
 
     if invalid_open:
         button:
@@ -304,6 +318,9 @@ screen attribute_dice_select(required_stat, min_dice=1, max_dice=3, requirement=
                     text "骰组不合法" style "attribute_check_section_title"
                     text "[invalid_reason]" style "attribute_check_body"
                     text "点击屏幕以重新选择。" style "attribute_check_invalid_hint"
+
+    if rm_ui_test_skin_active:
+        use rm_ui_test_close_button()
 
 
 screen attribute_dice_confirm(required_stat, die_ids):
@@ -462,10 +479,16 @@ screen attribute_check_result(result):
                         text "本次没有完成掷骰：[result['reason']]" style "attribute_check_body"
                         text "目标值：[result['success_threshold']]  结果：无法执行" style "attribute_check_body"
 
-            textbutton "继续":
-                xalign 1.0
-                style "attribute_check_button"
-                action Return()
+            if rm_ui_test_skin_active:
+                textbutton "继续":
+                    xalign 1.0
+                    style "rm_ui_test_prominent_button"
+                    action Return()
+            else:
+                textbutton "继续":
+                    xalign 1.0
+                    style "attribute_check_button"
+                    action Return()
 
 
 style attribute_check_panel is frame:
@@ -577,3 +600,5 @@ style attribute_check_button is button:
 
 style attribute_check_button_text is button_text:
     size 24
+    color "#f3eadb"
+    hover_color "#ffffff"

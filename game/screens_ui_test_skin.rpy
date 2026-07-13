@@ -9,43 +9,71 @@ init python:
 
     def rm_ui_test_mood_cursor_offset(value):
         clamped = rm_ui_test_clamp(value, -200, 200)
-        return 144 - int(((clamped + 200) / 400.0) * 118)
+        return story_hud_mood_cursor_offset(clamped)
+
+    def rm_ui_test_energy_cursor_offset(points, maximum):
+        return 219 + story_hud_energy_fill_width(points, maximum)
+
+
+screen rm_ui_test_close_button(action=Return("__rm_ui_test_exit__")):
+    textbutton "X":
+        xpos 1774
+        ypos 48
+        style "rm_ui_test_close_button_style"
+        action action
 
 
 screen rm_ui_test_skin_hud_surface(origin_x=36, origin_y=28):
     $ status_mood = rm_status_mood_value()
+    $ status_energy = rm_status_energy_points()
+    $ status_energy_max = rm_status_energy_max()
 
     fixed:
-        xpos origin_x
-        ypos origin_y
-        xysize (520, 230)
+        xysize (1920, 230)
 
         add "gui/ui_test_skin/clock_face.png":
-            xpos 0
-            ypos 0
+            xpos origin_x
+            ypos origin_y
             xysize (150, 150)
 
         add Transform(
             "gui/ui_test_skin/clock_hand.png",
             zoom=0.12,
             anchor=(0.5, 0.82),
-            pos=(75, 78),
+            pos=(origin_x + 75, origin_y + 78),
             rotate=story_hud_clock_rotation(current_time_minutes),
         )
 
-        add "gui/ui_test_skin/mood_bar.png":
-            xpos 155
-            ypos -6
-            xysize (110, 190)
+        add "gui/story_ui/ui_mood_bar_canvas.png" at story_hud_bleed_canvas
+
+        add "gui/story_ui/ui_energy_empty_canvas.png" at story_hud_bleed_canvas
+
+        viewport:
+            xpos 219
+            ypos 120
+            xysize (story_hud_energy_fill_width(status_energy, status_energy_max), 58)
+            add Crop((630, 347, 982, 115), "gui/story_ui/ui_energy_full_canvas.png"):
+                zoom 0.5
 
         add "gui/ui_test_skin/mood_cursor.png":
-            xpos 242
-            ypos rm_ui_test_mood_cursor_offset(status_mood)
-            xysize (46, 108)
+            xpos rm_ui_test_mood_cursor_offset(status_mood)
+            ypos 46
+            xysize (34, 82)
+
+        add "gui/ui_test_skin/mood_cursor.png":
+            xpos rm_ui_test_energy_cursor_offset(status_energy, status_energy_max)
+            ypos 102
+            xysize (34, 82)
 
         text "心境 [status_mood]":
-            xpos 292
-            ypos 64
+            xpos 735
+            ypos 74
+            size 24
+            color "#211b15"
+
+        text "精力 [status_energy]/[status_energy_max]":
+            xpos 735
+            ypos 118
             size 24
             color "#211b15"
 
@@ -67,10 +95,13 @@ screen rm_ui_test_dialogue_preview():
     fixed:
         xysize (1920, 1080)
 
-        add "gui/ui_test_skin/dialogue_paper.png":
-            xpos 520
-            ypos 666
-            xysize (1040, 292)
+        add Solid("#0b0a09e6"):
+            xpos 0
+            ypos 810
+            xsize 1920
+            ysize 270
+
+        add "gui/story_ui/ui_notebook_canvas.png" at story_ui_bleed_canvas
 
         add "gui/ui_test_skin/dialogue_photo_avatar.png":
             xpos 226
@@ -90,8 +121,8 @@ screen rm_ui_test_dialogue_preview():
             color "#1f1a15"
 
         text "这是一段 UI 测试对白。这里用于检查纸张文本区、角色照片模块、姓名标签和字体位置是否协调。":
-            xpos 650
-            ypos 748
+            xpos notebook_dialogue_x
+            ypos notebook_dialogue_y
             xsize 760
             size 32
             line_spacing 9
@@ -100,8 +131,10 @@ screen rm_ui_test_dialogue_preview():
         textbutton "返回":
             xpos 1408
             ypos 900
-            style "rm_ui_test_skin_button"
+            style "rm_ui_test_prominent_button"
             action Return()
+
+        use rm_ui_test_close_button(Return())
 
 
 screen rm_ui_test_hud_preview():
@@ -138,20 +171,52 @@ screen rm_ui_test_hud_preview():
         textbutton "返回":
             xpos 1230
             ypos 812
-            style "rm_ui_test_skin_button"
+            style "rm_ui_test_prominent_button"
             action Return()
 
+        use rm_ui_test_close_button(Return())
 
-style rm_ui_test_skin_button is button:
+
+style rm_ui_test_prominent_button is button:
+    xsize 220
+    ysize 68
+    background Frame("gui/ui_test_skin/prominent_tab.png", 72, 22, 72, 22)
+    hover_background Frame("gui/ui_test_skin/prominent_tab.png", 72, 22, 72, 22)
+    padding (20, 0)
+
+style rm_ui_test_prominent_button_text is button_text:
+    size 24
+    color "#211b15"
+    hover_color "#000000"
+    xalign 0.5
+    yalign 0.5
+
+style rm_ui_test_option_button is button:
     xsize 172
     ysize 58
     background Frame("gui/ui_test_skin/option_button.png", 42, 18, 42, 18)
     hover_background Frame("gui/ui_test_skin/option_button.png", 42, 18, 42, 18)
     padding (20, 0)
 
-style rm_ui_test_skin_button_text is button_text:
+style rm_ui_test_option_button_text is button_text:
     size 24
     color "#211b15"
     hover_color "#000000"
+    xalign 0.5
+    yalign 0.5
+
+style rm_ui_test_close_button_style is button:
+    xsize 74
+    ysize 74
+    background Frame("gui/ui_test_skin/close_circle.png", 32, 32)
+    hover_background Frame("gui/ui_test_skin/close_circle.png", 32, 32)
+    padding (0, 0)
+
+style rm_ui_test_close_button_style_text is button_text:
+    size 28
+    bold True
+    color "#211b15"
+    hover_color "#000000"
+    insensitive_color "#f3eadb"
     xalign 0.5
     yalign 0.5

@@ -529,6 +529,9 @@ screen rm_test_schedule_select():
                 style "rm_test_schedule_button"
                 action Return("test_jogging")
 
+    if rm_ui_test_skin_active:
+        use rm_ui_test_close_button()
+
 
 screen rm_test_pending_card_choice(request):
     modal True
@@ -562,6 +565,9 @@ screen rm_test_pending_card_choice(request):
                             text "[rm_test_card_label(card)]" style "rm_test_reward_card_title_text"
                             text "[rm_test_card_description(card)]" style "rm_test_reward_card_description_text"
 
+    if rm_ui_test_skin_active:
+        use rm_ui_test_close_button()
+
 
 screen rm_test_pending_die_choice(request, card=None):
     modal True
@@ -585,6 +591,9 @@ screen rm_test_pending_die_choice(request, card=None):
                     style "rm_test_schedule_button"
                     action Return(die["id"])
 
+    if rm_ui_test_skin_active:
+        use rm_ui_test_close_button()
+
 
 screen rm_test_pending_face_choice(die_id):
     modal True
@@ -606,6 +615,9 @@ screen rm_test_pending_face_choice(die_id):
                 textbutton "第[face['index'] + 1]面：[face['value']]":
                     style "rm_test_schedule_button"
                     action Return(face["index"])
+
+    if rm_ui_test_skin_active:
+        use rm_ui_test_close_button()
 
 
 style rm_test_schedule_frame is frame:
