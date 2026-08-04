@@ -132,8 +132,9 @@ class UiTestSkinTests(unittest.TestCase):
         self.assertIn("gui/ui_test_skin/prominent_tab.png", combined)
         self.assertIn("style rm_ui_test_option_button is button:", skin_source)
         self.assertIn("gui/ui_test_skin/option_button.png", combined)
-        self.assertIn('color "#211b15"', skin_source)
-        self.assertIn('color "#f3eadb"', skin_source)
+        self.assertIn('color "#000000"', skin_source)
+        self.assertNotIn('color "#f3eadb"', skin_source)
+        self.assertNotIn('color "#211b15"', skin_source)
 
     def test_secondary_ui_test_screens_expose_close_button(self):
         skin_source = UI_TEST_SKIN_PATH.read_text(encoding="utf-8")
@@ -175,6 +176,10 @@ class UiTestSkinTests(unittest.TestCase):
         self.assertGreaterEqual((attribute_source + schedule_source).count("rm_ui_test_skin_active"), 8)
         self.assertIn("ConditionSwitch", attribute_source)
         self.assertIn("ConditionSwitch", schedule_source)
+        self.assertIn('color "#000000"', attribute_source)
+        self.assertIn('color "#000000"', schedule_source)
+        self.assertNotIn('color "#f3eadb"', attribute_source + schedule_source)
+        self.assertNotIn('hover_color "#ffffff"', attribute_source + schedule_source)
 
 
 if __name__ == "__main__":

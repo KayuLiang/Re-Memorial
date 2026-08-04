@@ -51,6 +51,10 @@ class UiLayoutEditorTests(unittest.TestCase):
         self.assertIn("rm_ui_layout_draw_safe_frame", source)
         self.assertIn("rm_ui_layout_draw_center_lines", source)
         self.assertIn("renpy.get_mouse_pos()", source)
+        self.assertIn('color "#000000"', source)
+        self.assertNotIn('color "#ffffff"', source)
+        self.assertNotIn('color "#f5f0df"', source)
+        self.assertNotIn('color "#bde8ff"', source)
 
         for key_name in (
             "K_LEFT",

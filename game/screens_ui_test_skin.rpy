@@ -69,13 +69,13 @@ screen rm_ui_test_skin_hud_surface(origin_x=36, origin_y=28):
             xpos 735
             ypos 74
             size 24
-            color "#211b15"
+            color "#000000"
 
         text "精力 [status_energy]/[status_energy_max]":
             xpos 735
             ypos 118
             size 24
-            color "#211b15"
+            color "#000000"
 
 
 screen rm_ui_test_skin_hud():
@@ -118,7 +118,7 @@ screen rm_ui_test_dialogue_preview():
             ypos 776
             xsize 170
             size 28
-            color "#1f1a15"
+            color "#000000"
 
         text "这是一段 UI 测试对白。这里用于检查纸张文本区、角色照片模块、姓名标签和字体位置是否协调。":
             xpos notebook_dialogue_x
@@ -126,7 +126,7 @@ screen rm_ui_test_dialogue_preview():
             xsize 760
             size 32
             line_spacing 9
-            color "#211b15"
+            color "#000000"
 
         textbutton "返回":
             xpos 1408
@@ -158,7 +158,7 @@ screen rm_ui_test_hud_preview():
             xpos 650
             ypos 520
             size 36
-            color "#211b15"
+            color "#000000"
 
         text "心境条读取当前 mood，并用游标标记位置。这个温度计式长条不表示体温或精力。":
             xpos 650
@@ -166,7 +166,7 @@ screen rm_ui_test_hud_preview():
             xsize 620
             size 26
             line_spacing 7
-            color "#3f352b"
+            color "#000000"
 
         textbutton "返回":
             xpos 1230
@@ -186,7 +186,7 @@ style rm_ui_test_prominent_button is button:
 
 style rm_ui_test_prominent_button_text is button_text:
     size 24
-    color "#211b15"
+    color "#000000"
     hover_color "#000000"
     xalign 0.5
     yalign 0.5
@@ -200,7 +200,7 @@ style rm_ui_test_option_button is button:
 
 style rm_ui_test_option_button_text is button_text:
     size 24
-    color "#211b15"
+    color "#000000"
     hover_color "#000000"
     xalign 0.5
     yalign 0.5
@@ -215,8 +215,8 @@ style rm_ui_test_close_button_style is button:
 style rm_ui_test_close_button_style_text is button_text:
     size 28
     bold True
-    color "#211b15"
+    color "#000000"
     hover_color "#000000"
-    insensitive_color "#f3eadb"
+    insensitive_color "#000000"
     xalign 0.5
     yalign 0.5

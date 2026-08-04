@@ -311,14 +311,14 @@ screen rm_ui_layout_editor(layout_name="dice_select"):
         xpos 18
         ypos 18
         xsize 420
-        background Solid("#000000cc")
+        background Solid("#f5f0dfdd")
         padding (16, 14)
 
         vbox:
             spacing 8
-            text "UI Layout Editor: [layout_name]" size 22 color "#ffffff"
-            text "[rm_ui_layout_selected_info(layout_name, selected_id)]" size 18 color "#f5f0df"
-            text "mouse: [mouse_pos[0]] / [mouse_pos[1]]" size 18 color "#bde8ff"
+            text "UI Layout Editor: [layout_name]" size 22 color "#000000"
+            text "[rm_ui_layout_selected_info(layout_name, selected_id)]" size 18 color "#000000"
+            text "mouse: [mouse_pos[0]] / [mouse_pos[1]]" size 18 color "#000000"
 
             hbox:
                 spacing 8

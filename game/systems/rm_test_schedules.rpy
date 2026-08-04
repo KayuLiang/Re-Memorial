@@ -630,11 +630,11 @@ style rm_test_schedule_frame is frame:
 style rm_test_schedule_title_text is gui_text:
     size 34
     bold True
-    color "#171513"
+    color "#000000"
 
 style rm_test_schedule_hint_text is gui_text:
     size 22
-    color "#5c554e"
+    color "#000000"
 
 style rm_test_schedule_button is button:
     xfill True
@@ -645,7 +645,7 @@ style rm_test_schedule_button is button:
 
 style rm_test_schedule_button_text is button_text:
     size 24
-    color "#171513"
+    color "#000000"
     hover_color "#000000"
     yalign 0.5
 
@@ -659,9 +659,9 @@ style rm_test_reward_card_button is button:
 style rm_test_reward_card_title_text is gui_text:
     size 26
     bold True
-    color "#171513"
+    color "#000000"
 
 style rm_test_reward_card_description_text is gui_text:
     size 20
-    color "#4d453e"
+    color "#000000"
     line_spacing 4

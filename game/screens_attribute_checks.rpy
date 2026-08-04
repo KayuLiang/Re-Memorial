@@ -419,7 +419,7 @@ screen attribute_check_roll_animation(result):
                             xalign 0.5
                             yalign 0.08
                             size 72
-                            color "#ffffff"
+                            color "#000000"
                             at attribute_die_result_flash
                     elif roll_finished:
                         frame:
@@ -432,7 +432,7 @@ screen attribute_check_roll_animation(result):
                             xalign 0.5
                             yalign 0.10
                             size 34
-                            color "#ffffff"
+                            color "#000000"
                     else:
                         frame:
                             background None
@@ -511,11 +511,11 @@ style attribute_check_summary_frame is frame:
 
 style attribute_check_summary_label is text:
     size 18
-    color "#93a99a"
+    color "#000000"
 
 style attribute_check_summary_value is text:
     size 24
-    color "#f1f5ed"
+    color "#000000"
 
 style attribute_check_tab_button is button:
     xsize 148
@@ -527,9 +527,9 @@ style attribute_check_tab_button is button:
 
 style attribute_check_tab_button_text is button_text:
     size 18
-    color "#dce5db"
-    hover_color "#ffffff"
-    selected_color "#1f2b23"
+    color "#000000"
+    hover_color "#000000"
+    selected_color "#000000"
     xalign 0.5
     yalign 0.5
 
@@ -549,49 +549,49 @@ style attribute_check_confirm_modal is frame:
 
 style attribute_check_invalid_hint is text:
     size 18
-    color "#9fb0a4"
+    color "#000000"
     xalign 0.5
 
 style attribute_check_title is text:
     size 36
-    color "#f1f5ed"
+    color "#000000"
 
 style attribute_check_section_title is text:
     size 25
-    color "#cfe1d1"
+    color "#000000"
 
 style attribute_check_body is text:
     size 24
-    color "#dce5db"
+    color "#000000"
     line_spacing 4
 
 style attribute_check_muted_text is text:
     size 23
-    color "#83918a"
+    color "#000000"
 
 style attribute_check_die_text is text:
     size 24
-    color "#1f2b23"
+    color "#000000"
 
 style attribute_check_faces_text is text:
     size 19
-    color "#344238"
+    color "#000000"
 
 style attribute_check_hint_text is text:
     size 18
-    color "#54775f"
+    color "#000000"
 
 style attribute_check_die_disabled_text is text:
     size 24
-    color "#9ca49f"
+    color "#000000"
 
 style attribute_check_faces_disabled_text is text:
     size 19
-    color "#858d88"
+    color "#000000"
 
 style attribute_check_disabled_hint_text is text:
     size 18
-    color "#747d78"
+    color "#000000"
 
 style attribute_check_button is button:
     background ConditionSwitch("rm_ui_test_skin_active", Frame("gui/ui_test_skin/option_button.png", 40, 16), "True", Solid("#35443a"))
@@ -600,5 +600,5 @@ style attribute_check_button is button:
 
 style attribute_check_button_text is button_text:
     size 24
-    color "#f3eadb"
-    hover_color "#ffffff"
+    color "#000000"
+    hover_color "#000000"
