@@ -1,0 +1,900 @@
+*** Begin Patch
+*** Update File: E:/RenpyProject/ReMemorial/game/systems/rm_core.py
+@@
+ ACTION_SCHEDULE = "schedule"
+ ACTION_INSTANT = "instant"
+ ACTION_FORCED_SCHEDULE = "forced_schedule"
++ACTION_WAKE = "wake"
+ 
+ MOOD_STABLE = "stable"
+ MOOD_HIGH = "high"
+@@
+         self.weekday = 1
+         self.time_slot_index = 0
+         self.current_time_slot = None
++        self.night_actions_completed = 0
++        self.night_snack_eaten = False
++        self.meal_choices = {}
++        self.sleep_pending = None
++        self.sleep_fatigue = []
++        self.deep_fatigue = None
+         self.energy = energy_max(self)
+ 
+     def dice_for(self, attribute):
+@@
+     base = int(character.formal_attributes.get(attribute, 0))
+     value = int(character.attribute_values.get(attribute, 0))
+     bonus = sum(int(item.get("value", 0)) if isinstance(item, dict) else int(item) for item in character.attribute_bonuses.get(attribute, []))
+-    return base + value + bonus
++    return base + value + bonus + sleep_attribute_modifier(character, attribute)
++
++
++def sleep_attribute_modifier(character, attribute):
++    if attribute == "pow":
++        return -sum(expires > character.day for expires in getattr(character, "sleep_fatigue", []))
++    if attribute == "con":
++        return -int((getattr(character, "deep_fatigue", None) or {}).get("layers", 0))
++    return 0
++
++
++def sleep_status_summary(state):
++    rows = []
++    expiries = [day for day in getattr(state, "sleep_fatigue", []) if day > state.day]
++    if expiries:
++        rows.append(_status_row("sleep_fatigue", "疲劳", "×{}".format(len(expiries)),
++            "生理类：每层意志 -1；按时睡觉清除。各层剩余天数：{}。".format(
++                "、".join(str(day - state.day) for day in sorted(expiries))), "pow", "physiological"))
++    disease = getattr(state, "deep_fatigue", None)
++    if disease:
++        rows.append(_status_row("deep_fatigue", "深度疲劳", "×{}".format(disease["layers"]),
++            "疾病类：体质临时 -{0}；距结算还有 {1} 晚。患病后再次熬夜，每晚加一层，不延长结算时间。{2}".format(
++                disease["layers"], disease["last_night"] - state.day + 1,
++                "结算时将永久减少 {} 点体质。".format(disease["layers"]) if disease["relapsed"]
++                else "这七晚均按时睡觉可避免永久体质损失；康复不直接获得良好作息。"), "con", "disease"))
++    if getattr(state, "good_routine", False):
++        rows.append(_status_row("good_routine", "良好作息", "",
++            "日程类：精力上限 +25%（向下取整），加强睡眠 Mood 恢复；抵消一次起床结算的全部新增疲劳后，整个状态消失。未产生疲劳则不消耗。",
++            category="schedule"))
++    return rows
+ 
+ 
+ def effective_attribute(character, attribute):
+@@
+         "formal": int(character.formal_attributes.get(attribute, 0)),
+         "value": int(character.attribute_values.get(attribute, 0)),
+         "bonus": bonus,
++        "status_modifier": sleep_attribute_modifier(character, attribute),
+         "current": current_attribute(character, attribute),
+         "effective": effective_attribute(character, attribute),
+     }
+ 
+ 
+-def _status_row(status_id, label, value_text, tooltip, attribute=None):
++def _status_row(status_id, label, value_text, tooltip, attribute=None, category=None):
+     return {
+         "id": status_id,
+         "label": label,
+         "value_text": value_text,
+         "tooltip": tooltip,
+         "attribute": attribute,
++        "category": category,
+     }
+ 
+ 
+@@
+ 
+ def status_summary(character):
+     """Return compact status rows shown in the test HUD and character panel."""
+-    rows = []
++    rows = sleep_status_summary(character)
+     for attribute in ATTRIBUTES:
+         label = ATTRIBUTE_LABELS.get(attribute, attribute)
+         value = int(character.attribute_values.get(attribute, 0))
+@@
+             label = TEST_TRAINING_SCHEDULE_LABELS.get(schedule_id, schedule_id)
+             rows.append(_status_row(
+                 "training_fatigue_{}".format(schedule_id),
+-                "疲劳：{}".format(label),
++                "训练疲劳：{}".format(label),
+                 "x{}".format(layers),
+-                "疲劳：每层使下一次相同日程目标提高 1d4，并使可发生大失败时的大失败点数范围 +1；休息减少一层，睡觉清空。",
++                "训练疲劳：每层使下一次相同日程目标提高 1d4，并使可发生大失败时的大失败点数范围 +1；休息减少一层，睡觉清空。与缺觉导致的生理疲劳分开计算。",
+                 attribute,
++                "schedule",
+             ))
+     rows.extend(second_stage_status_summary(character))
+     return rows
+@@
+ 
+ 
+ def resolve_test_sleep(character, rng=None):
+-    """Resolve the test sleep schedule through the second-stage day settlement."""
+-    before = int(character.energy)
+-    character.energy = energy_max(character)
+-    events = ["sleep", "energy_full:{}:{}".format(before, int(character.energy))]
+-    events.extend(end_day(character, rng).get("events", []))
+-    events.extend(end_week_if_needed(character, rng).get("events", []))
+-    events.extend(clear_training_fatigue_on_sleep(character))
+-    character.energy = energy_max(character)
+-    return {"available": True, "energy_before": before, "energy_after": int(character.energy), "events": events}
++    """Test UI and ordinary sleep share one settlement entry point."""
++    if character.current_time_slot is None:
++        start_turn(character, "sleep_decision")
++    return begin_sleep(character, rng)
+ 
+ 
+ def _reset_disease_values(character):
+@@
+ 
+ 
+ def total_energy_cost(dice, spec, profile):
++    # Waking is entirely free, including additional dice and heavy enchantments.
++    if spec.action_type == ACTION_WAKE:
++        return 0
+     cost = base_energy_cost(len(dice), spec.action_type, profile["third_die_discount"])
+     cost += enchantment_energy_cost(dice)
+     if spec.is_late_night and spec.action_type in (ACTION_SCHEDULE, ACTION_FORCED_SCHEDULE) and cost > 0:
+@@
+ # Second-stage backend helpers. These functions intentionally stay UI-agnostic
+ # and keep formal schedule/event pools as mock-only placeholders.
+ 
+-TIME_SLOTS = ("morning_1", "morning_2", "afternoon_1", "afternoon_2", "evening_1", "evening_2", "late_night")
++TIME_SLOTS = ("morning_1", "morning_2", "afternoon_1", "afternoon_2", "evening_1", "evening_2",
++              "late_night_1", "late_night_2", "late_night_3")
++MEAL_SLOTS = ("breakfast", "lunch", "dinner")
++SLEEP_DECISIONS = ("sleep_decision", "night_break_1", "night_break_2")
++TIME_SLOT_LABELS = dict(zip(TIME_SLOTS, ("上午1", "上午2", "下午1", "下午2", "晚上1", "晚上2",
++                                      "深夜1", "深夜2", "深夜3")))
++TIME_SLOT_LABELS.update(breakfast="早餐", lunch="午饭", dinner="晚饭", sleep_decision="就寝时间",
++                        night_break_1="深夜1之后", night_break_2="深夜2之后",
++                        forced_sleep="昏迷", wake_check="起床")
++NEXT_TIME_SLOT = {
++    "breakfast": "morning_1", "morning_1": "morning_2", "morning_2": "lunch",
++    "lunch": "afternoon_1", "afternoon_1": "afternoon_2", "afternoon_2": "dinner",
++    "dinner": "evening_1", "evening_1": "evening_2", "evening_2": "sleep_decision",
++    "late_night_1": "night_break_1", "late_night_2": "night_break_2", "late_night_3": "forced_sleep",
++}
++STATUS_CATEGORIES = {"weather": "天气类", "emotion": "情绪类", "physiological": "生理类",
++                     "medication": "药物类", "disease": "疾病类", "schedule": "日程类"}
++WAKE_REQUIREMENT = 13  # Initial POW 6 + both starting dice: exactly 82% success.
+ POSITIVE_ENCHANTMENTS = (ENCHANT_LIGHT, ENCHANT_SWIFT)
+ NEGATIVE_ENCHANTMENTS = (ENCHANT_SEAL, ENCHANT_SHACKLE, ENCHANT_HEAVY, ENCHANT_SLUGGISH)
+ GROWTH_REWARD_TYPES = (
+@@
+         "weekday": 1,
+         "time_slot_index": 0,
+         "current_time_slot": None,
++        "night_actions_completed": 0,
++        "night_snack_eaten": False,
++        "sleep_pending": None,
++        "deep_fatigue": None,
+     }
+     for key, value in defaults.items():
+         if not hasattr(character, key):
+             setattr(character, key, value)
++    if not hasattr(character, "meal_choices"):
++        character.meal_choices = {}
++    if not hasattr(character, "sleep_fatigue"):
++        character.sleep_fatigue = []
++    # The old single deep-night action becomes the first of three, not a new day.
++    if character.current_time_slot == "late_night":
++        character.current_time_slot = "late_night_1"
+     dict_defaults = (
+         "dice_growth_progress",
+         "growth_reward_pending",
+@@
+ 
+ def add_formal_attribute(state, attr, amount):
+     ensure_second_stage_state(state)
++    before = int(state.formal_attributes.get(attr, 0))
+     state.formal_attributes[attr] = max(0, int(state.formal_attributes.get(attr, 0)) + int(amount))
+     if amount > 0:
+         state.formal_attribute_gain_counters[attr] += int(amount)
+         rewards = _counter_step(state.formal_attribute_gain_counters, attr, 1)
+         if rewards:
+             add_dice_growth_progress(state, attr, rewards * 6)
++    elif amount < 0:
++        # Manual 5.10: each actually lost formal point gives 6 degradation points.
++        lost = before - state.formal_attributes[attr]
++        if lost:
++            add_degradation_progress(state, attr, lost * 6)
+     return current_attribute(state, attr)
+ 
+ 
+@@
+ 
+ def start_turn(state, time_slot):
+     ensure_second_stage_state(state)
++    if time_slot == "late_night":
++        time_slot = "late_night_1"
++    if time_slot not in TIME_SLOT_LABELS:
++        raise ValueError("Unknown time slot: {}".format(time_slot))
+     state.current_time_slot = time_slot
++    if time_slot in TIME_SLOTS:
++        state.time_slot_index = TIME_SLOTS.index(time_slot)
+     return {"time_slot": time_slot}
+ 
+ 
+ def resolve_action(state, schedule_spec):
++    if state.current_time_slot not in TIME_SLOTS:
++        return {"available": False, "reason": "not_action_round", "events": []}
+     result = {"schedule": schedule_spec, "mood_delta": getattr(schedule_spec, "mood_delta", 0), "events": []}
+     if getattr(schedule_spec, "check_spec", None) is not None:
+         result["check"] = perform_check(state, schedule_spec.check_spec)
+@@
+ 
+ def end_turn(state, turn_result, rng=None):
+     ensure_second_stage_state(state)
++    if state.current_time_slot not in TIME_SLOTS or turn_result.get("available") is False:
++        return {"available": False, "events": []}
+     events = list(turn_result.get("events", []))
+     check = turn_result.get("check")
++    if check is not None and not check.available:
++        return {"available": False, "events": []}
+     if check is not None:
+         apply_big_failure_degradation(state, check)
+     delta = apply_mood_delta(state, turn_result.get("mood_delta", 0))
+@@
+ 
+ 
+ def advance_time_slot(state):
++    """Finish one action; meals and sleep decisions require explicit choices."""
+     ensure_second_stage_state(state)
+-    state.time_slot_index += 1
+-    if state.time_slot_index >= len(TIME_SLOTS):
+-        state.time_slot_index = 0
+-        state.day += 1
+-        state.weekday = 1 + ((state.weekday) % 7)
+-    state.current_time_slot = TIME_SLOTS[state.time_slot_index]
++    if state.current_time_slot not in TIME_SLOTS:
++        raise ValueError("Only an action round can be advanced.")
++    if state.current_time_slot.startswith("late_night_"):
++        state.night_actions_completed = int(state.current_time_slot.rsplit("_", 1)[1])
++    state.time_slot_index = TIME_SLOTS.index(state.current_time_slot) + 1
++    start_turn(state, NEXT_TIME_SLOT[state.current_time_slot])
+     return state.current_time_slot
+ 
+ 
+-def end_day(state, rng=None):
++def start_day(state):
++    """Start the first day. Subsequent days must pass through sleep settlement."""
++    ensure_second_stage_state(state)
++    if state.current_time_slot is not None:
++        raise ValueError("A day is already in progress.")
++    state.time_slot_index = 0
++    return start_turn(state, "breakfast")
++
++
++def action_clock_progress(state):
++    """Six regular holes; reveal optional night rounds only when entered."""
++    ensure_second_stage_state(state)
++    night_rounds = state.night_actions_completed
++    if state.current_time_slot in TIME_SLOTS[6:]:
++        night_rounds = max(night_rounds, TIME_SLOTS.index(state.current_time_slot) - 5)
++    return (6 + night_rounds, state.time_slot_index)
++
++
++def choose_meal(state, eat, special_event=None):
++    """A meal has only eat/skip choices; authored events may hook into either."""
++    ensure_second_stage_state(state)
++    slot = state.current_time_slot
++    if slot not in MEAL_SLOTS or not isinstance(eat, bool):
++        raise ValueError("A meal requires an eat/skip choice at a meal node.")
++    state.meal_choices[slot] = eat
++    events = ["meal:{}:{}".format(slot, "eat" if eat else "skip")]
++    if special_event is not None:
++        events.extend(special_event(state, slot, eat) or [])
++    start_turn(state, NEXT_TIME_SLOT[slot])
++    return {"events": events, "time_slot": state.current_time_slot}
++
++
++def choose_night_snack(state, special_event=None):
++    ensure_second_stage_state(state)
++    if state.current_time_slot not in ("night_break_1", "night_break_2") or state.night_snack_eaten:
++        return {"available": False, "reason": "snack_unavailable", "events": []}
++    state.night_snack_eaten = True
++    state.meal_choices["night_snack"] = True
++    events = ["meal:night_snack:eat"]
++    if special_event is not None:
++        events.extend(special_event(state, "night_snack", True) or [])
++    return {"available": True, "events": events}
++
++
++def continue_night(state):
++    ensure_second_stage_state(state)
++    if state.current_time_slot not in SLEEP_DECISIONS:
++        raise ValueError("Continuing the night requires a sleep decision.")
++    record_late_night(state)
++    slot = "late_night_{}".format(state.night_actions_completed + 1)
++    return start_turn(state, slot)
++
++
++def start_deep_fatigue(state):
++    ensure_second_stage_state(state)
++    if state.deep_fatigue is None:
++        # Acquired day's night is night one; settle after its seventh night's sleep.
++        state.deep_fatigue = {"layers": 1, "first_day": state.day, "last_night": state.day + 6,
++                              "last_late_day": None, "relapsed": False}
++        return ["deep_fatigue_started"]
++    return []
++
++
++def record_late_night(state):
++    """Disease relapse depends on staying up, NOT on fatigue at next waking."""
++    ensure_second_stage_state(state)
++    disease = state.deep_fatigue
++    if disease is not None and disease["last_late_day"] != state.day:
++        disease["layers"] += 1
++        disease["last_late_day"] = state.day
++        disease["relapsed"] = True
++        return ["deep_fatigue_added:{}".format(disease["layers"])]
++    return []
++
++
++def wake_outcome(rank, forced_coma=False):
++    """Map the actual POW result to skipped morning rounds and NEW fatigue."""
++    if rank not in (RESULT_BIG_FAILURE, RESULT_FAILURE, RESULT_SUCCESS, RESULT_HARD_SUCCESS, RESULT_BIG_SUCCESS):
++        raise ValueError("A wake check result is required.")
++    if forced_coma:
++        if rank == RESULT_BIG_SUCCESS:
++            return {"skip_morning": 0, "fatigue": 2}
++        if rank == RESULT_HARD_SUCCESS:
++            return {"skip_morning": 1, "fatigue": 1}
++        return {"skip_morning": 2, "fatigue": 0}
++    if rank in (RESULT_SUCCESS, RESULT_HARD_SUCCESS, RESULT_BIG_SUCCESS):
++        return {"skip_morning": 0, "fatigue": 1}
++    return {"skip_morning": 1, "fatigue": 0}
++
++
++def perform_wake_check(state, requirement, dice_ids, rng=None):
++    # Target is supplied by the rule configuration; never infer it from current POW.
++    return perform_check(state, CheckSpec("pow", requirement, dice_ids, action_type=ACTION_WAKE), rng)
++
++
++def begin_sleep(state, rng=None):
++    """Settle the old night's rest once, then wait for a free wake check if late."""
++    ensure_second_stage_state(state)
++    if state.current_time_slot not in SLEEP_DECISIONS + ("forced_sleep",):
++        return {"available": False, "reason": "not_sleep_time", "events": []}
++    on_time = state.current_time_slot == "sleep_decision"
++    forced_coma = state.current_time_slot == "forced_sleep"
++    before = int(state.energy)
++    events = ["sleep"]
++    events.extend(end_day(state, rng, on_time=on_time)["events"])
++    events.extend(end_week_if_needed(state, rng)["events"])
++    events.extend(clear_training_fatigue_on_sleep(state))
++    state.day += 1
++    state.weekday = 1 + (state.weekday % 7)
++    state.sleep_fatigue = [expiry for expiry in state.sleep_fatigue if expiry > state.day]
++    state.energy = energy_max(state)
++    state.meal_choices = {}
++    state.night_actions_completed = 0
++    state.night_snack_eaten = False
++    state.time_slot_index = 0
++    if on_time:
++        start_turn(state, "breakfast")
++    else:
++        state.sleep_pending = {"forced_coma": forced_coma}
++        start_turn(state, "wake_check")
++    events.append("energy_full:{}:{}".format(before, state.energy))
++    return {"available": True, "needs_wake_check": not on_time, "energy_before": before,
++            "energy_after": state.energy, "events": events}
++
++
++def end_day(state, rng=None, on_time=None):
+     ensure_second_stage_state(state)
+     events = ["sleep_recovery", "small_rest"]
+     apply_sleep_recovery(state)
+     events.extend(process_small_rest(state, rng))
+-    if getattr(state, "late_night_rest_today", False):
++    if on_time is None:
++        on_time = state.current_time_slot == "sleep_decision"
++    if on_time:
++        if state.sleep_fatigue:
++            events.append("sleep_fatigue_cleared")
++        state.sleep_fatigue = []
+         state.good_routine_streak += 1
+     else:
+         state.good_routine_streak = 0
+-    state.good_routine = state.good_routine_streak >= 7
++    # A late night breaks the streak, but only actual NEW fatigue spends a buff.
++    if state.good_routine_streak >= 7:
++        state.good_routine = True
+     return {"events": events}
+ 
+ 
+*** Update File: E:/RenpyProject/ReMemorial/game/systems/rm_test_schedules.rpy
+@@
+         ("下午2", 15 * 60),
+         ("晚上1", 18 * 60),
+         ("晚上2", 20 * 60),
+-        ("深夜", 23 * 60),
++        # Existing test-clock timestamps only; final night timestamps are not designed yet.
++        ("深夜1", 23 * 60),
++        ("深夜2", 23 * 60),
++        ("深夜3", 23 * 60),
+     )
+ 
+     def rm_test_day_text():
+         return "第{}天".format(store.rm_test_day)
+ 
+     def rm_test_turn_text():
+-        return RM_TEST_TURNS[store.rm_test_turn_index][0]
++        return rm_core.TIME_SLOT_LABELS.get(rm_ensure_player().current_time_slot, "")
+ 
+     def rm_test_sync_clock():
+-        store.current_time_minutes = RM_TEST_TURNS[store.rm_test_turn_index][1]
+-        if getattr(store, "rm_player", None) is not None:
+-            store.rm_player.day = int(store.rm_test_day)
+-            store.rm_player.weekday = 1 + ((int(store.rm_test_day) - 1) % 7)
++        player = rm_ensure_player()
++        rm_core.ensure_second_stage_state(player)
++        if player.current_time_slot is None and store.rm_test_flow_active:
++            # Old test saves only stored a separate seven-round index.
++            rm_core.start_turn(player, rm_core.TIME_SLOTS[min(store.rm_test_turn_index, 8)])
++        store.rm_test_day = player.day
++        store.rm_test_turn_index = player.time_slot_index
++        slot = player.current_time_slot
++        clock_slot = {"breakfast": "morning_1", "lunch": "afternoon_1", "dinner": "evening_1",
++                      "sleep_decision": "evening_2", "night_break_1": "late_night_1",
++                      "night_break_2": "late_night_2", "forced_sleep": "late_night_3",
++                      "wake_check": "morning_1"}.get(slot, slot)
++        if clock_slot in rm_core.TIME_SLOTS:
++            store.current_time_minutes = RM_TEST_TURNS[rm_core.TIME_SLOTS.index(clock_slot)][1]
+ 
+     def rm_test_start_flow():
+         store.rm_test_flow_active = True
+@@
+         store.rm_test_turn_index = 0
+         store.rm_test_last_result_text = ""
+         store.rm_player = rm_core.create_initial_character({"str": 3, "dex": 3, "int": 2}, rng=renpy.random)
++        store.rm_player.day = 101
++        store.rm_player.weekday = 3
++        rm_core.start_day(store.rm_player)
+         store.story_hud_status_unlocked = True
+         store.story_hud_character_panel_unlocked = True
+         rm_test_sync_clock()
+@@
+         return rm_test_pending_card_request(character)
+ 
+     def rm_test_advance_turn(schedule_id=None):
+-        if schedule_id == "test_sleep" or store.rm_test_turn_index >= len(RM_TEST_TURNS) - 1:
+-            store.rm_test_day += 1
+-            store.rm_test_turn_index = 0
+-        else:
+-            store.rm_test_turn_index += 1
++        if schedule_id != "test_sleep":
++            rm_core.advance_time_slot(rm_ensure_player())
+         rm_test_sync_clock()
+ 
+     def rm_test_schedule_names():
+@@
+         }
+ 
+     def rm_test_is_daytime_turn():
+-        return store.rm_test_turn_index in (0, 1, 2, 3)
++        return rm_ensure_player().current_time_slot in rm_core.TIME_SLOTS[:4]
+ 
+     def rm_test_is_deep_night_turn():
+-        return store.rm_test_turn_index == len(RM_TEST_TURNS) - 1
++        return rm_ensure_player().current_time_slot in rm_core.TIME_SLOTS[6:]
+ 
+     def rm_test_schedule_available(schedule_id):
++        slot = rm_ensure_player().current_time_slot
++        if schedule_id == "test_sleep":
++            return slot in rm_core.SLEEP_DECISIONS + ("forced_sleep",)
++        if slot not in rm_core.TIME_SLOTS:
++            return False
+         if schedule_id == "test_rest":
+             return not rm_test_is_deep_night_turn()
+-        if schedule_id == "test_sleep":
+-            return rm_test_is_deep_night_turn()
+         return True
+ 
+     def rm_test_schedule_unavailable_text(schedule_id):
+         if schedule_id == "test_rest":
+             return "休息（测试）只能在深夜以外使用。"
+         if schedule_id == "test_sleep":
+-            return "睡觉（测试）只能在深夜使用。"
++            return "晚上2结束后或深夜行动间可以睡觉。第三轮深夜结束会强制昏迷。"
+         return "当前时间不能使用该日程。"
+ 
+     def rm_test_schedule_uses_check(schedule_id):
+@@
+             requirement,
+             dice_ids=selected_ids,
+             action_type=rm_core.ACTION_SCHEDULE,
++            is_late_night=rm_test_is_deep_night_turn(),
+             big_failure_slack=rm_core.training_fatigue_big_failure_slack(character, schedule_id),
+             allowed_dice_attributes=rm_test_allowed_die_attributes(schedule_id),
+             required_dice_attributes=rm_test_required_die_attributes(schedule_id),
+@@
+         else:
+             raise ValueError("Schedule must use the check flow: {!r}".format(schedule_id))
+         events = result.get("events", [])
+-        turn = rm_core.end_action_round(character, 0, rng=renpy.random, exact_mood_delta=True)
++        if not result.get("available", False):
++            store.rm_test_last_result_text = "{}无法执行，不消耗行动轮。".format(name)
++            return {"available": False, "events": events}
++        turn = (rm_core.end_action_round(character, 0, rng=renpy.random, exact_mood_delta=True)
++                if schedule_id == "test_rest" else None)
+         store.rm_test_last_result_text = "{}完成。{} 本轮事件：{}。".format(
+             name,
+             rm_test_rest_result_text(schedule_id, result),
+@@
+                 result.get("restored", 0),
+             )
+         if schedule_id == "test_sleep":
+-            return "深夜睡觉，精力恢复至 {}/{}。".format(result.get("energy_after", 0), rm_core.energy_max(rm_ensure_player()))
++            return "睡眠结算，精力恢复至 {}/{}。".format(result.get("energy_after", 0), rm_core.energy_max(rm_ensure_player()))
+         return ""
+ 
+     def rm_test_event_text(events):
+@@
+     def rm_test_finalize_schedule_check(schedule_id, result_dict, character=None):
+         character = character or rm_ensure_player()
+         result = result_dict.get("_result")
++        if result is None or not result.available:
++            store.rm_test_last_result_text = "检定无法执行，不消耗行动轮。"
++            return {"available": False, "events": []}
+         events = rm_test_apply_schedule_effect(schedule_id, result, character)
+         mood_delta = 10 if result_dict.get("available") and result_dict.get("success") else -10
+         turn = rm_core.end_action_round(character, mood_delta, rng=renpy.random, exact_mood_delta=True)
+@@
+                 sensitive rm_test_schedule_available("test_rest")
+                 action Return("test_rest")
+ 
+-            textbutton "睡觉（测试）":
+-                style "rm_test_schedule_button"
+-                sensitive rm_test_schedule_available("test_sleep")
+-                action Return("test_sleep")
++            if rm_test_schedule_available("test_sleep"):
++                textbutton "睡觉（测试）":
++                    style "rm_test_schedule_button"
++                    sensitive rm_test_schedule_available("test_sleep")
++                    action Return("test_sleep")
+ 
+             textbutton "力量训练（测试）":
+                 style "rm_test_schedule_button"
+*** Update File: E:/RenpyProject/ReMemorial/game/story/9-9-9-test-flow.rpy
+@@
+ 
+ 
+ label rm_test_flow_start:
+-    # 测试行动轮：上午1，上午2，下午1，下午2，晚上1，晚上2，深夜。
++    # 餐次、六个常规行动轮、睡觉决定，以及最多三个深夜行动轮。
+     $ rm_ui_test_skin_active = False
+     $ rm_test_start_flow()
+     jump rm_test_flow_loop
+@@
+ 
+ label rm_test_flow_loop:
+     $ rm_test_sync_clock()
++    $ rm_test_node = rm_ensure_player().current_time_slot
++
++    if rm_test_node in rm_core.MEAL_SLOTS:
++        menu:
++            "现在是[rm_test_turn_text()]时间。"
++            "吃饭":
++                $ rm_core.choose_meal(rm_ensure_player(), True)
++            "不吃":
++                $ rm_core.choose_meal(rm_ensure_player(), False)
++        jump rm_test_flow_loop
++
++    if rm_test_node in rm_core.SLEEP_DECISIONS:
++        menu:
++            "今天就到这里，还是继续？"
++            "睡觉":
++                call rm_test_sleep_flow
++            "继续行动":
++                $ rm_core.continue_night(rm_ensure_player())
++            "吃夜宵" if rm_test_node in ("night_break_1", "night_break_2") and not rm_ensure_player().night_snack_eaten:
++                $ rm_core.choose_night_snack(rm_ensure_player())
++        jump rm_test_flow_loop
++
++    if rm_test_node == "forced_sleep":
++        "你再也撑不住了，眼前一黑，失去了意识。"
++        call rm_test_sleep_flow
++        jump rm_test_flow_loop
++
++    if rm_test_node == "wake_check":
++        call rm_test_wake_flow
++        jump rm_test_flow_loop
+ 
+     "现在是[rm_test_day_text()][rm_test_turn_text()]时间点。"
+     "接下来要做什么。"
+@@
+     if selected_schedule == "test_sleep":
+         call rm_test_resolve_pending_cards
+ 
+-    $ rm_test_advance_turn(selected_schedule)
++    if rm_test_outcome.get("available", True):
++        $ rm_test_advance_turn(selected_schedule)
+     jump rm_test_flow_loop
+ 
+ 
++label rm_test_sleep_flow:
++    $ rm_test_outcome = rm_test_execute_rest_schedule("test_sleep")
++    "[rm_test_last_result_text]"
++    call rm_test_resolve_pending_cards
++    return
++
++
++label rm_test_wake_flow:
++    "该起床了。这次意志检定不消耗精力。"
++    if rm_core.usable_dice(rm_ensure_player(), "pow"):
++        $ rm_wake_max_dice = rm_core.max_dice_for_check(rm_core.CheckSpec("pow", rm_core.WAKE_REQUIREMENT), rm_core.mood_check_profile(rm_core.mood_state(rm_ensure_player())))
++        call screen attribute_dice_select("pow", min_dice=1, max_dice=rm_wake_max_dice, requirement=rm_core.WAKE_REQUIREMENT, check_kind="起床", action_type=rm_core.ACTION_WAKE)
++        $ rm_wake_dice = _return
++        if rm_wake_dice == "__rm_ui_test_exit__":
++            $ rm_ui_test_skin_active = False
++            jump rm_ui_test_menu
++        $ rm_wake_result = rm_core.perform_wake_check(rm_ensure_player(), rm_core.WAKE_REQUIREMENT, rm_wake_dice, rng=renpy.random)
++        $ rm_wake_display = rm_test_result_dict_for_schedule(rm_wake_result, rm_ensure_player(), rm_wake_dice, "test_sleep")
++        call screen attribute_check_roll_animation(rm_wake_display)
++        call screen attribute_check_result(rm_wake_display)
++        $ rm_wake_rank = rm_wake_result.rank
++    else:
++        "没有可用的意志骰，你没能提前醒来。"
++        $ rm_wake_rank = rm_core.RESULT_FAILURE
++    $ rm_wake_outcome = rm_core.finish_wake(rm_ensure_player(), rm_wake_rank)
++    if rm_wake_outcome["skip_morning"] == 2:
++        "醒来时已经到了午饭时间。"
++    elif rm_wake_outcome["skip_morning"] == 1:
++        "你睡过了上午的第一轮。"
++    else:
++        "你按正常时间起床了。"
++    if "good_routine_spent" in rm_wake_outcome["events"]:
++        "良好作息抵消了这次起床带来的疲劳，随后消失。"
++    elif rm_wake_outcome["fatigue"]:
++        "睡眠不足带来了疲劳。"
++    return
++
++
+ label rm_test_schedule_check_flow(schedule_id):
+     $ rm_test_required_stat = rm_test_check_attribute(schedule_id)
+     $ rm_test_requirement = rm_test_check_requirement(schedule_id)
+*** Update File: E:/RenpyProject/ReMemorial/game/opening_stats.rpy
+@@
+         return " / ".join(str(face) for face in faces)
+ 
+     def attribute_check_action_type_label(action_type):
++        if action_type == _rm_core.ACTION_WAKE:
++            return "起床·免费"
+         if action_type == _rm_core.ACTION_SCHEDULE:
+             return "日程"
+         if action_type == _rm_core.ACTION_FORCED_SCHEDULE:
+@@
+             6,
+             selected_ids,
+             action_type=action_type,
++            is_late_night=(character.current_time_slot in _rm_core.TIME_SLOTS[6:]),
+             allowed_dice_attributes=_normal_attribute_tuple(allowed_attributes, attribute),
+             required_dice_attributes=tuple(required_die_attributes or ()),
+         )
+*** Update File: E:/RenpyProject/ReMemorial/game/ui/rm_hud_flat.rpy
+@@
+     def rm_hud_clock_data():
+         player = rm_ensure_player()
+         if rm_test_flow_active:
++            count, index = rm_core.action_clock_progress(player)
+             return ("", "周" + "一二三四五六日"[(player.weekday - 1) % 7], rm_test_day,
+-                    len(RM_TEST_TURNS), rm_test_turn_index)
+-        # The engine has no meal rounds yet. Do not fabricate eight/eleven rounds.
+-        count = len(rm_core.TIME_SLOTS) if player.current_time_slot is not None else 0
+-        return (story_hud_date_text, story_hud_weekday_text, player.day, count, player.time_slot_index)
++                    count, index)
++        # Punched holes count action rounds only; meals/decisions are given by dialogue.
++        count, index = rm_core.action_clock_progress(player) if player.current_time_slot is not None else (0, 0)
++        return (story_hud_date_text, story_hud_weekday_text, player.day, count, index)
+ 
+     def rm_hud_fraction(value, maximum):
+         return max(0.0, min(1.0, float(value) / maximum)) if maximum > 0 else 0.0
+*** Add File: E:/RenpyProject/ReMemorial/tests/test_rm_sleep_cycle.py
++import itertools
++import random
++import unittest
++
++from game.systems import rm_core as rm
++
++
++class SleepCycleTests(unittest.TestCase):
++    def setUp(self):
++        self.player = rm.create_initial_character(rng=random.Random(7))
++
++    def test_six_actions_and_three_meals_end_at_sleep_decision(self):
++        p = self.player
++        rm.start_day(p)
++        sequence = []
++        while p.current_time_slot != "sleep_decision":
++            sequence.append(p.current_time_slot)
++            if p.current_time_slot in rm.MEAL_SLOTS:
++                before = (p.energy, p.mood)
++                rm.choose_meal(p, True)
++                self.assertEqual((p.energy, p.mood), before)
++            else:
++                rm.advance_time_slot(p)
++        self.assertEqual(sequence, ["breakfast", "morning_1", "morning_2", "lunch",
++                                   "afternoon_1", "afternoon_2", "dinner", "evening_1", "evening_2"])
++        self.assertEqual(p.day, 1)
++        self.assertEqual(p.night_actions_completed, 0)
++
++    def test_meal_cannot_be_bypassed_as_action_and_event_sees_choice(self):
++        p = self.player
++        rm.start_day(p)
++        with self.assertRaises(ValueError):
++            rm.advance_time_slot(p)
++        result = rm.resolve_action(p, rm.ScheduleSpec("mock", "mock"))
++        self.assertFalse(result["available"])
++        self.assertFalse(rm.end_turn(p, result)["available"])
++        calls = []
++        rm.choose_meal(p, False, lambda state, slot, eat: calls.append((slot, eat)))
++        self.assertEqual(calls, [("breakfast", False)])
++
++    def test_third_night_completes_then_coma_no_fourth_or_automatic_new_day(self):
++        p = self.player
++        rm.start_turn(p, "sleep_decision")
++        self.assertFalse(rm.choose_night_snack(p)["available"])
++        for number in range(1, 4):
++            rm.continue_night(p)
++            self.assertEqual(p.current_time_slot, "late_night_{}".format(number))
++            rm.advance_time_slot(p)
++            if number == 1:
++                self.assertTrue(rm.choose_night_snack(p)["available"])
++            elif number == 2:
++                self.assertFalse(rm.choose_night_snack(p)["available"])
++        self.assertEqual(p.current_time_slot, "forced_sleep")
++        self.assertEqual(p.night_actions_completed, 3)
++        self.assertEqual(p.day, 1)
++        with self.assertRaises(ValueError):
++            rm.continue_night(p)
++
++    def test_voluntary_wake_results(self):
++        for rank in (rm.RESULT_SUCCESS, rm.RESULT_HARD_SUCCESS, rm.RESULT_BIG_SUCCESS):
++            self.assertEqual(rm.wake_outcome(rank), {"skip_morning": 0, "fatigue": 1})
++        for rank in (rm.RESULT_FAILURE, rm.RESULT_BIG_FAILURE):
++            self.assertEqual(rm.wake_outcome(rank), {"skip_morning": 1, "fatigue": 0})
++
++    def test_coma_wake_results(self):
++        expected = {rm.RESULT_BIG_SUCCESS: (0, 2), rm.RESULT_HARD_SUCCESS: (1, 1),
++                    rm.RESULT_SUCCESS: (2, 0), rm.RESULT_FAILURE: (2, 0), rm.RESULT_BIG_FAILURE: (2, 0)}
++        for rank, (skip, fatigue) in expected.items():
++            self.assertEqual(rm.wake_outcome(rank, True), {"skip_morning": skip, "fatigue": fatigue})
++
++    def test_wake_check_free_with_zero_energy_and_three_heavy_dice(self):
++        p = self.player
++        p.energy = 0
++        p.dice_pool.append(rm.RMDice("pow_extra", "pow", list(range(1, 21))))
++        dice = p.dice_for("pow")
++        for die in dice:
++            die.enchantment = rm.ENCHANT_HEAVY
++        result = rm.perform_wake_check(p, rm.WAKE_REQUIREMENT, [die.id for die in dice], random.Random(8))
++        self.assertTrue(result.available)
++        self.assertEqual(len(result.dice_results), 3)
++        self.assertEqual((result.energy_cost, p.energy), (0, 0))
++
++    def test_initial_all_out_success_is_82_percent_at_fixed_target_13(self):
++        dice = self.player.dice_for("pow")
++        totals = [sum(values) + 3 for values in itertools.product(*(die.faces for die in dice))]
++        self.assertEqual(sum(totals) / len(totals), 19)
++        self.assertEqual(sum(total >= rm.WAKE_REQUIREMENT for total in totals) / len(totals), .82)
++
++    def test_sleep_fatigue_independent_expiry_and_attribute_layer(self):
++        p = self.player
++        p.sleep_fatigue = [8, 9]
++        self.assertEqual(rm.current_attribute(p, "pow"), 4)
++        p.day = 8
++        self.assertEqual(rm.current_attribute(p, "pow"), 5)
++        p.day = 9
++        self.assertEqual(rm.current_attribute(p, "pow"), 6)
++        self.assertEqual(p.attribute_values["pow"], 0)
++        self.assertEqual(p.attribute_bonuses["pow"], [])
++
++    def test_formal_loss_uses_manual_degradation_but_temporary_loss_does_not(self):
++        p = self.player
++        rm.start_deep_fatigue(p)
++        self.assertEqual(p.current_attribute("con"), 5)
++        self.assertEqual(p.degradation_penalty_pending["con"], 0)
++        rm.add_formal_attribute(p, "con", -2)
++        self.assertEqual(p.degradation_penalty_pending["con"], 2)
++        rm.add_formal_attribute(p, "con", -10)
++        self.assertEqual(p.formal_attributes["con"], 0)
++        self.assertEqual(p.degradation_penalty_pending["con"], 6)
++
++    def test_optional_night_holes_appear_only_when_entered(self):
++        p = self.player
++        rm.start_day(p)
++        self.assertEqual(rm.action_clock_progress(p), (6, 0))
++        rm.start_turn(p, "sleep_decision")
++        for number in range(1, 4):
++            rm.continue_night(p)
++            self.assertEqual(rm.action_clock_progress(p), (6 + number, 5 + number))
++            rm.advance_time_slot(p)
++        self.assertEqual(rm.action_clock_progress(p), (9, 9))
++
++    def test_day_settlement_outside_on_time_sleep_does_not_award_routine(self):
++        p = self.player
++        rm.start_turn(p, "morning_1")
++        for _ in range(7):
++            rm.end_day(p, random.Random(7))
++        self.assertFalse(p.good_routine)
++        self.assertEqual(p.good_routine_streak, 0)
++
++    def test_disease_repeated_night_actions_add_one_layer_without_extending_deadline(self):
++        p = self.player
++        rm.start_deep_fatigue(p)
++        rm.start_turn(p, "sleep_decision")
++        for _ in range(3):
++            rm.continue_night(p)
++            rm.advance_time_slot(p)
++        self.assertEqual(p.deep_fatigue["layers"], 2)
++        self.assertEqual(p.deep_fatigue["last_night"], 7)
++        self.assertTrue(p.deep_fatigue["relapsed"])
++
++
++if __name__ == "__main__":
++    unittest.main()
+*** Add File: E:/RenpyProject/ReMemorial/game/tests/sleep_cycle.rpy
++# Developer test: exercise real menu routing and shared time settlement in Ren'Py.
++testsuite sleep_cycle:
++    parameter saved_afm = [None]
++    before testcase:
++        $ saved_afm = _preferences.afm_enable
++        $ _preferences.afm_enable = False
++    after testcase:
++        $ _preferences.afm_enable = saved_afm
++        run MainMenu(confirm=False)
++
++testcase sleep_cycle.day_flow:
++    run Start("rm_test_flow_start")
++    pause until screen "choice" timeout 5
++    assert eval rm_player.current_time_slot == "breakfast"
++    assert "吃饭"
++    assert "不吃"
++    click "不吃"
++    assert eval rm_player.current_time_slot == "morning_1"
++    click "继续"
++    click "继续"
++    pause until screen "rm_test_schedule_select" timeout 5
++    assert screen "rm_test_schedule_select"
++    click "休息（测试）"
++    click "继续"
++    assert eval rm_player.current_time_slot == "morning_2"
++    click "继续"
++    click "继续"
++    pause until screen "rm_test_schedule_select" timeout 5
++    click "休息（测试）"
++    click "继续"
++    assert eval rm_player.current_time_slot == "lunch"
++    click "吃饭"
++    assert eval rm_player.current_time_slot == "afternoon_1"
++    python:
++        for action in range(4):
++            if rm_player.current_time_slot == "dinner":
++                rm_core.choose_meal(rm_player, True)
++            rm_core.advance_time_slot(rm_player)
++    run Jump("rm_test_flow_loop")
++    pause until screen "choice" timeout 5
++    assert eval rm_player.current_time_slot == "sleep_decision"
++    click "睡觉"
++    assert eval rm_player.day == 102
++    assert eval rm_player.current_time_slot == "breakfast"
++    assert eval rm_player.good_routine_streak == 1
++    python:
++        for night in range(6):
++            rm_core.start_turn(rm_player, "sleep_decision")
++            rm_core.begin_sleep(rm_player, renpy.random)
++    assert eval rm_player.good_routine
++    assert eval rm_player.day == 108
+*** Update File: E:/RenpyProject/ReMemorial/tests/test_rm_test_flow.py
+@@
+-    def test_test_story_defines_day_101_seven_turn_loop_and_schedule_prompt(self):
++    def test_test_story_uses_core_meals_sleep_and_wake_flow(self):
+@@
+-        self.assertIn("上午1", source)
+-        self.assertIn("深夜", source)
++        self.assertIn("rm_test_node in rm_core.MEAL_SLOTS", source)
++        self.assertIn("rm_test_node in rm_core.SLEEP_DECISIONS", source)
++        self.assertIn('rm_test_node == "forced_sleep"', source)
++        self.assertIn("call rm_test_wake_flow", source)
+*** End Patch

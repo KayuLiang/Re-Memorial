@@ -1,534 +1,402 @@
-# Phone screens for Re: Memorial.
+# Narrow native phone, in the project's 2560 x 1440 logical coordinates.
+# 552 x 1226 becomes 414 x 920 in a 1920 x 1080 window.
 
 init python:
-    config.overlay_screens.append("phone_button")
+    def phone_round(color="white"):
+        return Frame("gui/phone_modern/" + color + ".png", 22, 22)
 
-    def phone_calculate():
-        expr = store.phone_calc_expr
-        if not expr:
-            store.phone_calc_result = "0"
-            return
+    def phone_chat_event(adjustment, send=False):
+        # Motion belongs to this visible interaction, never to saved chat records.
+        follow = adjustment.value if adjustment.value >= adjustment.range - 8 else None
+        before = len(phone_history("ami"))
+        if send:
+            phone_send_story_ami_reply()
+        else:
+            phone_next_story_ami(store.phone_story_ami_count)
+        if len(phone_history("ami")) > before:
+            renpy.set_screen_variable("phone_new_index", before, "phone_panel")
+            renpy.set_screen_variable("phone_follow", follow, "phone_panel")
 
-        allowed = set("0123456789+-*/(). ")
-        if any(ch not in allowed for ch in expr):
-            store.phone_calc_result = "\u8f93\u5165\u9519\u8bef"
-            return
+    def phone_scroll_latest(adjustment, previous_value):
+        # Read the new range after layout; preserve any intervening manual scroll.
+        if abs(adjustment.value - previous_value) < 1:
+            adjustment.change(adjustment.range)
 
-        try:
-            value = eval(expr, {"__builtins__": {}}, {})
-            store.phone_calc_result = str(value)
-        except Exception:
-            store.phone_calc_result = "\u8ba1\u7b97\u9519\u8bef"
+transform phone_open:
+    alpha 0.0
+    yoffset 38
+    easeout .28 alpha 1.0 yoffset 0
 
-    def phone_send_message(contact_id):
-        msg = store.phone_draft_message.strip()
-        if not msg:
-            return
-        store.phone_chat_history.setdefault(contact_id, []).append(("\u6211", msg))
-        store.phone_draft_message = ""
+transform phone_page_in(direction=1):
+    alpha .35
+    xoffset (direction * 32)
+    easeout .20 alpha 1.0 xoffset 0
 
-    def phone_send_story_ami_reply():
-        store.phone_story_ami_sent = True
-        store.phone_story_ami_reply_ready = False
-        store.phone_draft_message = ""
+transform phone_message_in:
+    alpha 0.0
+    yoffset 9
+    easeout .16 alpha 1.0 yoffset 0
 
-    def phone_story_open_ami_chat():
-        if store.phone_story_ami_count < 1:
-            store.phone_story_ami_count = 1
-
-    def phone_prepare_story_ami_reply():
-        store.phone_draft_message = store.phone_story_ami_reply_text
-        store.phone_story_ami_reply_ready = True
-
-default phone_calc_expr = ""
-default phone_calc_result = "0"
-default phone_draft_message = ""
-default phone_chat_history = {}
-default phone_story_ami_count = 0
-default phone_story_ami_reply_ready = False
-default phone_story_ami_sent = False
-
-define phone_story_ami_reply_text = "\u8c22\u8c22\u4f60\u7ed9\u6211\u9001\u7684\u8863\u670d\uff0c\u5f88\u5408\u8eab\u3002\u6211\u9a6c\u4e0a\u51fa\u6765\u4e86\u3002"
-
-define phone_apps = [
-    ("phone", "\u7535\u8bdd", "\u260e", "#34C759"),
-    ("messages", "\u4fe1\u606f", "\u25cf", "#32D74B"),
-    ("weather", "\u5929\u6c14", "\u2601", "#5AC8FA"),
-    ("calendar", "\u65e5\u5386", "16", "#FF3B30"),
-    ("notes", "\u7b14\u8bb0", "\u270e", "#FFD60A"),
-    ("recorder", "\u5f55\u97f3\u673a", "\u25cf", "#FF453A"),
-    ("clock", "\u65f6\u949f", "\u25f7", "#8E8E93"),
-    ("album", "\u76f8\u518c", "\u25a7", "#AF52DE"),
-    ("calculator", "\u8ba1\u7b97\u5668", "+", "#1C1C1E"),
-]
-
-define phone_contacts = [
-    ("ami", "\u963f\u5f25", "\u51fa\u9662\u5feb\u4e50\uff01"),
-    ("doctor", "\u533b\u751f", "\u590d\u8bca\u4fe1\u606f\u5360\u4f4d"),
-    ("mom", "\u5988\u5988", "\u5185\u5bb9\u5360\u4f4d\uff0c\u5f85\u8865\u5145"),
-    ("hospital", "\u533b\u9662\u516c\u4f17\u53f7", "\u533b\u7597\u62a5\u544a\u5360\u4f4d"),
-]
-
-define phone_chats = {
-    "ami": [
-        ("\u963f\u5f25", "\u5f17\u6d1b\uff0c\u6211\u628a\u4f60\u4e4b\u524d\u5f04\u810f\u7684\u8863\u670d\u90fd\u62ff\u56de\u53bb\u6d17\u4e86\u3002"),
-        ("\u963f\u5f25", "\u65b0\u7684\u6362\u6d17\u8863\u670d\u4e5f\u8ba9\u62a4\u58eb\u5e2e\u5fd9\u5e26\u8fdb\u53bb\u4e86\uff0c\u4f60\u8bb0\u5f97\u627e\u5979\u62ff\u4e00\u4e0b\u3002"),
-        ("\u963f\u5f25", "\u6536\u62fe\u597d\u4e1c\u897f\u5c31\u51fa\u6765\u627e\u6211\u5427\uff0c\u6211\u5728\u4e2d\u5fc3\u7684\u5927\u5385\u7b49\u4f60\uff01"),
-        ("\u963f\u5f25", "\u4e24\u4e2a\u6708\u6ca1\u89c1\u4e86\uff0c\u6211\u5bf9\u4f60\u53ef\u662f\u53c8\u62c5\u5fc3\u53c8\u60f3\u7684\uff0c\u8fd8\u4e0d\u5feb\u70b9\u51fa\u6765\u8ba9\u6211\u62b1\u4e00\u4e0b\u3002"),
-        ("\u6211", "\u8c22\u8c22\u4f60\u7ed9\u6211\u9001\u7684\u8863\u670d\uff0c\u5f88\u5408\u8eab\u3002\u6211\u9a6c\u4e0a\u51fa\u6765\u4e86\u3002"),
-    ],
-    "doctor": [("\u533b\u751f", "\u5185\u5bb9\u5360\u4f4d\uff1a\u590d\u8bca\u65f6\u95f4\u548c\u533b\u7597\u62a5\u544a\u5c1a\u672a\u5b9e\u88c5\u3002")],
-    "mom": [("\u5988\u5988", "\u5185\u5bb9\u5360\u4f4d\uff1a\u5bb6\u5ead\u76f8\u5173\u5bf9\u8bdd\u5c1a\u672a\u5b9e\u88c5\u3002")],
-    "hospital": [("\u533b\u9662\u516c\u4f17\u53f7", "\u5185\u5bb9\u5360\u4f4d\uff1a\u533b\u9662\u901a\u77e5\u5c1a\u672a\u5b9e\u88c5\u3002")],
-}
-
-screen phone_button():
-    zorder 90
-
-    if not main_menu and not opening_active and "\u624b\u673a" in inventory:
-        textbutton "\u624b\u673a":
-            style "phone_side_button"
-            action Show("phone_panel")
+transform phone_still:
+    alpha 1.0
+    yoffset 0
 
 screen phone_panel(start_app="home", start_chat=None, story_mode=False):
     modal True
     zorder 210
     default phone_app = start_app
     default chat_contact = start_chat
+    default phone_direction = 1
+    default phone_scroll = ui.adjustment()
+    default phone_new_index = None
+    default phone_follow = None
+    if story_mode:
+        on "show" action [Function(renpy.retain_after_load), Function(phone_begin_story_ami)]
+    else:
+        on "show" action Function(renpy.retain_after_load)
 
-    key "game_menu" action If(chat_contact is not None, SetScreenVariable("chat_contact", None), If(phone_app != "home", SetScreenVariable("phone_app", "home"), If(story_mode, Return(), Hide("phone_panel"))))
-
-    frame:
-        style "phone_overlay_frame"
-
-        textbutton "\u2715":
-            style "phone_close_button"
-            action If(story_mode, Return(), Hide("phone_panel"))
-
-        frame:
-            style "phone_device_frame"
-
-            vbox:
-                spacing 12
-                xfill True
-                yfill True
-
-                hbox:
-                    xfill True
-                    text "13:30" style "phone_status_text"
-                    text "\u25cf\u25cf\u25cf  5G     82%" style "phone_status_text" xalign 1.0
-
-                if phone_app == "home":
-                    use phone_home
-                elif phone_app == "messages":
-                    if chat_contact:
-                        use phone_chat(chat_contact, story_mode)
-                    else:
-                        use phone_messages(story_mode)
-                elif phone_app == "phone":
-                    use phone_placeholder("\u7535\u8bdd", "\u8054\u7cfb\u4eba\u548c\u901a\u8bdd\u8bb0\u5f55\u5360\u4f4d\u3002")
-                elif phone_app == "weather":
-                    use phone_placeholder("\u5929\u6c14", "\u5929\u6c14\u6570\u636e\u5360\u4f4d\uff1a\u5e02\u7acb\u7cbe\u795e\u536b\u751f\u4e2d\u5fc3\uff0c\u6674\u8f6c\u591a\u4e91\u3002")
-                elif phone_app == "calendar":
-                    use phone_placeholder("\u65e5\u5386", "\u65e5\u7a0b\u5360\u4f4d\uff1a\u4e24\u5468\u540e\u590d\u8bca\u3002")
-                elif phone_app == "notes":
-                    use phone_placeholder("\u7b14\u8bb0", "\u8bb0\u5fc6\u788e\u7247\u548c\u7ebf\u7d22\u5360\u4f4d\u3002")
-                elif phone_app == "recorder":
-                    use phone_placeholder("\u5f55\u97f3\u673a", "\u5f55\u97f3\u5217\u8868\u5360\u4f4d\u3002")
-                elif phone_app == "clock":
-                    use phone_placeholder("\u65f6\u949f", "\u95f9\u949f\u548c\u65f6\u95f4\u5360\u4f4d\u3002")
-                elif phone_app == "album":
-                    use phone_album
-                elif phone_app == "calculator":
-                    use phone_calculator
-
-                textbutton "\u25ac":
-                    xalign 0.5
-                    action [SetScreenVariable("phone_app", "home"), SetScreenVariable("chat_contact", None)]
-
+    $ close_action = Return("closed") if story_mode else Hide("phone_panel")
+    $ home_action = [SetScreenVariable("phone_direction", -1), SetScreenVariable("phone_app", "home"), SetScreenVariable("chat_contact", None), SetScreenVariable("phone_new_index", None)]
+    $ back_action = [SetScreenVariable("phone_direction", -1), SetScreenVariable("chat_contact", None), SetScreenVariable("phone_new_index", None)] if chat_contact else home_action
+    key "game_menu" action (back_action if phone_app != "home" else close_action)
+    use modal_dim_background
+    fixed:
+        at phone_open
+        use phone_device(phone_app, chat_contact, story_mode, False, phone_direction, phone_scroll, phone_new_index, phone_follow)
+    textbutton "收起手机":
+        id "phone_close"
+        style "phone_close_button"
+        xpos 1588
+        ypos 137
+        action close_action
 
 screen phone_panel_background(start_chat=None, story_mode=False):
-    modal False
     zorder 1
+    # Read-only: no timers, input, marks, or repeated message animations.
+    use phone_device("messages", start_chat, story_mode, True)
 
-    frame:
-        style "phone_overlay_frame"
-
-        frame:
-            style "phone_device_frame"
-
-            vbox:
-                spacing 12
-                xfill True
-                yfill True
-
-                hbox:
-                    xfill True
-                    text "13:30" style "phone_status_text"
-                    text "\u25cf\u25cf\u25cf  5G     82%" style "phone_status_text" xalign 1.0
-
-                if start_chat:
-                    use phone_chat(start_chat, story_mode, True)
+screen phone_device(app, contact, story_mode, background, phone_direction=1, phone_scroll=None, phone_new_index=None, phone_follow=None):
+    fixed:
+        pos (1004, 107)
+        xysize (552, 1226)
+        add "gui/phone_modern/device.svg"
+        text phone_clock_text() style "phone_status_text" pos (51, 43)
+        # No invented signal strength or battery percentage.
+        text "RE / M" style "phone_status_text" size 17 color "#8993a2" pos (405, 47)
+        fixed:
+            pos (34, 106)
+            xysize (484, 1050)
+            if background:
+                if contact:
+                    use phone_chat(contact, story_mode, True)
                 else:
-                    use phone_messages(story_mode)
+                    use phone_messages(story_mode, True)
+            else:
+                for page_key index page_key in [(app, contact)]:
+                    fixed:
+                        at phone_page_in(phone_direction)
+                        if app == "home":
+                            use phone_home
+                        elif app == "messages":
+                            if contact:
+                                use phone_chat(contact, story_mode, False, phone_scroll, phone_new_index, phone_follow)
+                            else:
+                                use phone_messages(story_mode)
+                        elif app == "calculator":
+                            use phone_calculator
+                        else:
+                            use phone_placeholder(dict((a[0], a[1]) for a in phone_apps).get(app, "应用"))
+        button:
+            id "phone_home_gesture"
+            pos (186, 1168)
+            xysize (180, 40)
+            background None
+            sensitive not background
+            action [SetScreenVariable("phone_direction", -1), SetScreenVariable("phone_app", "home"), SetScreenVariable("chat_contact", None), SetScreenVariable("phone_new_index", None)]
+            add Solid("#344050", xsize=152, ysize=5) align (.5, .5)
 
+screen phone_header(title, background=False):
+    fixed:
+        xysize (484, 86)
+        button:
+            id "phone_back"
+            xysize (62, 72)
+            background None
+            sensitive not background
+            action ([SetScreenVariable("phone_direction", -1), SetScreenVariable("chat_contact", None), SetScreenVariable("phone_new_index", None)] if title in [c[1] for c in phone_contacts] else [SetScreenVariable("phone_direction", -1), SetScreenVariable("phone_app", "home")])
+            add "gui/phone_modern/back.svg" xysize (36, 36) align (.5, .5)
+        if title != "信息":
+            text title style "phone_title" xalign .5 ypos 18
+        add Solid("#e0e5ec", xsize=452, ysize=1) pos (16, 83)
+
+screen phone_avatar(contact_id, edge=72):
+    fixed:
+        xysize (edge, edge)
+        add phone_round("avatar") xysize (edge, edge)
+        if contact_id == "ami":
+            # Reuse the existing full-size art, with a head-and-shoulders crop.
+            add Transform(Crop((890, 540, 770, 770), "images/sprites/ami/spr_ami_casual_default.png"), xysize=(edge, edge))
+        else:
+            text dict((c[0], c[1][0]) for c in phone_contacts).get(contact_id, "我") style "phone_text" size (edge // 2) align (.5, .5) color "#597080"
 
 screen phone_home():
-    vbox:
-        spacing 18
-        xfill True
-        yfill True
-
-        grid 3 3:
-            xalign 0.5
-            yalign 0.5
-            spacing 28
-
-            for app_id, app_name, app_icon, app_color in phone_apps:
-                button:
-                    style "phone_app_button"
-                    action SetScreenVariable("phone_app", app_id)
-
-                    vbox:
-                        spacing 6
-                        xalign 0.5
-                        frame:
-                            style "phone_app_icon_frame"
-                            background Solid(app_color)
-                            text app_icon style "phone_app_icon_text"
-                        text app_name style "phone_app_name_text"
-
-screen phone_messages(story_mode=False):
-    vbox:
-        spacing 12
-        hbox:
-            spacing 12
-            textbutton "\u2b05":
-                style "phone_back_button"
-                action SetScreenVariable("phone_app", "home")
-            text "\u4fe1\u606f" style "phone_app_title_text"
-
-        for contact_id, contact_name, preview in phone_contacts:
+    text phone_date_text() style "phone_muted" xalign .5 ypos 68
+    text phone_clock_text() style "phone_text" size 90 xalign .5 ypos 110 color "#20364e"
+    text "Re: Memorial" style "phone_muted" size 20 xalign .5 ypos 228
+    grid 3 3:
+        xpos 17
+        ypos 352
+        spacing 26
+        for app_id, app_name, app_icon, app_color in phone_apps:
             button:
-                style "phone_list_button"
-                if story_mode and contact_id == "ami":
-                    action [Function(phone_story_open_ami_chat), SetScreenVariable("chat_contact", contact_id)]
-                else:
-                    action SetScreenVariable("chat_contact", contact_id)
+                id ("phone_app_" + app_id)
+                xysize (132, 142)
+                padding (0, 0)
+                background None
+                action [SetScreenVariable("phone_direction", 1), SetScreenVariable("phone_app", app_id)]
+                vbox:
+                    xalign .5
+                    spacing 12
+                    frame:
+                        xalign .5
+                        xysize (90, 90)
+                        padding (0, 0)
+                        background phone_round("blue" if app_id == "messages" else "dark")
+                        add ("gui/phone_modern/" + app_id + ".svg") xysize (54, 54) align (.5, .5)
+                        if app_id == "messages" and phone_unread("ami"):
+                            frame:
+                                background phone_round("blue")
+                                xysize (30, 30)
+                                padding (0, 0)
+                                align (1.12, -.12)
+                                text str(phone_unread("ami")) style "phone_badge"
+                    text app_name style "phone_text" size 23 xalign .5
+
+screen phone_messages(story_mode=False, background=False):
+    use phone_header("信息", background)
+    text "信息" style "phone_title" size 48 pos (20, 115)
+    $ unread = sum(phone_unread(c[0]) for c in phone_contacts)
+    text ("%d 条未读消息" % unread if unread else "所有消息已读") style "phone_muted" pos (23, 186)
+    vbox:
+        pos (12, 260)
+        spacing 2
+        for contact_id, contact_name, unused_preview in phone_contacts:
+            button:
+                id ("phone_contact_" + contact_id)
+                xysize (460, 135)
+                padding (14, 18)
+                background None
+                hover_background phone_round("white")
+                sensitive not background
+                action [SetScreenVariable("phone_direction", 1), SetScreenVariable("phone_scroll", ui.adjustment()), SetScreenVariable("phone_new_index", None), SetScreenVariable("phone_follow", None), SetScreenVariable("chat_contact", contact_id)]
                 hbox:
-                    xfill True
+                    spacing 18
+                    use phone_avatar(contact_id, 74)
                     vbox:
-                        text contact_name style "phone_list_title_text"
-                        text preview style "phone_list_preview_text"
-                    if story_mode and contact_id == "ami" and phone_story_ami_count == 0 and not phone_story_ami_sent:
+                        xsize 290
+                        spacing 10
+                        text contact_name style "phone_text" size 29
+                        $ preview = phone_preview(contact_id)
+                        text (preview[:11] + "…" if len(preview) > 12 else preview) style "phone_muted" xmaximum 290 substitute False
+                    if phone_unread(contact_id):
                         frame:
-                            style "phone_unread_badge"
-                            text "1" style "phone_unread_badge_text"
+                            background phone_round("blue")
+                            padding (0, 0)
+                            xysize (28, 28)
+                            text str(phone_unread(contact_id)) style "phone_badge"
+            add Solid("#e0e5ec", xsize=350, ysize=1) xalign 1.0
+    text "消息会随故事逐步出现" style "phone_muted" size 21 xalign .5 ypos 988
 
-screen phone_chat(contact_id, story_mode=False, background=False):
+screen phone_chat(contact_id, story_mode=False, background=False, phone_scroll=None, phone_new_index=None, phone_follow=None):
     $ contact_name = dict((c[0], c[1]) for c in phone_contacts).get(contact_id, "")
-    if story_mode and contact_id == "ami":
-        $ chat_lines = phone_chats["ami"][:phone_story_ami_count]
-        if phone_story_ami_sent:
-            $ chat_lines = chat_lines + [phone_chats["ami"][4]]
-    else:
-        $ chat_lines = phone_chats.get(contact_id, []) + phone_chat_history.get(contact_id, [])
-
-    vbox:
-        spacing 12
-
-        hbox:
-            spacing 12
-            textbutton "\u2b05":
-                style "phone_back_button"
-                action SetScreenVariable("chat_contact", None)
-            text contact_name style "phone_app_title_text"
-
-        viewport:
-            ymaximum 620
-            mousewheel True
-            scrollbars "vertical"
-            vbox:
-                spacing 10
-                for i, (who, msg) in enumerate(chat_lines):
-                    hbox:
-                        spacing 8
-                        xfill True
-                        if who == "\u6211":
-                            null width 72
-                        frame:
-                            style ("phone_bubble_self" if who == "\u6211" else "phone_bubble_other")
-                            vbox:
-                                text who style "phone_bubble_name_text"
-                                text msg style "phone_bubble_text"
-                        if story_mode and contact_id == "ami" and who != "\u6211" and i == len(chat_lines) - 1 and phone_story_ami_count < 4:
-                            textbutton "\u2193":
-                                style "phone_next_message_button"
-                                action SetVariable("phone_story_ami_count", phone_story_ami_count + 1)
-
-        if story_mode and contact_id == "ami" and phone_story_ami_count >= 4 and not phone_story_ami_reply_ready and not phone_story_ami_sent:
-            if not background:
-                timer 0.01 action Return("reply_prompt")
-            null height 72
-        elif story_mode and contact_id == "ami" and phone_story_ami_sent:
-            text "\u5df2\u53d1\u9001" style "phone_list_preview_text" xalign 0.5
-        else:
-            hbox:
-                spacing 10
-                frame:
-                    style "phone_input_frame"
-                    input value VariableInputValue("phone_draft_message") length 28 style "phone_input_text"
-                textbutton "\u53d1\u9001":
-                    style "phone_send_button"
-                    if story_mode and contact_id == "ami":
-                        action Function(phone_send_story_ami_reply)
+    $ chat_lines = phone_history(contact_id)
+    $ can_reply = contact_id == "ami" and phone_can_reply(story_mode)
+    use phone_header(contact_name, background)
+    viewport:
+        id "phone_chat_viewport"
+        pos (8, 104)
+        xysize (468, 724 if can_reply else 782)
+        mousewheel not background
+        draggable not background
+        arrowkeys not background
+        pagekeys not background
+        yinitial 1.0
+        if not background:
+            yadjustment phone_scroll
+        vbox:
+            xsize 468
+            spacing 22
+            null height 8
+            if not chat_lines:
+                text "暂无聊天记录" style "phone_muted" xalign .5
+            for i, line index i in enumerate(chat_lines):
+                $ who, msg = line
+                hbox:
+                    xsize 468
+                    spacing 12
+                    at (phone_message_in if not background and i == phone_new_index else phone_still)
+                    if who != "我":
+                        use phone_avatar(contact_id, 48)
                     else:
-                        action Function(phone_send_message, contact_id)
-
-screen phone_album():
-    vbox:
-        spacing 14
-        hbox:
-            spacing 12
-            textbutton "\u2b05":
-                style "phone_back_button"
-                action SetScreenVariable("phone_app", "home")
-            text "\u76f8\u518c" style "phone_app_title_text"
-        text "\u89d2\u8272\u7acb\u7ed8\u5360\u4f4d" style "phone_list_preview_text"
-
-        grid 2 2:
-            spacing 16
-            for name in ["\u5f17\u6d1b", "\u963f\u5f25", "\u5e15\u5c14", "\u795e\u79d8\u7684\u4ed6"]:
-                frame:
-                    style "phone_album_card"
-                    vbox:
-                        text name style "phone_list_title_text"
-                        text "\u7acb\u7ed8\u5360\u4f4d" style "phone_list_preview_text"
+                        null width 62
+                    frame:
+                        background phone_round("blue" if who == "我" else "white")
+                        padding (19, 16)
+                        xmaximum 384
+                        text msg style "phone_bubble_text" color ("#ffffff" if who == "我" else "#253244") xmaximum 342 substitute False
+            null height 16
+    if not background:
+        timer .15 repeat True action Function(phone_mark_read, contact_id, phone_scroll, _update_screens=False)
+        if phone_follow is not None:
+            timer .02 action [Function(phone_scroll_latest, phone_scroll, phone_follow), SetScreenVariable("phone_follow", None)]
+        if phone_new_index is not None:
+            timer .18 action SetScreenVariable("phone_new_index", None)
+        if story_mode and contact_id == "ami" and phone_story_ami_active:
+            if phone_story_ami_count < 4:
+                textbutton "阅读下一条消息":
+                    id "phone_next"
+                    style "phone_primary_button"
+                    pos (20, 916)
+                    xysize (444, 70)
+                    action Function(phone_chat_event, phone_scroll)
+            elif not phone_story_ami_reply_ready and not phone_story_ami_sent:
+                # Give the fourth line its own reading beat; no auto-dismiss timer.
+                textbutton "回复阿弥":
+                    id "phone_reply_prompt"
+                    style "phone_primary_button"
+                    pos (20, 916)
+                    xysize (444, 70)
+                    action Return("reply_prompt")
+        if can_reply:
+            frame:
+                pos (10, 850)
+                xysize (464, 188)
+                padding (16, 15)
+                background phone_round("white")
+                vbox:
+                    spacing 12
+                    text phone_draft_message style "phone_text" size 24 xmaximum 426 substitute False
+                    textbutton "发送":
+                        id "phone_send"
+                        style "phone_primary_button"
+                        xalign 1.0
+                        xysize (104, 52)
+                        action Function(phone_chat_event, phone_scroll, True)
+        elif contact_id == "ami" and phone_story_ami_sent:
+            text "已发送" style "phone_muted" xalign .5 ypos 914
+            if story_mode:
+                textbutton "完成":
+                    id "phone_done"
+                    style "phone_primary_button"
+                    pos (20, 966)
+                    xysize (444, 66)
+                    action Return("sent")
+        elif not (story_mode and contact_id == "ami"):
+            frame:
+                pos (12, 944)
+                xysize (460, 76)
+                padding (20, 20)
+                background phone_round("soft")
+                text "暂无可发送的回复" style "phone_muted" size 23
 
 screen phone_calculator():
-    vbox:
+    use phone_header("计算器")
+    frame:
+        pos (12, 135)
+        xysize (460, 232)
+        padding (24, 24)
+        background phone_round("dark")
+        vbox:
+            spacing 20
+            viewport:
+                xysize (412, 60)
+                mousewheel "horizontal"
+                xinitial 1.0
+                text (phone_calc_expr or "0") style "phone_text" size 30 color "#b9c6d9" layout "nobreak"
+            viewport:
+                xysize (412, 80)
+                mousewheel "horizontal"
+                xinitial 1.0
+                text phone_calc_result style "phone_text" size 48 color "#ffffff" layout "nobreak"
+    grid 4 5:
+        pos (12, 414)
         spacing 12
-        hbox:
-            spacing 12
-            textbutton "\u2b05":
-                style "phone_back_button"
-                action SetScreenVariable("phone_app", "home")
-            text "\u8ba1\u7b97\u5668" style "phone_app_title_text"
-        frame:
-            style "phone_calc_display_frame"
-            vbox:
-                text phone_calc_expr style "phone_calc_expr_text"
-                text phone_calc_result style "phone_calc_result_text"
+        for key in ["7", "8", "9", "/", "4", "5", "6", "*", "1", "2", "3", "-", "0", ".", "=", "+", "C", "(", ")", "<"]:
+            textbutton key:
+                style "phone_calc_button"
+                id ("phone_calc_" + key)
+                if key == "=":
+                    action Function(phone_calculate)
+                elif key == "C":
+                    action [SetVariable("phone_calc_expr", ""), SetVariable("phone_calc_result", "0")]
+                elif key == "<":
+                    action SetVariable("phone_calc_expr", phone_calc_expr[:-1])
+                else:
+                    action SetVariable("phone_calc_expr", phone_calc_expr + key)
 
-        grid 4 5:
-            spacing 8
-            for key in ["7", "8", "9", "/", "4", "5", "6", "*", "1", "2", "3", "-", "0", ".", "=", "+", "C", "(", ")", "<"]:
-                textbutton key:
-                    style "phone_calc_button"
-                    if key == "=":
-                        action Function(phone_calculate)
-                    elif key == "C":
-                        action [SetVariable("phone_calc_expr", ""), SetVariable("phone_calc_result", "0")]
-                    elif key == "<":
-                        action SetVariable("phone_calc_expr", phone_calc_expr[:-1])
-                    else:
-                        action SetVariable("phone_calc_expr", phone_calc_expr + key)
+screen phone_placeholder(title):
+    use phone_header(title)
+    text title style "phone_title" size 42 xalign .5 ypos 340
+    text "此应用尚未开放" style "phone_muted" xalign .5 ypos 411
 
-screen phone_placeholder(title, body):
-    vbox:
-        spacing 18
-        hbox:
-            spacing 12
-            textbutton "\u2b05":
-                style "phone_back_button"
-                action SetScreenVariable("phone_app", "home")
-            text title style "phone_app_title_text"
-        text body style "phone_placeholder_text"
+screen phone_story_resume():
+    zorder 211
+    textbutton "继续回复消息":
+        id "phone_resume"
+        style "phone_primary_button"
+        align (.88, .28)
+        padding (30, 18)
+        action Return()
 
-style phone_side_button is button:
-    xalign 1.0
-    yalign 0.34
-    xsize 110
-    ysize 54
+style phone_text is text:
+    font "SourceHanSansLite.ttf"
+    size 27
+    color "#253244"
+    line_spacing 5
+    outlines []
 
-style phone_overlay_frame is frame:
-    xfill True
-    yfill True
-    background "#111111cc"
-    padding (0, 0)
+style phone_muted is phone_text:
+    size 23
+    color "#758193"
 
-style phone_device_frame is frame:
-    xalign 0.5
-    yalign 0.5
-    xsize 520
-    ysize 900
-    background "#f3f4f7"
-    padding (28, 22)
+style phone_status_text is phone_text:
+    size 23
+    bold True
 
-style phone_close_button is button:
-    xalign 0.86
-    yalign 0.05
-    xsize 56
-    ysize 56
-    background "#b00020"
+style phone_title is phone_text:
+    size 30
+    bold True
 
-style phone_close_button_text is gui_text:
+style phone_bubble_text is phone_text:
+    size 27
+    line_spacing 8
+
+style phone_badge is phone_text:
+    size 19
+    color "#ffffff"
+    align (.5, .5)
+
+style phone_primary_button is button:
+    background phone_round("blue")
+    hover_background phone_round("dark")
+    padding (18, 10)
+
+style phone_primary_button_text is phone_text:
+    size 25
+    color "#ffffff"
+    align (.5, .5)
+
+style phone_close_button is phone_primary_button:
+    background phone_round("dark")
+    padding (24, 15)
+
+style phone_close_button_text is phone_primary_button_text
+
+style phone_calc_button is phone_primary_button:
+    xysize (106, 100)
+    background phone_round("white")
+    hover_background phone_round("soft")
+
+style phone_calc_button_text is phone_text:
     size 34
-    bold True
-    color "#ffffff"
-    xalign 0.5
-    yalign 0.5
-
-style phone_back_button is button:
-    xsize 54
-    ysize 48
-
-style phone_back_button_text is gui_text:
-    size 34
-    bold True
-    color "#000000"
-    xalign 0.5
-    yalign 0.5
-
-style phone_status_text is gui_text:
-    size 18
-    color "#1c1c1e"
-
-style phone_app_button is button:
-    xsize 128
-    ysize 132
-
-style phone_app_icon_frame is frame:
-    xsize 74
-    ysize 74
-    padding (0, 0)
-
-style phone_app_icon_text is gui_text:
-    size 34
-    color "#ffffff"
-    xalign 0.5
-    yalign 0.5
-
-style phone_app_name_text is gui_text:
-    size 18
-    color "#1c1c1e"
-    xalign 0.5
-
-style phone_app_title_text is gui_text:
-    size 34
-    bold True
-    color "#1c1c1e"
-
-style phone_list_button is button:
-    xfill True
-    yminimum 78
-
-style phone_list_title_text is gui_text:
-    size 24
-    bold True
-    color "#1c1c1e"
-
-style phone_list_preview_text is gui_text:
-    size 18
-    color "#6e6e73"
-
-style phone_unread_badge is frame:
-    xalign 1.0
-    yalign 0.5
-    xsize 34
-    ysize 34
-    background "#ff3b30"
-    padding (0, 0)
-
-style phone_unread_badge_text is gui_text:
-    size 20
-    bold True
-    color "#ffffff"
-    xalign 0.5
-    yalign 0.5
-
-style phone_bubble_other is frame:
-    xalign 0.0
-    xmaximum 380
-    background "#ffffff"
-    padding (14, 10)
-
-style phone_bubble_self is frame:
-    xalign 1.0
-    xmaximum 380
-    background "#95ec69"
-    padding (14, 10)
-
-style phone_bubble_name_text is gui_text:
-    size 14
-    color "#6e6e73"
-
-style phone_bubble_text is gui_text:
-    size 20
-    color "#1c1c1e"
-
-style phone_next_message_button is button:
-    xsize 38
-    ysize 38
-    yalign 0.5
-    background "#000000"
-
-style phone_next_message_button_text is gui_text:
-    size 22
-    bold True
-    color "#ffffff"
-    xalign 0.5
-    yalign 0.5
-
-style phone_input_frame is frame:
-    xsize 370
-    ysize 56
-    background "#ffffff"
-    padding (12, 8)
-
-style phone_input_text is gui_text:
-    size 20
-    color "#1c1c1e"
-
-style phone_send_button is button:
-    xsize 96
-    ysize 56
-    background "#07c160"
-
-style phone_send_button_text is gui_text:
-    size 20
-    bold True
-    color "#ffffff"
-    xalign 0.5
-    yalign 0.5
-
-style phone_album_card is frame:
-    xsize 210
-    ysize 150
-    background "#ffffff"
-    padding (16, 16)
-
-style phone_placeholder_text is gui_text:
-    size 22
-    color "#3a3a3c"
-
-style phone_calc_display_frame is frame:
-    xfill True
-    ysize 120
-    background "#1c1c1e"
-    padding (18, 12)
-
-style phone_calc_expr_text is gui_text:
-    size 22
-    color "#a1a1a6"
-    xalign 1.0
-
-style phone_calc_result_text is gui_text:
-    size 38
-    color "#ffffff"
-    xalign 1.0
-
-style phone_calc_button is button:
-    xsize 100
-    ysize 62
-    background "#ffffff"
+    align (.5, .5)

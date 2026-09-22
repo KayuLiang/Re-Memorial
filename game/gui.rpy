@@ -1,4 +1,4 @@
-﻿################################################################################
+################################################################################
 ## 初始化
 ################################################################################
 
@@ -9,7 +9,8 @@ init offset = -2
 ## 调用 gui.init 会将样式重置为合理的默认值，并设置游戏的宽度和高度（基准分辨
 ## 率）。
 init python:
-    gui.init(1920, 1080)
+    # QHD is the authoring canvas; Ren'Py scales to 1080p/720p windows.
+    gui.init(2560, 1440)
 
 ## 启用对屏幕或变换中无效或不稳定属性的检查
 define config.check_conflicting_properties = True
@@ -55,32 +56,37 @@ define gui.interface_text_color = '#ffffff'
 
 ## 字体和字体大小 #####################################################################
 
-## 游戏内文本使用的字体。
-define gui.text_font = "SourceHanSansLite.ttf"
+## UI uses clean Song/Mincho strokes; story text keeps its existing printed texture.
+define rememorial_dialogue_font = FontGroup().add("fonts/source/HuiwenMincho.otf", None, None).add("SourceHanSansLite.ttf", None, None)
+define rememorial_ui_font = FontGroup().add("fonts/source-han-serif/SourceHanSerifSC-SemiBold.otf", None, None).add("SourceHanSansLite.ttf", None, None)
+
+## 未指定样式的界面文字；对白单独指定，避免改变原有剧情排版。
+define gui.text_font = rememorial_ui_font
+define gui.dialogue_text_font = rememorial_dialogue_font
 
 ## 角色名称使用的字体。
-define gui.name_text_font = "SourceHanSansLite.ttf"
+define gui.name_text_font = rememorial_dialogue_font
 
 ## 游戏外文本使用的字体。
-define gui.interface_text_font = "SourceHanSansLite.ttf"
+define gui.interface_text_font = rememorial_ui_font
 
 ## 普通对话文本的大小。
-define gui.text_size = 33
+define gui.text_size = 44
 
 ## 角色名称的大小。
-define gui.name_text_size = 45
+define gui.name_text_size = 60
 
 ## 游戏用户界面中文本的大小。
-define gui.interface_text_size = 33
+define gui.interface_text_size = 44
 
 ## 游戏用户界面中标签的大小。
-define gui.label_text_size = 36
+define gui.label_text_size = 48
 
 ## 通知屏幕上文本的大小。
-define gui.notify_text_size = 24
+define gui.notify_text_size = 32
 
 ## 游戏标题的大小。
-define gui.title_text_size = 75
+define gui.title_text_size = 100
 
 
 ## 标题和游戏菜单 #####################################################################
@@ -95,7 +101,7 @@ define gui.game_menu_background = "gui/game_menu.png"
 ## 这些变量控制对话如何在屏幕上逐行显示。
 
 ## 包含对话的文本框的高度。
-define gui.textbox_height = 278
+define gui.textbox_height = 371
 
 ## 文本框在屏幕上的垂直位置。0.0 是顶部，0.5 是居中，1.0 是底部。
 define gui.textbox_yalign = 1.0
@@ -103,7 +109,7 @@ define gui.textbox_yalign = 1.0
 
 ## 叙述角色名字相对于文本框的位置。可以是从左侧或顶部起的整数像素，或设为 0.5 来
 ## 居中。
-define gui.name_xpos = 360
+define gui.name_xpos = 480
 define gui.name_ypos = 0
 
 ## 角色名字的水平对齐方式。0.0 为左侧对齐，0.5 为居中显示，而 1.0 为右侧对齐。
@@ -114,7 +120,7 @@ define gui.namebox_width = None
 define gui.namebox_height = None
 
 ## 包含角色名字的方框的边界尺寸，以左、上、右、下顺序排列。
-define gui.namebox_borders = Borders(5, 5, 5, 5)
+define gui.namebox_borders = Borders(7, 7, 7, 7)
 
 ## 若为 True，则名字框的背景将平铺；若为 False，则名字框的背景将缩放。
 define gui.namebox_tile = False
@@ -122,11 +128,11 @@ define gui.namebox_tile = False
 
 ## 对话相对于文本框的位置。可以是相对于文本框从左侧或顶部起的整数像素，或设为
 ## 0.5 来居中。
-define gui.dialogue_xpos = 402
-define gui.dialogue_ypos = 75
+define gui.dialogue_xpos = 536
+define gui.dialogue_ypos = 100
 
 ## 对话文本的最大宽度，以像素为单位。
-define gui.dialogue_width = 1116
+define gui.dialogue_width = 1488
 
 ## 对话文本的水平对齐方式。0.0 为左侧对齐，0.5 为居中显示，而 1.0 为右侧对齐。
 define gui.dialogue_text_xalign = 0.0
@@ -141,13 +147,13 @@ define gui.button_width = None
 define gui.button_height = None
 
 ## 按钮两侧的边框，按左、上、右、下的顺序排列。
-define gui.button_borders = Borders(6, 6, 6, 6)
+define gui.button_borders = Borders(8, 8, 8, 8)
 
 ## 若为 True，则背景图像将平铺。若为 False，则背景图像将线性缩放。
 define gui.button_tile = False
 
 ## 按钮使用的字体。
-define gui.button_text_font = gui.interface_text_font
+define gui.button_text_font = rememorial_ui_font
 
 ## 按钮所使用的文本大小。
 define gui.button_text_size = gui.interface_text_size
@@ -168,16 +174,16 @@ define gui.button_text_xalign = 0.0
 ##
 ## 这些定制由默认界面使用：
 
-define gui.radio_button_borders = Borders(27, 6, 6, 6)
+define gui.radio_button_borders = Borders(36, 8, 8, 8)
 
-define gui.check_button_borders = Borders(27, 6, 6, 6)
+define gui.check_button_borders = Borders(36, 8, 8, 8)
 
 define gui.confirm_button_text_xalign = 0.5
 
-define gui.page_button_borders = Borders(15, 6, 15, 6)
+define gui.page_button_borders = Borders(20, 8, 20, 8)
 
-define gui.quick_button_borders = Borders(15, 6, 15, 0)
-define gui.quick_button_text_size = 21
+define gui.quick_button_borders = Borders(20, 8, 20, 0)
+define gui.quick_button_text_size = 28
 define gui.quick_button_text_idle_color = gui.idle_small_color
 define gui.quick_button_text_selected_color = gui.accent_color
 
@@ -191,11 +197,11 @@ define gui.quick_button_text_selected_color = gui.accent_color
 ##
 ## 游戏内菜单使用的选项按钮。
 
-define gui.choice_button_width = 1185
+define gui.choice_button_width = 1580
 define gui.choice_button_height = None
 define gui.choice_button_tile = False
-define gui.choice_button_borders = Borders(150, 8, 150, 8)
-define gui.choice_button_text_font = gui.text_font
+define gui.choice_button_borders = Borders(200, 11, 200, 11)
+define gui.choice_button_text_font = rememorial_ui_font
 define gui.choice_button_text_size = gui.text_size
 define gui.choice_button_text_xalign = 0.5
 define gui.choice_button_text_idle_color = '#888888'
@@ -209,18 +215,18 @@ define gui.choice_button_text_insensitive_color = '#8888887f'
 ## gui/button 中的图像文件，就像其他类型的按钮一样。
 
 ## 存档位按钮。
-define gui.slot_button_width = 414
-define gui.slot_button_height = 309
-define gui.slot_button_borders = Borders(15, 15, 15, 15)
-define gui.slot_button_text_size = 21
+define gui.slot_button_width = 552
+define gui.slot_button_height = 412
+define gui.slot_button_borders = Borders(20, 20, 20, 20)
+define gui.slot_button_text_size = 28
 define gui.slot_button_text_xalign = 0.5
 define gui.slot_button_text_idle_color = gui.idle_small_color
 define gui.slot_button_text_selected_idle_color = gui.selected_color
 define gui.slot_button_text_selected_hover_color = gui.hover_color
 
 ## 存档所用缩略图的宽度和高度。
-define config.thumbnail_width = 384
-define config.thumbnail_height = 216
+define config.thumbnail_width = 512
+define config.thumbnail_height = 288
 
 ## 存档网格中的列数和行数。
 define gui.file_slot_cols = 3
@@ -232,22 +238,22 @@ define gui.file_slot_rows = 2
 ## 这些变量控制各种用户界面元素的位置和间距。
 
 ## 导航按钮左侧相对于屏幕左侧的位置。
-define gui.navigation_xpos = 60
+define gui.navigation_xpos = 80
 
 ## 快进指示器的垂直位置。
-define gui.skip_ypos = 15
+define gui.skip_ypos = 20
 
 ## 通知界面的垂直位置。
-define gui.notify_ypos = 68
+define gui.notify_ypos = 91
 
 ## 菜单选项之间的间距。
-define gui.choice_spacing = 33
+define gui.choice_spacing = 44
 
 ## 标题菜单和游戏菜单的导航部分中的按钮。
-define gui.navigation_spacing = 6
+define gui.navigation_spacing = 8
 
 ## 控制设置项目之间的间隔量。
-define gui.pref_spacing = 15
+define gui.pref_spacing = 20
 
 ## 控制设置按钮之间的间距。
 define gui.pref_button_spacing = 0
@@ -256,7 +262,7 @@ define gui.pref_button_spacing = 0
 define gui.page_spacing = 0
 
 ## 存档按钮之间的间距。
-define gui.slot_spacing = 15
+define gui.slot_spacing = 20
 
 ## 标题菜单文本的位置。
 define gui.main_menu_text_xalign = 1.0
@@ -267,16 +273,16 @@ define gui.main_menu_text_xalign = 1.0
 ## 这些变量控制在不存在覆盖层或窗口时可以包含用户界面组件的框架的外观。
 
 ## 通用框架。
-define gui.frame_borders = Borders(6, 6, 6, 6)
+define gui.frame_borders = Borders(8, 8, 8, 8)
 
 ## 用作确认界面部分的框架。
-define gui.confirm_frame_borders = Borders(60, 60, 60, 60)
+define gui.confirm_frame_borders = Borders(80, 80, 80, 80)
 
 ## 用作快进界面部分的框架。
-define gui.skip_frame_borders = Borders(24, 8, 75, 8)
+define gui.skip_frame_borders = Borders(32, 11, 100, 11)
 
 ## 用作通知界面部分的框架。
-define gui.notify_frame_borders = Borders(24, 8, 60, 8)
+define gui.notify_frame_borders = Borders(32, 11, 80, 11)
 
 ## 框架背景是否应平铺？
 define gui.frame_tile = False
@@ -289,9 +295,9 @@ define gui.frame_tile = False
 ## 默认的 GUI 仅使用滑块和垂直滚动条。所有其他栏仅在创建者编写的屏幕中使用。
 
 ## 水平条，滚动条和滑块的高度。垂直条，滚动条和滑块的宽度。
-define gui.bar_size = 38
-define gui.scrollbar_size = 18
-define gui.slider_size = 38
+define gui.bar_size = 51
+define gui.scrollbar_size = 24
+define gui.slider_size = 51
 
 ## 若为 True，则条的底图平铺。若为 False，则条的底图线性缩放。
 define gui.bar_tile = False
@@ -299,14 +305,14 @@ define gui.scrollbar_tile = False
 define gui.slider_tile = False
 
 ## 水平边框。
-define gui.bar_borders = Borders(6, 6, 6, 6)
-define gui.scrollbar_borders = Borders(6, 6, 6, 6)
-define gui.slider_borders = Borders(6, 6, 6, 6)
+define gui.bar_borders = Borders(8, 8, 8, 8)
+define gui.scrollbar_borders = Borders(8, 8, 8, 8)
+define gui.slider_borders = Borders(8, 8, 8, 8)
 
 ## 垂直边框。
-define gui.vbar_borders = Borders(6, 6, 6, 6)
-define gui.vscrollbar_borders = Borders(6, 6, 6, 6)
-define gui.vslider_borders = Borders(6, 6, 6, 6)
+define gui.vbar_borders = Borders(8, 8, 8, 8)
+define gui.vscrollbar_borders = Borders(8, 8, 8, 8)
+define gui.vslider_borders = Borders(8, 8, 8, 8)
 
 ## What to do with unscrollable scrollbars in the game menu. "hide" hides them,
 ## while None shows them.
@@ -321,21 +327,21 @@ define gui.unscrollable = "hide"
 define config.history_length = 250
 
 ## 历史屏幕条目的高度，或设置为 None 以使高度变量自适应。
-define gui.history_height = 210
+define gui.history_height = 280
 
 ## 在历史记录屏幕条目之间添加额外的空间。
 define gui.history_spacing = 0
 
 ## 所指定叙述角色的标签的坐标、宽度和对齐方式。
-define gui.history_name_xpos = 233
+define gui.history_name_xpos = 311
 define gui.history_name_ypos = 0
-define gui.history_name_width = 233
+define gui.history_name_width = 311
 define gui.history_name_xalign = 1.0
 
 ## 对话文本的坐标、宽度和对齐方式。
-define gui.history_text_xpos = 255
-define gui.history_text_ypos = 3
-define gui.history_text_width = 1110
+define gui.history_text_xpos = 340
+define gui.history_text_ypos = 4
+define gui.history_text_width = 1480
 define gui.history_text_xalign = 0.0
 
 
@@ -344,39 +350,39 @@ define gui.history_text_xalign = 0.0
 ## NVL 模式屏幕显示 NVL 模式的角色所产生的对话。
 
 ## NVL 模式背景窗口的背景边框。
-define gui.nvl_borders = Borders(0, 15, 0, 30)
+define gui.nvl_borders = Borders(0, 20, 0, 40)
 
 ## Ren'Py 所显示的 NVL 模式条目的最大数量。当要显示的条目多于此数量时，最旧的条
 ## 目将被删除。
 define gui.nvl_list_length = 6
 
 ## NVL 模式条目的高度。将此设置为 None 可使条目动态调整高度。
-define gui.nvl_height = 173
+define gui.nvl_height = 231
 
 ## 当 gui.nvl_height 为 None 时，NVL 模式条目之间的间距，以及 NVL 模式条目和 NVL
 ## 模式菜单之间的间距。
-define gui.nvl_spacing = 15
+define gui.nvl_spacing = 20
 
 ## 所指定叙述角色的标签的坐标、宽度和对齐方式。
-define gui.nvl_name_xpos = 645
+define gui.nvl_name_xpos = 860
 define gui.nvl_name_ypos = 0
-define gui.nvl_name_width = 225
+define gui.nvl_name_width = 300
 define gui.nvl_name_xalign = 1.0
 
 ## 对话文本的坐标、宽度和对齐方式。
-define gui.nvl_text_xpos = 675
-define gui.nvl_text_ypos = 12
-define gui.nvl_text_width = 885
+define gui.nvl_text_xpos = 900
+define gui.nvl_text_ypos = 16
+define gui.nvl_text_width = 1180
 define gui.nvl_text_xalign = 0.0
 
 ## nvl_thought 文本（由 nvl_narrator 字符表示的文本）的位置，宽度和对齐方式。
-define gui.nvl_thought_xpos = 360
+define gui.nvl_thought_xpos = 480
 define gui.nvl_thought_ypos = 0
-define gui.nvl_thought_width = 1170
+define gui.nvl_thought_width = 1560
 define gui.nvl_thought_xalign = 0.0
 
 ## NVL menu_buttons 的位置。
-define gui.nvl_button_xpos = 675
+define gui.nvl_button_xpos = 900
 define gui.nvl_button_xalign = 0.0
 
 
@@ -398,56 +404,56 @@ init python:
     @gui.variant
     def touch():
 
-        gui.quick_button_borders = Borders(60, 21, 60, 0)
+        gui.quick_button_borders = Borders(80, 28, 80, 0)
 
     ## 该变量更改各个 GUI 元素的尺寸和间距来确保它们在手机上更容易被辨识。
     @gui.variant
     def small():
 
         ## 字体大小。
-        gui.text_size = 45
-        gui.name_text_size = 54
-        gui.notify_text_size = 38
-        gui.interface_text_size = 45
-        gui.button_text_size = 45
-        gui.label_text_size = 51
+        gui.text_size = 60
+        gui.name_text_size = 72
+        gui.notify_text_size = 51
+        gui.interface_text_size = 60
+        gui.button_text_size = 60
+        gui.label_text_size = 68
 
         ## 调整对话框的位置。
-        gui.textbox_height = 360
-        gui.name_xpos = 120
-        gui.dialogue_xpos = 135
-        gui.dialogue_width = 1650
+        gui.textbox_height = 480
+        gui.name_xpos = 160
+        gui.dialogue_xpos = 180
+        gui.dialogue_width = 2200
 
         ## 更改各元素的尺寸和间距。
-        gui.slider_size = 54
+        gui.slider_size = 72
 
-        gui.choice_button_width = 1860
-        gui.choice_button_text_size = 45
+        gui.choice_button_width = 2480
+        gui.choice_button_text_size = 60
 
-        gui.navigation_spacing = 30
-        gui.pref_button_spacing = 15
+        gui.navigation_spacing = 40
+        gui.pref_button_spacing = 20
 
-        gui.history_height = 285
-        gui.history_text_width = 1035
+        gui.history_height = 380
+        gui.history_text_width = 1380
 
-        gui.quick_button_text_size = 30
+        gui.quick_button_text_size = 40
 
         ## 文件按钮布局。
         gui.file_slot_cols = 2
         gui.file_slot_rows = 2
 
         ## NVL 模式。
-        gui.nvl_height = 255
+        gui.nvl_height = 340
 
-        gui.nvl_name_width = 458
-        gui.nvl_name_xpos = 488
+        gui.nvl_name_width = 611
+        gui.nvl_name_xpos = 651
 
-        gui.nvl_text_width = 1373
-        gui.nvl_text_xpos = 518
-        gui.nvl_text_ypos = 8
+        gui.nvl_text_width = 1831
+        gui.nvl_text_xpos = 691
+        gui.nvl_text_ypos = 11
 
-        gui.nvl_thought_width = 1860
-        gui.nvl_thought_xpos = 30
+        gui.nvl_thought_width = 2480
+        gui.nvl_thought_xpos = 40
 
-        gui.nvl_button_width = 1860
-        gui.nvl_button_xpos = 30
+        gui.nvl_button_width = 2480
+        gui.nvl_button_xpos = 40

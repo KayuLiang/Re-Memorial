@@ -123,7 +123,7 @@ class RMTestFlowCoreTests(unittest.TestCase):
         self.assertIn("fatigue_reduced:test_strength_training:1", result["events"])
         self.assertIn("fatigue_reduced:test_dex_training:0", result["events"])
 
-    def test_test_sleep_restores_full_energy_without_check(self):
+    def test_test_sleep_uses_quality_check_and_restores_energy(self):
         character = rm.create_initial_character({"str": 3, "dex": 3, "int": 2}, rng=random.Random(9))
         character.energy = 0
         character.test_growth_progress["str"] = 6
@@ -139,6 +139,57 @@ class RMTestFlowCoreTests(unittest.TestCase):
         self.assertEqual(character.training_fatigue["test_dex_training"], 0)
         self.assertIn("fatigue_cleared:test_strength_training", result["events"])
         self.assertIn("fatigue_cleared:test_dex_training", result["events"])
+
+    def test_sleep_converts_training_progress_once_and_enters_small_rest(self):
+        for slot in ("sleep_decision", "night_break_1", "forced_sleep"):
+            with self.subTest(slot=slot):
+                character = rm.create_initial_character(rng=random.Random(9))
+                character.test_growth_progress.update(str=6, dex=6)
+                character.attribute_bonus_gain_counters.update(str=3, dex=3)
+                rm.start_turn(character, slot)
+                result = rm.begin_sleep(character, SequenceRandom([.5, .5, .5, .5]))
+                for attr in ("str", "dex"):
+                    event = "test_training_bonus:" + attr
+                    self.assertEqual(result["events"].count(event), 1)
+                    self.assertEqual(character.test_growth_progress[attr], 0)
+                    self.assertEqual(len(character.attribute_bonuses[attr]), 1)
+                    self.assertEqual(character.growth_reward_pending[attr], 1)
+                again = rm.begin_sleep(character, SequenceRandom([.5, .5]))
+                self.assertFalse(again["available"])
+                self.assertEqual(character.growth_reward_pending["str"], 1)
+
+    def test_direct_small_rest_converts_training_before_attribute_conversion(self):
+        character = rm.create_initial_character(rng=random.Random(8))
+        character.test_growth_progress["dex"] = 6
+        character.attribute_value_gain_counters["dex"] = 1
+        events = rm.process_small_rest(character, SequenceRandom([.9]))
+        self.assertEqual(character.test_growth_progress["dex"], 0)
+        self.assertEqual(character.attribute_values["dex"], 1)
+        self.assertEqual(character.growth_reward_pending["dex"], 1)
+        self.assertLess(events.index("test_training_bonus:dex"), events.index("bonus_to_value:dex"))
+
+    def test_training_failure_degradation_is_settled_once_before_mood_changes(self):
+        for schedule, attr in rm.TEST_TRAINING_SCHEDULE_ATTRIBUTES.items():
+            with self.subTest(schedule=schedule):
+                character = rm.create_initial_character(rng=random.Random(2))
+                character.mood = 61
+                character.degradation_progress[attr] = 4
+                check = rm.CheckResult(available=True, attribute=attr, rank=rm.RESULT_BIG_FAILURE)
+                apply = rm.apply_test_exercise_schedule_result if attr == "con" else rm.apply_test_training_schedule_result
+                apply(character, schedule, check, random.Random(3))
+                self.assertEqual(character.degradation_progress[attr], 4)
+                rm.end_action_round(character, -10, random.Random(4), exact_mood_delta=True, check=check)
+                self.assertEqual(character.mood, 51)
+                self.assertEqual(character.degradation_progress[attr], 0)
+                self.assertEqual(character.degradation_penalty_pending[attr], 1)
+
+    def test_round_without_available_big_failure_does_not_add_degradation(self):
+        for check in (None, rm.CheckResult(available=False, attribute="str", rank=rm.RESULT_BIG_FAILURE),
+                      rm.CheckResult(available=True, attribute="str", rank=rm.RESULT_FAILURE)):
+            character = rm.create_initial_character(rng=random.Random(3))
+            rm.end_action_round(character, check=check, rng=random.Random(4))
+            self.assertEqual(character.degradation_progress["str"], 0)
+            self.assertEqual(character.degradation_penalty_pending["str"], 0)
 
     def test_sunday_sleep_runs_small_rest_then_large_rest(self):
         character = rm.create_initial_character({"str": 3, "dex": 3, "int": 2}, rng=random.Random(10))
@@ -410,7 +461,7 @@ class RMTestFlowRenpyTests(unittest.TestCase):
         self.assertIn("screen rm_allow_game_menu():", source)
         self.assertIn('key "game_menu" action ShowMenu()', source)
 
-    def test_test_story_defines_day_101_seven_turn_loop_and_schedule_prompt(self):
+    def test_test_story_uses_core_meals_sleep_and_wake_flow(self):
         source = TEST_STORY_PATH.read_text(encoding="utf-8")
 
         self.assertIn("label rm_test_flow_start:", source)
@@ -419,8 +470,10 @@ class RMTestFlowRenpyTests(unittest.TestCase):
         self.assertIn("接下来要做什么", source)
         self.assertIn("call screen rm_test_schedule_select", source)
         self.assertIn("jump rm_test_flow_loop", source)
-        self.assertIn("上午1", source)
-        self.assertIn("深夜", source)
+        self.assertIn("rm_test_node in rm_core.MEAL_SLOTS", source)
+        self.assertIn("rm_test_node in rm_core.SLEEP_DECISIONS", source)
+        self.assertIn('rm_test_node == "forced_sleep"', source)
+        self.assertIn("call rm_test_wake_flow", source)
 
     def test_test_schedules_use_interactive_dice_check_flow(self):
         source = TEST_STORY_PATH.read_text(encoding="utf-8")
@@ -447,6 +500,7 @@ class RMTestFlowRenpyTests(unittest.TestCase):
     def test_attribute_dice_select_has_tabs_summary_and_inline_confirm(self):
         source = (GAME_DIR / "screens_attribute_checks.rpy").read_text(encoding="utf-8")
 
+        self.assertNotIn("screen attribute_dice_confirm", source)
         self.assertIn("zorder 230", source)
         self.assertIn("use rm_allow_game_menu", source)
         self.assertIn("default selected_tab = \"usable\"", source)
@@ -471,7 +525,7 @@ class RMTestFlowRenpyTests(unittest.TestCase):
     def test_roll_animation_auto_returns_and_result_shows_rank(self):
         source = (GAME_DIR / "screens_attribute_checks.rpy").read_text(encoding="utf-8")
 
-        self.assertGreaterEqual(source.count("use rm_allow_game_menu"), 4)
+        self.assertEqual(source.count("use rm_allow_game_menu"), 3)
         self.assertIn("timer 1.32 action Return()", source)
         self.assertNotIn("textbutton \"查看结果\"", source)
         self.assertIn("attribute_check_rank_label", source)
@@ -513,7 +567,7 @@ class RMTestFlowRenpyTests(unittest.TestCase):
         self.assertIn("def rm_test_apply_card_selection(card, die_id=None, face_index=None):", source)
         self.assertIn("def rm_test_pending_dice_choices(request, card=None, character=None):", source)
         self.assertIn("rm_test_pending_dice_choices(request, card)", source)
-        self.assertIn("NEGATIVE_ENCHANTMENTS", source)
+        self.assertIn("rm_core.growth_reward_dice_candidates(character, attr, card)", source)
         self.assertIn("screen rm_test_pending_card_choice", source)
         self.assertIn("style \"rm_test_reward_card_button\"", source)
         self.assertIn("rm_test_card_description(card)", source)
@@ -543,25 +597,24 @@ class RMTestFlowRenpyTests(unittest.TestCase):
         self.assertIn('config.overlay_screens.append("rm_test_status_overlay")', source)
         self.assertIn("summary['statuses']", source)
         self.assertIn("screen rm_test_status_overlay():", source)
-        self.assertIn("rm_status_statuses()", source)
+        flat = (GAME_DIR / "ui/rm_hud_flat.rpy").read_text(encoding="utf-8")
+        self.assertIn("rm_status_statuses()", flat)
         self.assertIn("hovered SetScreenVariable", source)
         self.assertIn("viewport:", source)
         self.assertIn("mousewheel True", source)
         self.assertIn("draggable True", source)
         self.assertIn("vpgrid:", source)
-        self.assertIn("cols 3", source)
-        self.assertIn("xsize 200", source)
-        self.assertIn("xysize (172, 336)", source)
-        self.assertIn("ysize 400", source)
-        self.assertIn("ypos 280", source)
+        self.assertIn("use rm_flat_sides", source)
+        self.assertIn("xpos RM_HUD_RIGHT", flat)
+        self.assertIn("for effect in effects[:6]:", flat)
 
     def test_test_console_button_and_screen_expose_required_controls(self):
         source = STORY_HUD_PATH.read_text(encoding="utf-8")
 
-        self.assertIn("if rm_test_flow_active:", source)
-        self.assertIn('textbutton "操作台":', source)
-        self.assertIn('action Show("rm_test_console")', source)
-        self.assertLess(source.index('textbutton "操作台":'), source.index("if story_hud_character_panel_unlocked:"))
+        flat = (GAME_DIR / "ui/rm_hud_flat.rpy").read_text(encoding="utf-8")
+        self.assertIn("if rm_test_flow_active:", flat)
+        self.assertIn('textbutton "操作台"', flat)
+        self.assertIn('action Show("rm_test_console")', flat)
         self.assertIn("screen rm_test_console():", source)
         for label in (
             "Mood -10",

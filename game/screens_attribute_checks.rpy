@@ -44,11 +44,11 @@ init python:
 
 transform attribute_die_to_stage:
     alpha 0.0
-    yoffset 190
+    yoffset 253
     zoom 0.72
     rotate -16
     linear 0.18 alpha 1.0 yoffset 0 zoom 1.0 rotate 0
-    easeout 0.10 yoffset -12 zoom 1.04
+    easeout 0.10 yoffset -16 zoom 1.04
     easein 0.10 yoffset 0 zoom 1.0
 
 transform attribute_die_roll_body:
@@ -57,19 +57,19 @@ transform attribute_die_roll_body:
     xoffset 0
     yoffset 0
     zoom 1.0
-    linear 0.07 rotate 38 xoffset -34 yoffset -20 zoom 1.06
-    linear 0.07 rotate -26 xoffset 28 yoffset 14 zoom 0.98
-    linear 0.07 rotate 51 xoffset -20 yoffset -12 zoom 1.08
-    linear 0.07 rotate -18 xoffset 24 yoffset 8 zoom 1.0
+    linear 0.07 rotate 38 xoffset -45 yoffset -27 zoom 1.06
+    linear 0.07 rotate -26 xoffset 37 yoffset 19 zoom 0.98
+    linear 0.07 rotate 51 xoffset -27 yoffset -16 zoom 1.08
+    linear 0.07 rotate -18 xoffset 32 yoffset 11 zoom 1.0
     repeat 5
 
 transform attribute_die_land:
     subpixel True
     rotate -8
-    yoffset -10
+    yoffset -13
     zoom 1.16
     easeout 0.16 rotate 0 yoffset 0 zoom 1.0
-    easeout 0.10 yoffset -4
+    easeout 0.10 yoffset -5
     easein 0.08 yoffset 0
 
 transform attribute_die_result_flash:
@@ -85,35 +85,35 @@ screen attribute_die_entity(die_label, faces_text, face_text="?", active=True):
     $ die_faces_color = "#bcd0c0" if active else "#8e9691"
 
     frame:
-        xsize 132
-        ysize 132
+        xsize 176
+        ysize 176
         background (Frame("gui/ui_test_skin/dice_card.png", 34, 34) if rm_ui_test_skin_active else Solid("#edf5e9" if active else "#606964"))
-        padding (8, 8, 8, 8)
+        padding (11, 11, 11, 11)
 
         frame:
             xfill True
             yfill True
             background Solid("#32463a" if active else "#4c5550")
-            padding (8, 8, 8, 8)
+            padding (11, 11, 11, 11)
 
             vbox:
                 xalign 0.5
                 yalign 0.5
-                spacing 4
+                spacing 5
 
                 text die_label:
                     xalign 0.5
-                    size 20
+                    size 27
                     color die_label_color
 
                 text face_text:
                     xalign 0.5
-                    size 48
+                    size 64
                     color die_face_color
 
                 text faces_text:
                     xalign 0.5
-                    size 15
+                    size 20
                     color die_faces_color
 
 
@@ -139,7 +139,7 @@ screen attribute_dice_select(required_stat, min_dice=1, max_dice=3, requirement=
         style "attribute_check_panel"
 
         vbox:
-            spacing 12
+            spacing 16
             xfill True
 
             text "选择骰子" style "attribute_check_title"
@@ -148,26 +148,26 @@ screen attribute_dice_select(required_stat, min_dice=1, max_dice=3, requirement=
             frame:
                 style "attribute_check_summary_frame"
                 grid 4 1:
-                    spacing 12
+                    spacing 16
                     xfill True
 
                     vbox:
-                        spacing 4
+                        spacing 5
                         text "检定类型" style "attribute_check_summary_label"
                         text "[check_header['kind']]" style "attribute_check_summary_value"
 
                     vbox:
-                        spacing 4
+                        spacing 5
                         text "目标数值" style "attribute_check_summary_label"
                         text "[check_header['target']]" style "attribute_check_summary_value"
 
                     vbox:
-                        spacing 4
-                        text "属性固定值" style "attribute_check_summary_label"
+                        spacing 5
+                        text "固定修正合计" style "attribute_check_summary_label"
                         text "[check_header['fixed']]" style "attribute_check_summary_value"
 
                     vbox:
-                        spacing 4
+                        spacing 5
                         text "至少还需要投出" style "attribute_check_summary_label"
                         text "[check_header['needed_roll']]" style "attribute_check_summary_value"
 
@@ -176,20 +176,20 @@ screen attribute_dice_select(required_stat, min_dice=1, max_dice=3, requirement=
 
                 vbox:
                     xfill True
-                    spacing 12
+                    spacing 16
 
                     text "检定台" style "attribute_check_section_title"
 
                     fixed:
                         xfill True
-                        ysize 180
+                        ysize 240
 
                         if selected_preview:
-                            add Solid("#8fb39a") xalign 0.5 yalign 0.78 xsize 260 ysize 16
+                            add Solid("#8fb39a") xalign 0.5 yalign 0.78 xsize 347 ysize 21
                             hbox:
                                 xalign 0.5
                                 yalign 0.45
-                                spacing 12
+                                spacing 16
                                 at attribute_die_to_stage
                                 for selected_die in selected_preview["dice"]:
                                     use attribute_die_entity(selected_die["label"], format_die_faces(selected_die["faces"]), "?", True)
@@ -197,17 +197,17 @@ screen attribute_dice_select(required_stat, min_dice=1, max_dice=3, requirement=
                             frame:
                                 xalign 0.5
                                 yalign 0.5
-                                xsize 300
-                                ysize 118
+                                xsize 400
+                                ysize 157
                                 background Solid("#1d2822")
-                                padding (18, 14, 18, 14)
+                                padding (24, 19, 24, 19)
 
                                 text "从下方选择 1-3 颗可用骰子" xalign 0.5 yalign 0.5 style "attribute_check_muted_text"
 
             text "骰子池" style "attribute_check_section_title"
 
             hbox:
-                spacing 8
+                spacing 11
                 xfill True
 
                 for tab_id, tab_label in ATTRIBUTE_DICE_TABS:
@@ -218,9 +218,9 @@ screen attribute_dice_select(required_stat, min_dice=1, max_dice=3, requirement=
 
             vpgrid:
                 cols 3
-                spacing 14
+                spacing 19
                 xfill True
-                ymaximum 250
+                ymaximum 333
                 mousewheel True
                 draggable True
 
@@ -229,23 +229,23 @@ screen attribute_dice_select(required_stat, min_dice=1, max_dice=3, requirement=
                     $ selected = die["id"] in selected_die_ids
 
                     button:
-                        xsize 292
-                        ysize 122
-                        padding (12, 10, 12, 10)
+                        xsize 389
+                        ysize 163
+                        padding (16, 13, 16, 13)
                         background (Frame("gui/ui_test_skin/dice_card.png", 34, 34) if rm_ui_test_skin_active else Solid("#dfe7dc" if selected else ("#eef5ef" if selectable else "#4e5652")))
                         hover_background (Frame("gui/ui_test_skin/dice_card.png", 34, 34) if rm_ui_test_skin_active and selectable else Solid("#d8eadb" if selectable else "#4e5652"))
                         sensitive selectable
                         action SetScreenVariable("selected_die_ids", attribute_toggle_die_selection(selected_die_ids, die["id"], max_dice))
 
                         hbox:
-                            spacing 12
+                            spacing 16
                             yalign 0.5
 
                             use attribute_die_entity(die["label"], format_die_faces(die["faces"]), "?", selectable)
 
                             vbox:
                                 yalign 0.5
-                                spacing 5
+                                spacing 7
 
                                 text die["label"] style ("attribute_check_die_text" if selectable else "attribute_check_die_disabled_text")
                                 text format_die_faces(die["faces"]) style ("attribute_check_faces_text" if selectable else "attribute_check_faces_disabled_text")
@@ -256,7 +256,7 @@ screen attribute_dice_select(required_stat, min_dice=1, max_dice=3, requirement=
 
             hbox:
                 xalign 1.0
-                spacing 14
+                spacing 19
 
                 if rm_ui_test_skin_active:
                     textbutton "确认骰子":
@@ -276,7 +276,7 @@ screen attribute_dice_select(required_stat, min_dice=1, max_dice=3, requirement=
             style "attribute_check_confirm_modal"
 
             vbox:
-                spacing 18
+                spacing 24
                 xfill True
 
                 text "确认检定" style "attribute_check_section_title"
@@ -284,7 +284,7 @@ screen attribute_dice_select(required_stat, min_dice=1, max_dice=3, requirement=
 
                 hbox:
                     xalign 1.0
-                    spacing 14
+                    spacing 19
 
                     if rm_ui_test_skin_active:
                         textbutton "取消":
@@ -312,7 +312,7 @@ screen attribute_dice_select(required_stat, min_dice=1, max_dice=3, requirement=
                 style "attribute_check_confirm_modal"
 
                 vbox:
-                    spacing 18
+                    spacing 24
                     xfill True
 
                     text "骰组不合法" style "attribute_check_section_title"
@@ -321,62 +321,6 @@ screen attribute_dice_select(required_stat, min_dice=1, max_dice=3, requirement=
 
     if rm_ui_test_skin_active:
         use rm_ui_test_close_button()
-
-
-screen attribute_dice_confirm(required_stat, die_ids):
-    modal True
-    zorder 81
-    $ preview = preview_attribute_check(required_stat, die_ids)
-
-    use rm_allow_game_menu
-    use modal_dim_background
-
-    frame:
-        style "attribute_check_panel"
-
-        vbox:
-            spacing 20
-            xfill True
-
-            text "确认检定" style "attribute_check_title"
-
-            frame:
-                style "attribute_stage_frame"
-
-                hbox:
-                    xfill True
-                    spacing 32
-
-                    fixed:
-                        xsize 520
-                        ysize 180
-                        add Solid("#8fb39a") xalign 0.5 yalign 0.82 xsize 420 ysize 16
-                        hbox:
-                            xalign 0.5
-                            yalign 0.43
-                            spacing 12
-                            for selected_die in preview["dice"]:
-                                use attribute_die_entity(selected_die["label"], format_die_faces(selected_die["faces"]), "?", True)
-
-                    vbox:
-                        yalign 0.5
-                        spacing 10
-
-                        text "属性：[preview['stat_label']]" style "attribute_check_body"
-                        text "当前值：[preview['stat_value']]  固定值：floor([preview['stat_value']] × 0.5) = [preview['stat_half']]" style "attribute_check_body"
-                        text "确认后会进入投掷演出，并结算最终点数。" style "attribute_check_body"
-
-            hbox:
-                xalign 1.0
-                spacing 14
-
-                textbutton "返回选择":
-                    style "attribute_check_button"
-                    action Return(False)
-
-                textbutton "进行检定":
-                    style "attribute_check_button"
-                    action Return(True)
 
 
 screen attribute_check_roll_animation(result):
@@ -393,7 +337,7 @@ screen attribute_check_roll_animation(result):
         style "attribute_check_panel"
 
         vbox:
-            spacing 20
+            spacing 27
             xfill True
 
             text "检定投掷" style "attribute_check_title"
@@ -403,9 +347,9 @@ screen attribute_check_roll_animation(result):
 
                 fixed:
                     xfill True
-                    ysize 310
+                    ysize 413
 
-                    add Solid("#8fb39a") xalign 0.5 yalign 0.74 xsize 520 ysize 18
+                    add Solid("#8fb39a") xalign 0.5 yalign 0.74 xsize 693 ysize 24
 
                     if roll_finished and result["available"] and result["rolls"]:
                         frame:
@@ -418,7 +362,7 @@ screen attribute_check_roll_animation(result):
                         text str(result["rolls"][0]):
                             xalign 0.5
                             yalign 0.08
-                            size 72
+                            size 96
                             color "#000000"
                             at attribute_die_result_flash
                     elif roll_finished:
@@ -431,7 +375,7 @@ screen attribute_check_roll_animation(result):
                         text "本次没有完成掷骰":
                             xalign 0.5
                             yalign 0.10
-                            size 34
+                            size 45
                             color "#000000"
                     else:
                         frame:
@@ -457,20 +401,20 @@ screen attribute_check_result(result):
         style "attribute_check_panel"
 
         vbox:
-            spacing 18
+            spacing 24
             xfill True
 
             text "检定结果" style "attribute_check_title"
 
             hbox:
-                spacing 26
+                spacing 35
                 xfill True
 
                 use attribute_die_entity(result["die_label"], result["die_faces_text"], str(result["rolls"][0]) if result["rolls"] else "!", result["available"] and result["rolls"])
 
                 vbox:
                     yalign 0.5
-                    spacing 8
+                    spacing 11
 
                     if result["available"] and result["rolls"]:
                         text "[result['stat_label']]检定：[result['stat_half']] + 骰组[result.get('dice_total', sum(result['rolls']))] + 修正[result['mood_modifier']] = [result['total']]" style "attribute_check_body"
@@ -494,39 +438,39 @@ screen attribute_check_result(result):
 style attribute_check_panel is frame:
     xalign 0.5
     yalign 0.5
-    xsize 1536
-    ysize 864
+    xsize 2048
+    ysize 1152
     background ConditionSwitch("rm_ui_test_skin_active", Frame("gui/ui_test_skin/dice_check_panel.png", 90, 90), "True", Solid("#243029"))
-    padding (28, 24, 28, 24)
+    padding (37, 32, 37, 32)
 
 style attribute_stage_frame is frame:
     xfill True
     background ConditionSwitch("rm_ui_test_skin_active", Frame("gui/ui_test_skin/check_stage.png", 70, 24), "True", Solid("#18241d"))
-    padding (22, 18, 22, 18)
+    padding (29, 24, 29, 24)
 
 style attribute_check_summary_frame is frame:
     xfill True
     background ConditionSwitch("rm_ui_test_skin_active", Frame("gui/ui_test_skin/dice_list.png", 60, 34), "True", Solid("#18241d"))
-    padding (16, 12, 16, 12)
+    padding (21, 16, 21, 16)
 
 style attribute_check_summary_label is text:
-    size 18
-    color "#000000"
-
-style attribute_check_summary_value is text:
     size 24
     color "#000000"
 
+style attribute_check_summary_value is text:
+    size 32
+    color "#000000"
+
 style attribute_check_tab_button is button:
-    xsize 148
-    ysize 40
+    xsize 197
+    ysize 53
     background ConditionSwitch("rm_ui_test_skin_active", Frame("gui/ui_test_skin/option_button.png", 40, 16), "True", Solid("#35443a"))
     hover_background ConditionSwitch("rm_ui_test_skin_active", Frame("gui/ui_test_skin/option_button.png", 40, 16), "True", Solid("#425846"))
     selected_background ConditionSwitch("rm_ui_test_skin_active", Frame("gui/ui_test_skin/option_button.png", 40, 16), "True", Solid("#dfe7dc"))
     padding (0, 0)
 
 style attribute_check_tab_button_text is button_text:
-    size 18
+    size 24
     color "#000000"
     hover_color "#000000"
     selected_color "#000000"
@@ -543,62 +487,62 @@ style attribute_check_confirm_dim is button:
 style attribute_check_confirm_modal is frame:
     xalign 0.5
     yalign 0.5
-    xsize 760
+    xsize 1013
     background ConditionSwitch("rm_ui_test_skin_active", Frame("gui/ui_test_skin/dice_list.png", 60, 34), "True", Solid("#101812f2"))
-    padding (26, 22, 26, 22)
+    padding (35, 29, 35, 29)
 
 style attribute_check_invalid_hint is text:
-    size 18
+    size 24
     color "#000000"
     xalign 0.5
 
 style attribute_check_title is text:
-    size 36
+    size 48
     color "#000000"
 
 style attribute_check_section_title is text:
-    size 25
+    size 33
     color "#000000"
 
 style attribute_check_body is text:
-    size 24
+    size 32
     color "#000000"
-    line_spacing 4
+    line_spacing 5
 
 style attribute_check_muted_text is text:
-    size 23
+    size 31
     color "#000000"
 
 style attribute_check_die_text is text:
-    size 24
+    size 32
     color "#000000"
 
 style attribute_check_faces_text is text:
-    size 19
+    size 25
     color "#000000"
 
 style attribute_check_hint_text is text:
-    size 18
-    color "#000000"
-
-style attribute_check_die_disabled_text is text:
     size 24
     color "#000000"
 
+style attribute_check_die_disabled_text is text:
+    size 32
+    color "#000000"
+
 style attribute_check_faces_disabled_text is text:
-    size 19
+    size 25
     color "#000000"
 
 style attribute_check_disabled_hint_text is text:
-    size 18
+    size 24
     color "#000000"
 
 style attribute_check_button is button:
     background ConditionSwitch("rm_ui_test_skin_active", Frame("gui/ui_test_skin/option_button.png", 40, 16), "True", Solid("#35443a"))
     hover_background ConditionSwitch("rm_ui_test_skin_active", Frame("gui/ui_test_skin/option_button.png", 40, 16), "True", Solid("#425846"))
-    padding (20, 10, 20, 10)
+    padding (27, 13, 27, 13)
 
 style attribute_check_button_text is button_text:
-    size 24
+    size 32
     color "#000000"
     hover_color "#000000"

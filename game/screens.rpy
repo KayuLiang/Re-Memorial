@@ -1,4 +1,4 @@
-﻿################################################################################
+################################################################################
 ## 初始化
 ################################################################################
 
@@ -63,12 +63,12 @@ style vscrollbar:
 style slider:
     ysize gui.slider_size
     base_bar Frame("gui/slider/horizontal_[prefix_]bar.png", gui.slider_borders, tile=gui.slider_tile)
-    thumb "gui/slider/horizontal_[prefix_]thumb.png"
+    thumb Transform("gui/slider/horizontal_[prefix_]thumb.png", zoom=(4.0 / 3.0))
 
 style vslider:
     xsize gui.slider_size
     base_bar Frame("gui/slider/vertical_[prefix_]bar.png", gui.vslider_borders, tile=gui.slider_tile)
-    thumb "gui/slider/vertical_[prefix_]thumb.png"
+    thumb Transform("gui/slider/vertical_[prefix_]thumb.png", zoom=(4.0 / 3.0))
 
 
 style frame:
@@ -92,25 +92,76 @@ style frame:
 ##
 ## https://doc.renpy.cn/zh-CN/screen_special.html#say
 
+transform story_ui_bleed_canvas:
+    zoom (2.0 / 3.0)
+    xalign 0.5
+    yalign 0.5
+
+define notebook_dialogue_x = 384
+define notebook_dialogue_y = 1173
+define notebook_dialogue_width = 1707
+define notebook_dialogue_height = 315
+
+transform notebook_tab_pull:
+    yoffset 32
+    on hover:
+        easeout .16 yoffset 0
+    on selected_hover:
+        easeout .16 yoffset 0
+    on idle:
+        easeout .12 yoffset 32
+    on selected_idle:
+        easeout .12 yoffset 32
+
+transform notebook_tab_caption:
+    alpha 0.0
+    pause .12
+    linear .08 alpha 1.0
+
 screen say(who, what):
-
-    window:
-        id "window"
-
+    # One stable paper layout for speech, narration and inner monologue.
+    fixed:
+        xysize (2560, 1440)
+        use quick_menu
+        # User will paint separate photographs. Do not crop standing sprites.
+        fixed:
+            pos (139, RM_HUD_DIALOGUE_Y + 16)
+            xysize (192, 213)
+            at Transform(rotate=-3, rotate_pad=False)
+            add "gui/hud_flat/photo_mount.svg"
+            text ("照片待绘" if who is not None else "旁白"):
+                align (.5, .48)
+                size 24
+                color "#888273"
+        add "gui/hud_flat/photo_clip.svg" pos (299, RM_HUD_DIALOGUE_Y + 5)
         if who is not None:
-
-            window:
-                id "namebox"
-                style "namebox"
-                text who id "who"
-
-        text what id "what"
-
-
-    ## 如果有对话框头像，会将其显示在文本之上。请不要在手机界面下显示这个，因为
-    ## 没有空间。
-    if not renpy.variant("small"):
-        add SideImage() xalign 0.0 yalign 1.0
+            fixed:
+                pos (notebook_dialogue_x, RM_HUD_DIALOGUE_Y + 11)
+                xysize (notebook_dialogue_width, 75)
+                text who:
+                    id "who"
+                    yalign .5
+                    size 51
+                    color RM_HUD_INK
+        add Solid("#a59e90") pos (notebook_dialogue_x, RM_HUD_DIALOGUE_Y + 85) xysize (notebook_dialogue_width, 1)
+        window:
+            id "window"
+            style "notebook_text_window"
+            xysize (2560, 1440)
+            text what:
+                id "what"
+                xpos notebook_dialogue_x
+                ypos notebook_dialogue_y
+                xsize notebook_dialogue_width
+                style "notebook_say_dialogue"
+                color RM_HUD_INK
+        imagebutton:
+            pos (2389, RM_HUD_DIALOGUE_Y + 240)
+            xysize (64, 64)
+            idle Transform("gui/hud_flat/play_ink.svg", xysize=(64, 64))
+            hover Transform("gui/hud_flat/play_hover.svg", xysize=(64, 64))
+            alt "继续"
+            action QueueEvent("dismiss_unfocused")
 
 
 ## 通过 Character 对象使名称框可用于样式化。
@@ -132,7 +183,23 @@ style window:
     yalign gui.textbox_yalign
     ysize gui.textbox_height
 
-    background Image("gui/textbox.png", xalign=0.5, yalign=1.0)
+    background None
+
+style notebook_text_window is empty:
+    background None
+    padding (0, 0)
+
+style notebook_portrait_name_text is gui_text:
+    size 37
+    color "#000000"
+
+style notebook_say_dialogue is say_dialogue:
+    xpos 0
+    ypos 0
+    xsize 1200
+    color "#000000"
+    size 43
+    line_spacing 13
 
 style namebox:
     xpos gui.name_xpos
@@ -146,6 +213,7 @@ style namebox:
 
 style say_label:
     properties gui.text_properties("name", accent=True)
+    bold False
     xalign gui.name_xalign
     yalign 0.5
 
@@ -212,7 +280,7 @@ style choice_button_text is button_text
 
 style choice_vbox:
     xalign 0.5
-    ypos 405
+    ypos 540
     yanchor 0.5
 
     spacing gui.choice_spacing
@@ -229,31 +297,51 @@ style choice_button_text is default:
 ## 快捷菜单显示于游戏内，以便于访问游戏外的菜单。
 
 screen quick_menu():
-
-    ## 确保该菜单出现在其他屏幕之上，
-    zorder 100
-
-    if quick_menu and not opening_active:
-
-        hbox:
-            style_prefix "quick"
-            style "quick_menu"
-
-            textbutton _("回退") action Rollback()
-            textbutton _("历史") action ShowMenu('history')
-            textbutton _("快进") action Skip() alternate Skip(fast=True, confirm=True)
-            textbutton _("自动") action Preference("auto-forward", "toggle")
-            textbutton _("保存") action ShowMenu('save')
-            textbutton _("快存") action QuickSave()
-            textbutton _("快读") action QuickLoad()
-            textbutton _("设置") action ShowMenu('preferences')
-
-
-## 此代码确保只要用户没有主动隐藏界面，就会在游戏中显示 quick_menu 屏幕。
-init python:
-    config.overlay_screens.append("quick_menu")
+    # Tabs first, foreground page second: the stems sit BETWEEN the leaves.
+    default control_tip = None
+    if quick_menu and not opening_active and rm_hud_visible():
+        # Fixed 96x117 hit areas, moving artwork only. No hover-boundary oscillation.
+        for icon, caption, control_x, target in (
+            ("article", "历史", 1931, ShowMenu("history")),
+            ("eye-slash", "隐藏 UI", 2037, HideInterface()),
+            ("arrows-clockwise", "自动", 2144, Preference("auto-forward", "toggle")),
+            ("fast-forward", "快进", 2251, Skip()),
+            ("sliders-horizontal", "设置", 2357, ShowMenu("preferences")),
+        ):
+            $ tab_state = "selected" if renpy.is_selected(target) else ("hover" if control_tip and control_tip[0] == caption else "idle")
+            button:
+                id ("dialogue_" + icon)
+                pos (control_x, RM_HUD_DIALOGUE_Y - 96)
+                xysize (96, 117)
+                padding (0, 0)
+                background None
+                hover_background None
+                selected_background None
+                alt caption
+                action target
+                hovered SetLocalVariable("control_tip", (caption, control_x))
+                unhovered SetLocalVariable("control_tip", None)
+                add ("gui/hud_flat/dialogue_" + icon + "_" + tab_state + ".svg"):
+                    at notebook_tab_pull
+    add "gui/hud_flat/notebook_page.svg" pos (53, RM_HUD_DIALOGUE_Y - 11)
+    if quick_menu and not opening_active and rm_hud_visible() and control_tip:
+        text control_tip[0]:
+            id "dialogue_control_tip"
+            xpos control_tip[1] + 48
+            ypos RM_HUD_DIALOGUE_Y - 32
+            xanchor .5
+            size 21
+            color RM_HUD_INK
+            at notebook_tab_caption
 
 default quick_menu = True
+
+
+screen modal_dim_background():
+    add Solid("#00000099")
+
+screen rm_allow_game_menu():
+    key "game_menu" action ShowMenu()
 
 style quick_menu is hbox
 style quick_button is default
@@ -262,12 +350,30 @@ style quick_button_text is button_text
 style quick_menu:
     xalign 0.5
     yalign 1.0
+    yoffset -3
+    spacing 19
 
 style quick_button:
     properties gui.button_properties("quick_button")
 
 style quick_button_text:
     properties gui.text_properties("quick_button")
+
+style quick_icon_button is button:
+    xsize 72
+    ysize 56
+    padding (0, 0)
+    background "#efe7d4bb"
+    hover_background "#fff8e9e8"
+    selected_background "#d6c8adf0"
+
+style quick_icon_button_text is button_text:
+    size 27
+    color "#5d554c"
+    hover_color "#171513"
+    selected_color "#171513"
+    xalign 0.5
+    yalign 0.5
 
 
 ################################################################################
@@ -347,7 +453,7 @@ screen main_menu():
     ## 此语句可确保替换掉任何其他菜单屏幕。
     tag menu
 
-    add gui.main_menu_background
+    add gui.main_menu_background xysize (2560, 1440)
 
     ## 此空框可使标题菜单变暗。
     frame:
@@ -375,17 +481,17 @@ style main_menu_title is main_menu_text
 style main_menu_version is main_menu_text
 
 style main_menu_frame:
-    xsize 420
+    xsize 560
     yfill True
 
-    background "gui/overlay/main_menu.png"
+    background Transform("gui/overlay/main_menu.png", xysize=(2560, 1440))
 
 style main_menu_vbox:
     xalign 1.0
-    xoffset -30
-    xmaximum 1200
+    xoffset -40
+    xmaximum 1600
     yalign 1.0
-    yoffset -30
+    yoffset -40
 
 style main_menu_text:
     properties gui.text_properties("main_menu", accent=True)
@@ -410,9 +516,9 @@ screen game_menu(title, scroll=None, yinitial=0.0, spacing=0):
     style_prefix "game_menu"
 
     if main_menu:
-        add gui.main_menu_background
+        add gui.main_menu_background xysize (2560, 1440)
     else:
-        add gui.game_menu_background
+        add gui.game_menu_background xysize (2560, 1440)
 
     frame:
         style "game_menu_outer_frame"
@@ -490,42 +596,42 @@ style return_button is navigation_button
 style return_button_text is navigation_button_text
 
 style game_menu_outer_frame:
-    bottom_padding 45
-    top_padding 180
+    bottom_padding 60
+    top_padding 240
 
-    background "gui/overlay/game_menu.png"
+    background Transform("gui/overlay/game_menu.png", xysize=(2560, 1440))
 
 style game_menu_navigation_frame:
-    xsize 420
+    xsize 560
     yfill True
 
 style game_menu_content_frame:
-    left_margin 60
-    right_margin 30
-    top_margin 15
+    left_margin 80
+    right_margin 40
+    top_margin 20
 
 style game_menu_viewport:
-    xsize 1380
+    xsize 1840
 
 style game_menu_vscrollbar:
     unscrollable gui.unscrollable
 
 style game_menu_side:
-    spacing 15
+    spacing 20
 
 style game_menu_label:
-    xpos 75
-    ysize 180
+    xpos 100
+    ysize 240
 
 style game_menu_label_text:
-    size 75
+    size 100
     color gui.accent_color
     yalign 0.5
 
 style return_button:
     xpos gui.navigation_xpos
     yalign 1.0
-    yoffset -45
+    yoffset -60
 
 
 ## 关于屏幕 ########################################################################
@@ -688,8 +794,8 @@ style slot_time_text is slot_button_text
 style slot_name_text is slot_button_text
 
 style page_label:
-    xpadding 75
-    ypadding 5
+    xpadding 100
+    ypadding 7
     xalign 0.5
 
 style page_label_text:
@@ -841,20 +947,20 @@ style mute_all_button_text is check_button_text
 
 style pref_label:
     top_margin gui.pref_spacing
-    bottom_margin 3
+    bottom_margin 4
 
 style pref_label_text:
     yalign 1.0
 
 style pref_vbox:
-    xsize 338
+    xsize 451
 
 style radio_vbox:
     spacing gui.pref_button_spacing
 
 style radio_button:
     properties gui.button_properties("radio_button")
-    foreground "gui/button/radio_[prefix_]foreground.png"
+    foreground Transform("gui/button/radio_[prefix_]foreground.png", zoom=(4.0 / 3.0))
 
 style radio_button_text:
     properties gui.text_properties("radio_button")
@@ -864,24 +970,24 @@ style check_vbox:
 
 style check_button:
     properties gui.button_properties("check_button")
-    foreground "gui/button/check_[prefix_]foreground.png"
+    foreground Transform("gui/button/check_[prefix_]foreground.png", zoom=(4.0 / 3.0))
 
 style check_button_text:
     properties gui.text_properties("check_button")
 
 style slider_slider:
-    xsize 525
+    xsize 700
 
 style slider_button:
     properties gui.button_properties("slider_button")
     yalign 0.5
-    left_margin 15
+    left_margin 20
 
 style slider_button_text:
     properties gui.text_properties("slider_button")
 
 style slider_vbox:
-    xsize 675
+    xsize 900
 
 
 ## 历史屏幕 ########################################################################
@@ -954,10 +1060,13 @@ style history_name:
     xsize gui.history_name_width
 
 style history_name_text:
+    font rememorial_dialogue_font
+    bold False
     min_width gui.history_name_width
     textalign gui.history_name_xalign
 
 style history_text:
+    font rememorial_dialogue_font
     xpos gui.history_text_xpos
     ypos gui.history_text_ypos
     xanchor gui.history_text_xalign
@@ -989,7 +1098,7 @@ screen help():
         style_prefix "help"
 
         vbox:
-            spacing 23
+            spacing 31
 
             hbox:
 
@@ -1118,14 +1227,14 @@ style help_text is gui_text
 
 style help_button:
     properties gui.button_properties("help_button")
-    xmargin 12
+    xmargin 16
 
 style help_button_text:
     properties gui.text_properties("help_button")
 
 style help_label:
-    xsize 375
-    right_padding 30
+    xsize 500
+    right_padding 40
 
 style help_label_text:
     size gui.text_size
@@ -1154,14 +1263,14 @@ screen confirm(message, yes_action, no_action):
 
     style_prefix "confirm"
 
-    add "gui/overlay/confirm.png"
+    add "gui/overlay/confirm.png" xysize (2560, 1440)
 
     frame:
 
         vbox:
             xalign .5
             yalign .5
-            spacing 45
+            spacing 60
 
             label _(message):
                 style "confirm_prompt"
@@ -1169,7 +1278,7 @@ screen confirm(message, yes_action, no_action):
 
             hbox:
                 xalign 0.5
-                spacing 150
+                spacing 200
 
                 textbutton _("确定") action yes_action
                 textbutton _("取消") action no_action
@@ -1215,7 +1324,7 @@ screen skip_indicator():
     frame:
 
         hbox:
-            spacing 9
+            spacing 12
 
             text _("正在快进")
 
@@ -1252,7 +1361,7 @@ style skip_text:
 
 style skip_triangle:
     ## 我们必须使用包含“▸”（黑色右旋小三角）字形的字体。
-    font "DejaVuSans.ttf"
+    font rememorial_ui_font
 
 
 ## 通知屏幕 ########################################################################
@@ -1367,7 +1476,7 @@ style nvl_window:
     xfill True
     yfill True
 
-    background "gui/nvl.png"
+    background Transform("gui/nvl.png", xysize=(2560, 1440))
     padding gui.nvl_borders.padding
 
 style nvl_entry:
@@ -1393,6 +1502,7 @@ style nvl_dialogue:
     layout ("subtitle" if gui.nvl_text_xalign else "tex")
 
 style nvl_thought:
+    font rememorial_dialogue_font
     xpos gui.nvl_thought_xpos
     xanchor gui.nvl_thought_xalign
     ypos gui.nvl_thought_ypos
@@ -1446,19 +1556,22 @@ style bubble_who is default
 style bubble_what is default
 
 style bubble_window:
-    xpadding 30
-    top_padding 5
-    bottom_padding 5
+    xpadding 40
+    top_padding 7
+    bottom_padding 7
 
 style bubble_namebox:
     xalign 0.5
 
 style bubble_who:
+    font rememorial_dialogue_font
+    bold False
     xalign 0.5
     textalign 0.5
     color "#000"
 
 style bubble_what:
+    font rememorial_dialogue_font
     align (0.5, 0.5)
     text_align 0.5
     layout "subtitle"
@@ -1470,22 +1583,22 @@ define bubble.thoughtframe = Frame("gui/thoughtbubble.png", 55, 55, 55, 55)
 define bubble.properties = {
     "bottom_left" : {
         "window_background" : Transform(bubble.frame, xzoom=1, yzoom=1),
-        "window_bottom_padding" : 27,
+        "window_bottom_padding" : 36,
     },
 
     "bottom_right" : {
         "window_background" : Transform(bubble.frame, xzoom=-1, yzoom=1),
-        "window_bottom_padding" : 27,
+        "window_bottom_padding" : 36,
     },
 
     "top_left" : {
         "window_background" : Transform(bubble.frame, xzoom=1, yzoom=-1),
-        "window_top_padding" : 27,
+        "window_top_padding" : 36,
     },
 
     "top_right" : {
         "window_background" : Transform(bubble.frame, xzoom=-1, yzoom=-1),
-        "window_top_padding" : 27,
+        "window_top_padding" : 36,
     },
 
     "thought" : {
@@ -1494,10 +1607,10 @@ define bubble.properties = {
 }
 
 define bubble.expand_area = {
-    "bottom_left" : (0, 0, 0, 22),
-    "bottom_right" : (0, 0, 0, 22),
-    "top_left" : (0, 22, 0, 0),
-    "top_right" : (0, 22, 0, 0),
+    "bottom_left" : (0, 0, 0, 29),
+    "bottom_right" : (0, 0, 0, 29),
+    "top_left" : (0, 29, 0, 0),
+    "top_right" : (0, 29, 0, 0),
     "thought" : (0, 0, 0, 0),
 }
 
@@ -1509,54 +1622,38 @@ define bubble.expand_area = {
 
 style pref_vbox:
     variant "medium"
-    xsize 675
+    xsize 900
 
-## 由于可能没有鼠标，我们将快捷菜单替换为一个使用更少、更大按钮的版本，这样更容
-## 易触摸。
-screen quick_menu():
-    variant "touch"
-
-    zorder 100
-
-    if quick_menu and not opening_active:
-
-        hbox:
-            style "quick_menu"
-            style_prefix "quick"
-
-            textbutton _("回退") action Rollback()
-            textbutton _("快进") action Skip() alternate Skip(fast=True, confirm=True)
-            textbutton _("自动") action Preference("auto-forward", "toggle")
-            textbutton _("菜单") action ShowMenu()
+## 对白内的五个 48px 图标共用于鼠标和触摸，不另加底部按钮排。
 
 
 style window:
     variant "small"
-    background "gui/phone/textbox.png"
+    background Transform("gui/phone/textbox.png", xysize=(2560, 480))
 
 style radio_button:
     variant "small"
-    foreground "gui/phone/button/radio_[prefix_]foreground.png"
+    foreground Transform("gui/phone/button/radio_[prefix_]foreground.png", zoom=(4.0 / 3.0))
 
 style check_button:
     variant "small"
-    foreground "gui/phone/button/check_[prefix_]foreground.png"
+    foreground Transform("gui/phone/button/check_[prefix_]foreground.png", zoom=(4.0 / 3.0))
 
 style nvl_window:
     variant "small"
-    background "gui/phone/nvl.png"
+    background Transform("gui/phone/nvl.png", xysize=(2560, 1440))
 
 style main_menu_frame:
     variant "small"
-    background "gui/phone/overlay/main_menu.png"
+    background Transform("gui/phone/overlay/main_menu.png", xysize=(2560, 1440))
 
 style game_menu_outer_frame:
     variant "small"
-    background "gui/phone/overlay/game_menu.png"
+    background Transform("gui/phone/overlay/game_menu.png", xysize=(2560, 1440))
 
 style game_menu_navigation_frame:
     variant "small"
-    xsize 510
+    xsize 680
 
 style game_menu_content_frame:
     variant "small"
@@ -1564,11 +1661,11 @@ style game_menu_content_frame:
 
 style game_menu_viewport:
     variant "small"
-    xsize 1305
+    xsize 1740
 
 style pref_vbox:
     variant "small"
-    xsize 600
+    xsize 800
 
 style bar:
     variant "small"
@@ -1598,13 +1695,13 @@ style slider:
     variant "small"
     ysize gui.slider_size
     base_bar Frame("gui/phone/slider/horizontal_[prefix_]bar.png", gui.slider_borders, tile=gui.slider_tile)
-    thumb "gui/phone/slider/horizontal_[prefix_]thumb.png"
+    thumb Transform("gui/phone/slider/horizontal_[prefix_]thumb.png", zoom=(4.0 / 3.0))
 
 style vslider:
     variant "small"
     xsize gui.slider_size
     base_bar Frame("gui/phone/slider/vertical_[prefix_]bar.png", gui.vslider_borders, tile=gui.slider_tile)
-    thumb "gui/phone/slider/vertical_[prefix_]thumb.png"
+    thumb Transform("gui/phone/slider/vertical_[prefix_]thumb.png", zoom=(4.0 / 3.0))
 
 style slider_vbox:
     variant "small"
@@ -1612,4 +1709,4 @@ style slider_vbox:
 
 style slider_slider:
     variant "small"
-    xsize 900
+    xsize 1200

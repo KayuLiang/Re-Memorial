@@ -1,0 +1,38 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="360" height="510" viewBox="0 0 360 510">
+  <defs>
+    <pattern id="ink" width="13" height="19" patternUnits="userSpaceOnUse">
+      <path d="M1 3h3 M8 13h2 M4 18h1" stroke="#aaa18a" stroke-width=".5" opacity=".11"/>
+    </pattern>
+    <clipPath id="inside"><rect x="16" y="16" width="328" height="478" rx="9"/></clipPath>
+    <g id="leaf" fill="none" stroke="#89764f" stroke-width=".8">
+      <path d="M29 112C48 144 27 179 32 213 M31 132C22 131 20 119 23 115C32 122 34 126 31 132 M34 148C42 144 45 135 43 130C35 135 31 140 34 148 M31 165C23 163 21 154 23 148C30 154 33 159 31 165 M30 183C37 179 41 174 40 168C31 172 29 177 30 183"/>
+    </g>
+  </defs>
+  <rect x="1" y="1" width="358" height="508" rx="16" fill="#101719" stroke="#917c52" stroke-width="1.5"/>
+  <rect x="8" y="8" width="344" height="494" rx="12" fill="none" stroke="#77684a" stroke-width=".7"/>
+  <rect x="16" y="16" width="328" height="478" rx="9" fill="#151d1f"/>
+  <g clip-path="url(#inside)">
+    <rect x="16" y="16" width="328" height="478" fill="url(#ink)"/>
+    <!-- Engraved lunar paths: recessed ink, not an emissive magic circle. -->
+    <g fill="none" stroke="#3e4541" stroke-width=".7">
+      <ellipse cx="180" cy="274" rx="115" ry="171"/>
+      <ellipse cx="180" cy="274" rx="107" ry="163"/>
+      <path d="M48 382C79 365 78 201 180 111C282 201 281 365 312 382 M48 166C79 183 78 347 180 437C282 347 281 183 312 166"/>
+      <path d="M68 398C124 395 236 153 292 150 M68 150C124 153 236 395 292 398"/>
+    </g>
+    <g opacity=".52">
+      <use href="#leaf"/>
+      <use href="#leaf" transform="translate(360 0) scale(-1 1)"/>
+      <use href="#leaf" transform="translate(0 548) scale(1 -1)"/>
+      <use href="#leaf" transform="translate(360 548) scale(-1 -1)"/>
+    </g>
+  </g>
+  <g fill="none" stroke="#ad9665" stroke-width=".8">
+    <path d="M26 92H334 M26 449H334"/>
+    <path d="M16 48V27Q16 16 27 16H48 M312 16H333Q344 16 344 27V48 M16 462V483Q16 494 27 494H48 M312 494H333Q344 494 344 483V462"/>
+  </g>
+  <g fill="#ad9665">
+    <path d="M24 22l2 4-2 4-2-4z M336 22l2 4-2 4-2-4z M24 480l2 4-2 4-2-4z M336 480l2 4-2 4-2-4z"/>
+    <circle cx="35" cy="474" r="1.5"/><circle cx="325" cy="474" r="1.5"/>
+  </g>
+</svg>

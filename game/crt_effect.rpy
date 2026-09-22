@@ -5,7 +5,7 @@
 default persistent.crt_effect_enabled = True
 
 define crt_scroll_speed = 18.0
-define crt_overscan = 24
+define crt_overscan = 32
 define crt_mode_settings = {
     "subtle": {
         "scanline": 0.40,
@@ -17,13 +17,13 @@ define crt_mode_settings = {
         "scanline": 0.62,
         "noise": 0.50,
         "flicker": 0.045,
-        "jitter": 8,
+        "jitter": 11,
     },
     "shutdown": {
         "scanline": 0.82,
         "noise": 0.80,
         "flicker": 0.18,
-        "jitter": 22,
+        "jitter": 29,
     },
 }
 

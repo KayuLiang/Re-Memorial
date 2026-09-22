@@ -12,16 +12,12 @@ label complete_opening_sequence:
 
 label opening_scene_00:
     scene black
-    show screen opening_disclaimer_one
-    $ renpy.pause(3.0, hard=True, modal=False)
-    hide screen opening_disclaimer_one
-    jump opening_scene_01
+    call screen opening_disclaimer_one
+    jump opening_scene_02
 
 
 label opening_scene_01:
-    scene black
-    call screen opening_disclaimer_two
-    jump opening_scene_02
+    jump opening_scene_00
 
 
 label opening_scene_02:
@@ -184,6 +180,7 @@ label opening_scene_12:
     fro "上面的初始属性——这是什么？"
     system "关于你在这场手术中物质的使用，一经确认无法更改，请保证你充分利用它们的价值。"
     system "个人信息确认无误后，请长按‘确认’按钮完成签名。"
+    $ rm_start_opening_allocation()
     call screen opening_identity_document
 
     jump opening_scene_13

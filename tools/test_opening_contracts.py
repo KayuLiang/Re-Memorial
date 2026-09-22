@@ -267,45 +267,14 @@ class StoryFileOrganizationContractTests(unittest.TestCase):
                 for fragment in fragments:
                     self.assertIn(fragment, source)
 
-    def test_known_story_openings_belong_to_their_numbered_files(self):
-        dream = STORY_FILE_PATHS["1-1-1"].read_text(encoding="utf-8")
-        hospital = STORY_FILE_PATHS["1-1-2"].read_text(encoding="utf-8")
-        apartment = STORY_FILE_PATHS["1-1-3"].read_text(encoding="utf-8")
-
-        self.assertIn("label mountain_memory_start:", dream)
-        self.assertIn(
-            'centered "20XX年8月18日 星期一 下午 13:30"',
-            hospital,
-        )
-        self.assertIn(
-            'centered "20XX年8月18日 星期一 下午 15：30"',
-            apartment,
-        )
-        self.assertNotIn('centered "20XX年8月18日 星期一 下午 13:30"', dream)
-        self.assertNotIn('centered "20XX年8月18日 星期一 下午 15：30"', hospital)
-
-
 class OpeningStatsContractTests(unittest.TestCase):
-    def test_stat_defaults_have_one_exact_canonical_value(self):
+    def test_legacy_stat_defaults_are_removed(self):
         source = "\n".join(
             path.read_text(encoding="utf-8")
             for path in sorted(GAME_DIR.rglob("*.rpy"))
         )
 
-        expected_defaults = {
-            "con": 3,
-            "str": 1,
-            "dex": 1,
-            "int": 1,
-            "pow": 1,
-        }
-        for stat_name, value in expected_defaults.items():
-            with self.subTest(stat_name=stat_name):
-                declarations = re.findall(
-                    rf"(?m)^\s*default\s+stat_{stat_name}\s*=\s*(.*?)\s*$",
-                    source,
-                )
-                self.assertEqual([str(value)], declarations)
+        self.assertNotRegex(source, r"(?m)^\s*default\s+stat_(con|str|dex|int|pow)\s*=")
 
     def test_opening_stats_defines_public_wrappers(self):
         self.assertTrue(
@@ -317,8 +286,9 @@ class OpeningStatsContractTests(unittest.TestCase):
             "opening_stat_points_remaining",
             "opening_can_adjust_stat",
             "opening_adjust_stat",
+            "rm_opening_attribute_value",
+            "rm_opening_adjust_attribute",
             "opening_stats_complete",
-            "get_base_stat",
             "get_effective_stat",
             "get_attribute_dice",
             "perform_attribute_check",
@@ -336,26 +306,23 @@ class OpeningStatsContractTests(unittest.TestCase):
         source = OPENING_STATS_PATH.read_text(encoding="utf-8")
 
         for function_name in (
-            "get_base_stat",
             "get_attribute_dice",
             "perform_attribute_check",
         ):
             with self.subTest(function_name=function_name):
                 block = function_block(source, function_name)
                 self.assertIn(
-                    "_validate_stat_name(stat_name)",
+                    "_validate_stat_name(attribute)",
                     block,
                 )
 
-    def test_attribute_checks_remain_unavailable(self):
+    def test_attribute_checks_use_rm_core_backend(self):
         source = OPENING_STATS_PATH.read_text(encoding="utf-8")
         block = function_block(source, "perform_attribute_check")
 
-        self.assertIn(
-            "return attribute_check_unavailable(stat_name)",
-            block,
-        )
-        self.assertNotIn('"available": True', source)
+        self.assertIn("_rm_core.CheckSpec", block)
+        self.assertIn("_rm_core.perform_check", block)
+        self.assertNotIn("attribute_check_unavailable", source)
 
 
 class CrtEffectContractTests(unittest.TestCase):
@@ -470,13 +437,13 @@ define crt_mode_settings = {
                 "scanline": 0.62,
                 "noise": 0.50,
                 "flicker": 0.045,
-                "jitter": 8,
+                "jitter": 11,
             },
             "shutdown": {
                 "scanline": 0.82,
                 "noise": 0.80,
                 "flicker": 0.18,
-                "jitter": 22,
+                "jitter": 29,
             },
         }
 
@@ -687,9 +654,9 @@ class HueSeparationEffectContractTests(unittest.TestCase):
 
     def test_strength_and_random_bounds_are_explicit(self):
         expected_fragments = (
-            "define hue_separation_baseline_pixels = 3.0",
-            "define hue_separation_peak_pixels_min = 8.0",
-            "define hue_separation_peak_pixels_max = 18.0",
+            "define hue_separation_baseline_pixels = 4.0",
+            "define hue_separation_peak_pixels_min = (32.0 / 3.0)",
+            "define hue_separation_peak_pixels_max = 24.0",
             "define hue_separation_wait_min = 6.0",
             "define hue_separation_wait_max = 12.0",
             "define hue_separation_peak_duration_min = 0.1",
@@ -889,7 +856,6 @@ class OpeningSystemShellContractTests(unittest.TestCase):
             "screen opening_system_desktop(body_screen, body_args=None):",
             "screen opening_window_frame(title, body_screen, body_args=None):",
             "screen opening_oscilloscope():",
-            "screen opening_shell_preview_body():",
             "transform opening_scope_scroll(distance=opening_scope_wave_span):",
         )
 
@@ -943,7 +909,7 @@ class OpeningSystemShellContractTests(unittest.TestCase):
 
         self.assertIn("background Solid(opening_color_border_dark)", outer_style_block)
         padding = parse_style_tuple(outer_style_block, "padding")
-        self.assertIn(padding, {(4, 4), (4, 4, 4, 4)})
+        self.assertIn(padding, {(5, 5), (5, 5, 5, 5)})
         inner_padding = parse_style_tuple(inner_style_block, "padding")
         self.assertIn(inner_padding, {(0, 0), (0, 0, 0, 0)})
         self.assertNotIn("background Solid(opening_color_border)", inner_style_block)
@@ -997,7 +963,7 @@ class OpeningSystemShellContractTests(unittest.TestCase):
         )
 
         highlight_lines = re.findall(
-            r'(?m)^\s*add Solid\([^)\n]+\)\s+xpos 0 ypos 0 xsize config\.screen_width ysize 2\s*$',
+            r'(?m)^\s*add Solid\([^)\n]+\)\s+xpos 0 ypos 0 xsize config\.screen_width ysize 3\s*$',
             desktop_block,
         )
         self.assertEqual(1, len(highlight_lines))
@@ -1008,27 +974,11 @@ class OpeningSystemShellContractTests(unittest.TestCase):
         self.assertIn('text "⊕"', desktop_block)
         self.assertIn('text "特殊治疗管理系统"', desktop_block)
         self.assertIn('text "13:30"', desktop_block)
-        self.assertEqual((44,), parse_style_tuple(taskbar_style_block, "ysize"))
-        self.assertEqual((14, 6, 14, 6), parse_style_tuple(taskbar_content_style_block, "padding"))
+        self.assertEqual((59,), parse_style_tuple(taskbar_style_block, "ysize"))
+        self.assertEqual((19, 8, 19, 8), parse_style_tuple(taskbar_content_style_block, "padding"))
         time_size = parse_style_tuple(time_style_block, "size")[0]
         status_size = parse_style_tuple(status_style_block, "size")[0]
-        self.assertLessEqual(time_size + status_size, 32)
-
-    def test_preview_body_keeps_paper_placeholder_and_scope_signature(self):
-        preview_block, _ = block_with_header(
-            self.source,
-            "screen opening_shell_preview_body():",
-        )
-        paper_style_block, _ = block_with_header(
-            self.source,
-            "style opening_shell_preview_paper_frame is frame:",
-        )
-
-        self.assertIn("use opening_oscilloscope", preview_block)
-        self.assertNotIn("background Solid(opening_color_paper)", preview_block)
-        self.assertIn("background Solid(opening_color_paper)", paper_style_block)
-        paper_width = parse_style_tuple(paper_style_block, "xsize")
-        self.assertEqual((1030,), paper_width)
+        self.assertLessEqual(time_size + status_size, 43)
 
     def test_scope_screen_uses_local_scroll_transform_and_metrics(self):
         scope_block, _ = block_with_header(
@@ -1052,7 +1002,7 @@ class OpeningSystemShellContractTests(unittest.TestCase):
         )
         wave_span = parse_define_scalar(self.source, "opening_scope_wave_span")
 
-        self.assertEqual(476, wave_span)
+        self.assertEqual(635, wave_span)
         self.assertIn("linear 4.8 xoffset -distance", transform_block)
         self.assertIn("xsize opening_scope_wave_span * 2", scope_block)
         self.assertIn("at opening_scope_scroll", scope_block)
@@ -1080,34 +1030,31 @@ class OpeningSystemShellContractTests(unittest.TestCase):
             6,
         )
         self.assertIn("for beat_x in range(", segment_block)
-        self.assertRegex(segment_block, r"\bxsize\s+\d+\s+ysize\s+[12]\b")
-        self.assertRegex(segment_block, r"\bxsize\s+[12]\s+ysize\s+\d+\b")
+        self.assertRegex(segment_block, r"\bxsize\s+\d+\s+ysize\s+3\b")
+        self.assertRegex(segment_block, r"\bxsize\s+3\s+ysize\s+\d+\b")
         self.assertNotIn("opening_shell_scope_wave_text", self.source)
         self.assertNotRegex(self.source, r"[▁▂▃▄▅▆▇]")
 
-    def test_scope_geometry_uses_consistent_450_pixel_budget(self):
+    def test_scope_geometry_uses_consistent_600_pixel_budget(self):
         scope_block, _ = block_with_header(
             self.source,
             "screen opening_oscilloscope():",
         )
 
-        self.assertIn("xsize 450", scope_block)
-        self.assertIn("xpos 18", scope_block)
-        self.assertIn("xsize 450 ysize 1", scope_block)
-        self.assertIn("xpos 18", scope_block)
+        self.assertIn("xsize 600", scope_block)
+        self.assertIn("xpos 24", scope_block)
+        self.assertIn("xsize 600 ysize 1", scope_block)
+        self.assertIn("xpos 24", scope_block)
         self.assertIn("xsize opening_scope_wave_span * 2", scope_block)
-        self.assertNotIn("xsize 452", scope_block)
+        self.assertNotIn("xsize 603", scope_block)
 
     def test_opening_shell_does_not_depend_on_legacy_medical_wave_scroll(self):
         self.assertNotIn("medical_wave_scroll", self.source)
 
-    def test_document_redactions_use_font_group_with_block_glyph_priority(self):
-        self.assertIn(
-            'define opening_document_font = FontGroup()'
-            '.add("DejaVuSans.ttf", 0x2588, 0x2588)'
-            '.add("SourceHanSansLite.ttf", None, None)',
-            self.source,
-        )
+    def test_document_redactions_use_huiwen_with_source_han_fallback(self):
+        self.assertIn("define opening_document_font = rememorial_ui_font", self.source)
+        self.assertNotIn("DejaVuSans.ttf", self.source)
+        self.assertNotIn("ReMemorialLayeredMing.ttf", self.source)
 
         for style_name in (
             "opening_records_meta_text",
@@ -1183,32 +1130,16 @@ class OpeningPreSystemSequenceContractTests(unittest.TestCase):
             with self.subTest(fragment=fragment):
                 self.assertIn(fragment, combined)
 
-    def test_opening_scene_00_uses_show_pause_hide_without_crt(self):
+    def test_opening_scene_00_calls_current_disclaimer_without_crt(self):
         block, _ = block_with_header(self.sequence_source, "label opening_scene_00:")
-        self.assertIn("show screen opening_disclaimer_one", block)
-        self.assertRegex(
-            block,
-            r"(pause\s+3(?:\.0)?\s+hard\b|renpy\.pause\(\s*3(?:\.0)?\s*,\s*hard\s*=\s*True\s*,\s*modal\s*=\s*False\s*\))",
-        )
-        self.assertIn("modal=False", block)
-        self.assertIn("hide screen opening_disclaimer_one", block)
-        self.assertNotIn("call screen opening_disclaimer_one", block)
+        self.assertIn("call screen opening_disclaimer_one", block)
+        self.assertIn("jump opening_scene_02", block)
         self.assertNotIn("crt_effect", block)
 
-    def test_opening_scene_01_routes_no_to_main_menu_and_keeps_crt_off(self):
-        screen_block, _ = block_with_header(
-            self.system_source,
-            "screen opening_disclaimer_two():",
-        )
+    def test_opening_scene_01_is_a_compatibility_alias(self):
         scene_block, _ = block_with_header(self.sequence_source, "label opening_scene_01:")
 
-        self.assertIn('textbutton "是"', screen_block)
-        self.assertIn("action Return(True)", screen_block)
-        self.assertIn('textbutton "否"', screen_block)
-        self.assertIn("MainMenu(confirm=False)", screen_block)
-        self.assertIn("call screen opening_disclaimer_two", scene_block)
-        self.assertNotIn("crt_effect", screen_block)
-        self.assertNotIn("crt_effect", scene_block)
+        self.assertEqual(["jump opening_scene_00"], direct_child_lines(scene_block))
 
     def test_tap_to_start_supports_keyboard_and_mouse(self):
         screen_block, _ = block_with_header(
@@ -1299,10 +1230,6 @@ class OpeningPreSystemSequenceContractTests(unittest.TestCase):
             direct_child_lines(compatibility_block),
         )
 
-    def test_opening_scene_00_pause_uses_modal_false_to_avoid_modal_deadlock(self):
-        block, _ = block_with_header(self.sequence_source, "label opening_scene_00:")
-        self.assertIn("renpy.pause(3.0, hard=True, modal=False)", block)
-
     def test_opening_system_desktop_uses_negative_zorder_below_dialogue(self):
         block, _ = block_with_header(
             self.system_source,
@@ -1367,27 +1294,19 @@ class OpeningPreSystemSequenceContractTests(unittest.TestCase):
             quick_menu_blocks.append(block)
             start_line = index + 1
 
-        self.assertEqual(2, len(quick_menu_blocks))
+        # The approved notebook uses one shared desktop/touch tab row.
+        self.assertEqual(1, len(quick_menu_blocks))
 
         for block in quick_menu_blocks:
             with self.subTest(header=block.splitlines()[0]):
                 self.assertRegex(
                     block,
-                    r"if\s+quick_menu\s+and\s+not\s+opening_active\s*:",
+                    r"if\s+quick_menu\s+and\s+not\s+opening_active\s+and\s+rm_hud_visible\(\)",
                 )
 
-    def test_inventory_and_phone_overlay_buttons_hide_during_opening(self):
-        inventory_block, _ = block_with_header(
-            self.inventory_source,
-            "screen inventory_button():",
-        )
-        phone_block, _ = block_with_header(
-            self.phone_source,
-            "screen phone_button():",
-        )
-
-        self.assertIn("and not opening_active", inventory_block)
-        self.assertIn("and not opening_active", phone_block)
+    def test_legacy_inventory_and_phone_overlay_buttons_are_removed(self):
+        self.assertNotIn("screen inventory_button():", self.inventory_source)
+        self.assertNotIn("screen phone_button():", self.phone_source)
 
 
 class OpeningMedicalConsentContractTests(unittest.TestCase):
@@ -1504,8 +1423,8 @@ class OpeningMedicalConsentContractTests(unittest.TestCase):
         )
 
         width = parse_style_tuple(style_block, "xsize")[0]
-        self.assertGreaterEqual(width, 18)
-        self.assertLessEqual(width, 20)
+        self.assertGreaterEqual(width, 24)
+        self.assertLessEqual(width, 27)
         self.assertIn('base_bar Solid("#4d5a52")', style_block)
         self.assertIn('thumb Solid("#617e6d")', style_block)
         self.assertNotRegex(style_block.lower(), r"(cyan|#00ffff|#00b8ff)")
@@ -1600,7 +1519,6 @@ class OpeningMedicalConsentContractTests(unittest.TestCase):
             "上述信息一经签署，将作为本次治疗及后续系统评估的依据。如有遗漏、错误或隐瞒，患者及家属/监护人已知悉可能产生相应风险。",
             "姓名：弗洛；性别：男；年龄：24；ID：██████████████████",
             "初始属性（剩余可分配点数：x）",
-            "力量 敏捷 体质 智力 意志",
             "六、患者声明",
             "本人自愿接受本次治疗。",
             "患者签名：______________；家属/监护人签名：______________；医师签名：______________；日期：████年██月██日",
@@ -1930,16 +1848,16 @@ class OpeningMedicalConsentContractTests(unittest.TestCase):
         self.assertIn("Function(opening_adjust_stat, stat_name, 1)", row_block)
 
         required_rows = (
-            'use opening_stat_row("体质", "con", stat_con, locked=True)',
-            'use opening_stat_row("力量", "str", stat_str)',
-            'use opening_stat_row("敏捷", "dex", stat_dex)',
-            'use opening_stat_row("智力", "int", stat_int)',
-            'use opening_stat_row("意志", "pow", stat_pow)',
+            'use opening_stat_row("体质", "con", rm_opening_attribute_value("con"), locked=True)',
+            'use opening_stat_row("力量", "str", rm_opening_attribute_value("str"))',
+            'use opening_stat_row("灵巧", "dex", rm_opening_attribute_value("dex"))',
+            'use opening_stat_row("智识", "int", rm_opening_attribute_value("int"))',
+            'use opening_stat_row("意志", "pow", rm_opening_attribute_value("pow"), locked=True)',
         )
         for row in required_rows:
             with self.subTest(row=row):
                 self.assertIn(row, identity_block)
-        self.assertNotIn("opening_adjust_stat", identity_block)
+        self.assertNotRegex(identity_block, r"\bstat_(con|str|dex|int|pow)\b")
 
     def test_identity_ui_binds_existing_remaining_and_completion_rules(self):
         identity_block, _ = block_with_header(
@@ -2110,7 +2028,7 @@ class OpeningMedicalConsentContractTests(unittest.TestCase):
             "style opening_signature_frame is frame:",
         )
 
-        self.assertEqual((98,), parse_style_tuple(style_block, "ysize"))
+        self.assertEqual((131,), parse_style_tuple(style_block, "ysize"))
         self.assertNotRegex(style_block, r"(?m)^\s*yfill\b")
         self.assertNotRegex(style_block, r"(?m)^\s*yminimum\b")
 
@@ -2141,9 +2059,9 @@ class OpeningMedicalConsentContractTests(unittest.TestCase):
         xsize = parse_style_tuple(document_style, "xsize")[0]
         ysize = parse_style_tuple(document_style, "ysize")[0]
         padding = parse_style_tuple(document_style, "padding")
-        self.assertEqual((153, 1554), (xpos, xsize))
-        self.assertEqual((178, 680), (ypos, ysize))
-        self.assertLessEqual(ypos + ysize, 875)
+        self.assertEqual((204, 2072), (xpos, xsize))
+        self.assertEqual((237, 907), (ypos, ysize))
+        self.assertLessEqual(ypos + ysize, 1167)
 
         top_padding = padding[1]
         bottom_padding = padding[3]
@@ -2153,7 +2071,7 @@ class OpeningMedicalConsentContractTests(unittest.TestCase):
             + 5 * parse_style_tuple(row_style, "ysize")[0]
             + parse_style_tuple(remaining_style, "size")[0]
             + parse_style_tuple(signature_style, "ysize")[0]
-            + 7 * 9
+            + 7 * 12
         )
         self.assertGreaterEqual(available_body_height, right_column_budget)
 
@@ -2312,13 +2230,12 @@ class OpeningHandoffContractTests(unittest.TestCase):
             direct_child_lines(compatibility_block),
         )
 
-        label_position = self.dream_source.index("label story_1_1_1:")
-        first_wind_position = self.dream_source.index("    wind ")
-        self.assertLess(label_position, first_wind_position)
-        between = self.dream_source[
-            label_position + len("label story_1_1_1:"):first_wind_position
-        ]
-        self.assertEqual("", between.strip())
+        story_block, _ = block_with_header(
+            self.dream_source,
+            "label story_1_1_1:",
+        )
+        self.assertIn("scene black", story_block)
+        self.assertIn('mystery "3——2——1——呼——"', story_block)
 
     def test_legacy_medical_screen_file_and_all_rpy_references_are_gone(self):
         self.assertFalse(MEDICAL_SCREENS_PATH.exists())

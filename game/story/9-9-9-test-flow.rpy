@@ -40,14 +40,46 @@ label rm_ui_test_reward_choice:
 
 
 label rm_test_flow_start:
-    # 测试行动轮：上午1，上午2，下午1，下午2，晚上1，晚上2，深夜。
+    # 餐次、六个常规行动轮、睡觉决定，以及最多三个深夜行动轮。
     $ rm_ui_test_skin_active = False
     $ rm_test_start_flow()
     jump rm_test_flow_loop
 
 
 label rm_test_flow_loop:
+    if rm_core.is_dead(rm_ensure_player()):
+        jump rm_health_end
     $ rm_test_sync_clock()
+    $ rm_test_node = rm_ensure_player().current_time_slot
+
+    if rm_test_node in rm_core.MEAL_SLOTS:
+        menu:
+            "现在是[rm_test_turn_text()]时间。"
+            "吃饭":
+                $ rm_core.choose_meal(rm_ensure_player(), True)
+            "不吃":
+                $ rm_core.choose_meal(rm_ensure_player(), False)
+        jump rm_test_flow_loop
+
+    if rm_test_node in rm_core.SLEEP_DECISIONS:
+        menu:
+            "今天就到这里，还是继续？"
+            "睡觉":
+                call rm_test_sleep_flow
+            "继续行动":
+                $ rm_core.continue_night(rm_ensure_player())
+            "吃夜宵" if rm_test_node in ("night_break_1", "night_break_2") and not rm_ensure_player().night_snack_eaten:
+                $ rm_core.choose_night_snack(rm_ensure_player())
+        jump rm_test_flow_loop
+
+    if rm_test_node == "forced_sleep":
+        "你再也撑不住了，眼前一黑，失去了意识。"
+        call rm_test_sleep_flow
+        jump rm_test_flow_loop
+
+    if rm_test_node == "wake_check":
+        call rm_test_wake_flow
+        jump rm_test_flow_loop
 
     "现在是[rm_test_day_text()][rm_test_turn_text()]时间点。"
     "接下来要做什么。"
@@ -66,11 +98,65 @@ label rm_test_flow_loop:
 
     "[rm_test_last_result_text]"
 
-    if selected_schedule == "test_sleep":
+    if rm_test_outcome.get("available", True):
         call rm_test_resolve_pending_cards
-
-    $ rm_test_advance_turn(selected_schedule)
+        $ rm_test_advance_turn(selected_schedule)
     jump rm_test_flow_loop
+
+
+label rm_test_sleep_flow:
+    $ rm_test_outcome = rm_test_execute_rest_schedule("test_sleep")
+    if rm_core.is_dead(rm_ensure_player()):
+        jump rm_health_end
+    "[rm_test_last_result_text]"
+    call rm_test_resolve_pending_cards
+    return
+
+
+label rm_test_wake_flow:
+    "该起床了。这次意志检定不消耗精力。"
+    if rm_core.usable_dice(rm_ensure_player(), "pow"):
+        $ rm_wake_requirement = rm_core.wake_requirement(rm_ensure_player())
+        $ rm_wake_max_dice = rm_core.max_dice_for_check(rm_core.CheckSpec("pow", rm_wake_requirement), rm_core.mood_check_profile(rm_core.mood_state(rm_ensure_player())))
+        call screen attribute_dice_select("pow", min_dice=1, max_dice=rm_wake_max_dice, requirement=rm_wake_requirement, check_kind="起床", action_type=rm_core.ACTION_WAKE)
+        $ rm_wake_dice = _return
+        if rm_wake_dice == "__rm_ui_test_exit__":
+            $ rm_ui_test_skin_active = False
+            jump rm_ui_test_menu
+        $ rm_wake_result = rm_core.perform_wake_check(rm_ensure_player(), rm_wake_requirement, rm_wake_dice, rng=renpy.random)
+        $ rm_wake_display = rm_test_result_dict_for_schedule(rm_wake_result, rm_ensure_player(), rm_wake_dice, "test_sleep")
+        call screen attribute_check_roll_animation(rm_wake_display)
+        call screen attribute_check_result(rm_wake_display)
+    else:
+        "没有可用的意志骰，你没能提前醒来。"
+        $ rm_wake_result = rm_core.RESULT_FAILURE
+    $ rm_wake_outcome = rm_core.finish_wake(rm_ensure_player(), rm_wake_result, rng=renpy.random)
+    if rm_core.is_dead(rm_ensure_player()):
+        jump rm_health_end
+    $ rm_test_sync_clock()
+    if rm_wake_outcome["skip_morning"] == 2:
+        "醒来时已经到了午饭时间。"
+    elif rm_wake_outcome["skip_morning"] == 1:
+        "你睡过了上午的第一轮。"
+    else:
+        "你按正常时间起床了。"
+    if "healthy_routine_blocked" in rm_wake_outcome["events"]:
+        if "good_routine_spent" in rm_wake_outcome["events"]:
+            "健康作息抵消了本次疲劳和困意，随后消失。"
+        else:
+            "健康作息抵消了本次疲劳和困意，并保留下来。"
+    elif "good_routine_spent" in rm_wake_outcome["events"]:
+        "这次健康作息未能抵消熬夜影响，并已消耗。"
+    if rm_wake_outcome["fatigue"]:
+        "熬夜带来了1层疲劳，精力上限降低1点。"
+    if rm_wake_outcome["drowsiness"]:
+        "提前起床带来了[rm_wake_outcome['drowsiness']]层困意。"
+    $ rm_wake_disease_events = [event for event in rm_wake_outcome["events"] if event.startswith("deep_fatigue_")]
+    if rm_wake_disease_events:
+        $ rm_wake_disease_text = rm_test_event_text(rm_wake_disease_events)
+        "[rm_wake_disease_text]"
+    call rm_test_resolve_pending_cards
+    return
 
 
 label rm_test_schedule_check_flow(schedule_id):
@@ -119,7 +205,7 @@ label rm_test_resolve_pending_cards:
                 jump rm_ui_test_menu
 
         if rm_test_card_needs_face_choice(rm_test_pending_card):
-            call screen rm_test_pending_face_choice(rm_test_pending_die_id)
+            call screen rm_test_pending_face_choice(rm_test_pending_die_id, rm_test_pending_card)
             $ rm_test_pending_face_index = _return
             if rm_test_pending_face_index == "__rm_ui_test_exit__":
                 $ rm_ui_test_skin_active = False

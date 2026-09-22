@@ -11,21 +11,33 @@ init -9 python:
         ("下午2", 15 * 60),
         ("晚上1", 18 * 60),
         ("晚上2", 20 * 60),
-        ("深夜", 23 * 60),
+        # Existing test-clock timestamps only; final night timestamps are not designed yet.
+        ("深夜1", 23 * 60),
+        ("深夜2", 23 * 60),
+        ("深夜3", 23 * 60),
     )
 
     def rm_test_day_text():
         return "第{}天".format(store.rm_test_day)
 
     def rm_test_turn_text():
-        return RM_TEST_TURNS[store.rm_test_turn_index][0]
+        return rm_core.TIME_SLOT_LABELS.get(rm_ensure_player().current_time_slot, "")
 
     def rm_test_sync_clock():
-        store.day_count = store.rm_test_day
-        store.current_time_minutes = RM_TEST_TURNS[store.rm_test_turn_index][1]
-        if getattr(store, "rm_player", None) is not None:
-            store.rm_player.day = int(store.rm_test_day)
-            store.rm_player.weekday = 1 + ((int(store.rm_test_day) - 1) % 7)
+        player = rm_ensure_player()
+        rm_core.ensure_second_stage_state(player)
+        if player.current_time_slot is None and store.rm_test_flow_active:
+            # Old test saves only stored a separate seven-round index.
+            rm_core.start_turn(player, rm_core.TIME_SLOTS[min(store.rm_test_turn_index, 8)])
+        store.rm_test_day = player.day
+        store.rm_test_turn_index = player.time_slot_index
+        slot = player.current_time_slot
+        clock_slot = {"breakfast": "morning_1", "lunch": "afternoon_1", "dinner": "evening_1",
+                      "sleep_decision": "evening_2", "night_break_1": "late_night_1",
+                      "night_break_2": "late_night_2", "forced_sleep": "late_night_3",
+                      "wake_check": "morning_1"}.get(slot, slot)
+        if clock_slot in rm_core.TIME_SLOTS:
+            store.current_time_minutes = RM_TEST_TURNS[rm_core.TIME_SLOTS.index(clock_slot)][1]
 
     def rm_test_start_flow():
         store.rm_test_flow_active = True
@@ -33,6 +45,9 @@ init -9 python:
         store.rm_test_turn_index = 0
         store.rm_test_last_result_text = ""
         store.rm_player = rm_core.create_initial_character({"str": 3, "dex": 3, "int": 2}, rng=renpy.random)
+        store.rm_player.day = 101
+        store.rm_player.weekday = 3
+        rm_core.start_day(store.rm_player)
         store.story_hud_status_unlocked = True
         store.story_hud_character_panel_unlocked = True
         rm_test_sync_clock()
@@ -44,11 +59,8 @@ init -9 python:
         return rm_test_pending_card_request(character)
 
     def rm_test_advance_turn(schedule_id=None):
-        if schedule_id == "test_sleep" or store.rm_test_turn_index >= len(RM_TEST_TURNS) - 1:
-            store.rm_test_day += 1
-            store.rm_test_turn_index = 0
-        else:
-            store.rm_test_turn_index += 1
+        if schedule_id != "test_sleep":
+            rm_core.advance_time_slot(rm_ensure_player())
         rm_test_sync_clock()
 
     def rm_test_schedule_names():
@@ -61,23 +73,26 @@ init -9 python:
         }
 
     def rm_test_is_daytime_turn():
-        return store.rm_test_turn_index in (0, 1, 2, 3)
+        return rm_ensure_player().current_time_slot in rm_core.TIME_SLOTS[:4]
 
     def rm_test_is_deep_night_turn():
-        return store.rm_test_turn_index == len(RM_TEST_TURNS) - 1
+        return rm_ensure_player().current_time_slot in rm_core.TIME_SLOTS[6:]
 
     def rm_test_schedule_available(schedule_id):
+        slot = rm_ensure_player().current_time_slot
+        if schedule_id == "test_sleep":
+            return slot in rm_core.SLEEP_DECISIONS + ("forced_sleep",)
+        if slot not in rm_core.TIME_SLOTS:
+            return False
         if schedule_id == "test_rest":
             return not rm_test_is_deep_night_turn()
-        if schedule_id == "test_sleep":
-            return rm_test_is_deep_night_turn()
         return True
 
     def rm_test_schedule_unavailable_text(schedule_id):
         if schedule_id == "test_rest":
             return "休息（测试）只能在深夜以外使用。"
         if schedule_id == "test_sleep":
-            return "睡觉（测试）只能在深夜使用。"
+            return "晚上2结束后或深夜行动间可以睡觉。第三轮深夜结束会强制昏迷。"
         return "当前时间不能使用该日程。"
 
     def rm_test_schedule_uses_check(schedule_id):
@@ -160,6 +175,7 @@ init -9 python:
             requirement,
             dice_ids=selected_ids,
             action_type=rm_core.ACTION_SCHEDULE,
+            is_late_night=rm_test_is_deep_night_turn(),
             big_failure_slack=rm_core.training_fatigue_big_failure_slack(character, schedule_id),
             allowed_dice_attributes=rm_test_allowed_die_attributes(schedule_id),
             required_dice_attributes=rm_test_required_die_attributes(schedule_id),
@@ -203,7 +219,11 @@ init -9 python:
         else:
             raise ValueError("Schedule must use the check flow: {!r}".format(schedule_id))
         events = result.get("events", [])
-        turn = rm_core.end_action_round(character, 0, rng=renpy.random, exact_mood_delta=True)
+        if not result.get("available", False):
+            store.rm_test_last_result_text = "{}无法执行，不消耗行动轮。".format(name)
+            return {"available": False, "events": events}
+        turn = (rm_core.end_action_round(character, 0, rng=renpy.random, exact_mood_delta=True)
+                if schedule_id == "test_rest" else None)
         store.rm_test_last_result_text = "{}完成。{} 本轮事件：{}。".format(
             name,
             rm_test_rest_result_text(schedule_id, result),
@@ -222,7 +242,7 @@ init -9 python:
                 result.get("restored", 0),
             )
         if schedule_id == "test_sleep":
-            return "深夜睡觉，精力恢复至 {}/{}。".format(result.get("energy_after", 0), rm_core.energy_max(rm_ensure_player()))
+            return "睡眠结算，精力恢复至 {}/{}。".format(result.get("energy_after", 0), rm_core.energy_max(rm_ensure_player()))
         return ""
 
     def rm_test_event_text(events):
@@ -231,7 +251,25 @@ init -9 python:
             return "无"
         texts = []
         for event in events:
-            if event == "small_rest":
+            if event == "death":
+                texts.append("生命值归零，角色死亡")
+            elif event.startswith("health_restored:"):
+                texts.append("小休恢复生命 +{}".format(event.split(":", 1)[1]))
+            elif event == "sleep_fatigue_cleared":
+                texts.append("按时睡觉，清除疲劳")
+            elif event == "drowsiness_cleared":
+                texts.append("按时睡觉，清除困意")
+            elif event.startswith("drowsiness_reduced:"):
+                texts.append("困意减少 {} 层".format(event.rsplit(":", 1)[1]))
+            elif event == "deep_fatigue_started":
+                texts.append("近七天内三次获得疲劳，引发深度疲劳")
+            elif event == "deep_fatigue_recovered":
+                texts.append("深度疲劳康复；健康作息重新累计")
+            elif event.startswith("deep_fatigue_permanent_loss:"):
+                texts.append("深度疲劳结算：永久体质 -{}，并结算相应骰子退化".format(event.rsplit(":", 1)[1]))
+            elif event.startswith("deep_fatigue_added:"):
+                texts.append("熬夜加重深度疲劳，现为 {} 层".format(event.rsplit(":", 1)[1]))
+            elif event == "small_rest":
                 texts.append("小休结算")
             elif event == "large_rest":
                 texts.append("大休结算")
@@ -283,9 +321,12 @@ init -9 python:
     def rm_test_finalize_schedule_check(schedule_id, result_dict, character=None):
         character = character or rm_ensure_player()
         result = result_dict.get("_result")
+        if result is None or not result.available:
+            store.rm_test_last_result_text = "检定无法执行，不消耗行动轮。"
+            return {"available": False, "events": []}
         events = rm_test_apply_schedule_effect(schedule_id, result, character)
         mood_delta = 10 if result_dict.get("available") and result_dict.get("success") else -10
-        turn = rm_core.end_action_round(character, mood_delta, rng=renpy.random, exact_mood_delta=True)
+        turn = rm_core.end_action_round(character, mood_delta, rng=renpy.random, exact_mood_delta=True, check=result)
         name = rm_test_schedule_names()[schedule_id]
         event_text = rm_test_event_text(events)
         store.rm_test_last_result_text = "{}完成。{} 本轮事件：{}。".format(
@@ -347,7 +388,7 @@ init -9 python:
         if result is not None:
             rm_core.apply_test_strength_training_result(character, result, rng=renpy.random)
         mood_delta = 10 if result_dict.get("available") and result_dict.get("success") else -10
-        turn = rm_core.end_action_round(character, mood_delta, rng=renpy.random, exact_mood_delta=True)
+        turn = rm_core.end_action_round(character, mood_delta, rng=renpy.random, exact_mood_delta=True, check=result)
         store.rm_test_last_result_text = "{}完成。{} 本轮事件：无。".format(
             rm_test_schedule_names()["test_strength_training"],
             rm_test_check_text(result) if result is not None else "",
@@ -429,16 +470,17 @@ init -9 python:
         character = character or rm_ensure_player()
         attr = request.get("attr")
         dice = list(character.dice_for(attr))
-        if card and card.get("type") in ("clear_negative_enchant", "convert_negative_enchant"):
-            dice = [die for die in dice if die.enchantment in rm_core.NEGATIVE_ENCHANTMENTS]
+        if card:
+            dice = rm_core.growth_reward_dice_candidates(character, attr, card)
         return [rm_core.dice_summary(die) for die in dice]
 
-    def rm_test_pending_face_choices(die_id, character=None):
+    def rm_test_pending_face_choices(die_id, character=None, card=None):
         character = character or rm_ensure_player()
         die = character.find_die(die_id)
         if die is None:
             return []
-        return [{"index": index, "value": value} for index, value in enumerate(die.faces)]
+        return [{"index": index, "value": die.faces[index]}
+                for index in rm_core.growth_reward_face_indices(die, card or {})]
 
     def rm_test_apply_card_selection(card, die_id=None, face_index=None):
         selected = dict(card)
@@ -501,7 +543,7 @@ screen rm_test_schedule_select():
         style "rm_test_schedule_frame"
 
         vbox:
-            spacing 16
+            spacing 21
             xfill True
 
             text "选择日程" style "rm_test_schedule_title_text"
@@ -512,10 +554,11 @@ screen rm_test_schedule_select():
                 sensitive rm_test_schedule_available("test_rest")
                 action Return("test_rest")
 
-            textbutton "睡觉（测试）":
-                style "rm_test_schedule_button"
-                sensitive rm_test_schedule_available("test_sleep")
-                action Return("test_sleep")
+            if rm_test_schedule_available("test_sleep"):
+                textbutton "睡觉（测试）":
+                    style "rm_test_schedule_button"
+                    sensitive rm_test_schedule_available("test_sleep")
+                    action Return("test_sleep")
 
             textbutton "力量训练（测试）":
                 style "rm_test_schedule_button"
@@ -544,14 +587,14 @@ screen rm_test_pending_card_choice(request):
         style "rm_test_schedule_frame"
 
         vbox:
-            spacing 16
+            spacing 21
             xfill True
 
             text "[rm_test_pending_card_title(request)]" style "rm_test_schedule_title_text"
             text "选择一张卡并立即结算。" style "rm_test_schedule_hint_text"
 
             hbox:
-                spacing 18
+                spacing 24
                 xalign 0.5
 
                 for card in request.get("cards", []):
@@ -560,7 +603,7 @@ screen rm_test_pending_card_choice(request):
                         action Return(card)
 
                         vbox:
-                            spacing 12
+                            spacing 16
                             xfill True
                             text "[rm_test_card_label(card)]" style "rm_test_reward_card_title_text"
                             text "[rm_test_card_description(card)]" style "rm_test_reward_card_description_text"
@@ -580,7 +623,7 @@ screen rm_test_pending_die_choice(request, card=None):
         style "rm_test_schedule_frame"
 
         vbox:
-            spacing 16
+            spacing 21
             xfill True
 
             text "选择骰子" style "rm_test_schedule_title_text"
@@ -595,7 +638,7 @@ screen rm_test_pending_die_choice(request, card=None):
         use rm_ui_test_close_button()
 
 
-screen rm_test_pending_face_choice(die_id):
+screen rm_test_pending_face_choice(die_id, card=None):
     modal True
     zorder 217
 
@@ -606,12 +649,12 @@ screen rm_test_pending_face_choice(die_id):
         style "rm_test_schedule_frame"
 
         vbox:
-            spacing 16
+            spacing 21
             xfill True
 
             text "选择面值" style "rm_test_schedule_title_text"
 
-            for face in rm_test_pending_face_choices(die_id):
+            for face in rm_test_pending_face_choices(die_id, card=card):
                 textbutton "第[face['index'] + 1]面：[face['value']]":
                     style "rm_test_schedule_button"
                     action Return(face["index"])
@@ -623,45 +666,45 @@ screen rm_test_pending_face_choice(die_id):
 style rm_test_schedule_frame is frame:
     xalign 0.5
     yalign 0.5
-    xsize 520
+    xsize 693
     background ConditionSwitch("rm_ui_test_skin_active", Frame("gui/ui_test_skin/dice_list.png", 62, 34), "True", "#eee7d8f4")
-    padding (30, 28)
+    padding (40, 37)
 
 style rm_test_schedule_title_text is gui_text:
-    size 34
+    size 45
     bold True
     color "#000000"
 
 style rm_test_schedule_hint_text is gui_text:
-    size 22
+    size 29
     color "#000000"
 
 style rm_test_schedule_button is button:
     xfill True
-    ysize 56
+    ysize 75
     background ConditionSwitch("rm_ui_test_skin_active", Frame("gui/ui_test_skin/option_button.png", 40, 16), "True", "#d9cdbb")
     hover_background ConditionSwitch("rm_ui_test_skin_active", Frame("gui/ui_test_skin/option_button.png", 40, 16), "True", "#eadfcc")
-    padding (18, 0)
+    padding (24, 0)
 
 style rm_test_schedule_button_text is button_text:
-    size 24
+    size 32
     color "#000000"
     hover_color "#000000"
     yalign 0.5
 
 style rm_test_reward_card_button is button:
-    xsize 300
-    ysize 260
+    xsize 400
+    ysize 347
     background ConditionSwitch("rm_ui_test_skin_active", Frame("gui/ui_test_skin/dice_card.png", 34, 34), "True", "#f7f0e4")
     hover_background ConditionSwitch("rm_ui_test_skin_active", Frame("gui/ui_test_skin/dice_card.png", 34, 34), "True", "#fff2d8")
-    padding (20, 18)
+    padding (27, 24)
 
 style rm_test_reward_card_title_text is gui_text:
-    size 26
+    size 35
     bold True
     color "#000000"
 
 style rm_test_reward_card_description_text is gui_text:
-    size 20
+    size 27
     color "#000000"
-    line_spacing 4
+    line_spacing 5

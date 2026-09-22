@@ -6,8 +6,8 @@ define opening_color_border = "#5b8db8"
 define opening_color_border_dark = "#315f88"
 define opening_color_paper = "#e7e4d9"
 define opening_color_phosphor = "#a8c7aa"
-define opening_scope_wave_span = 476
-define opening_document_font = FontGroup().add("DejaVuSans.ttf", 0x2588, 0x2588).add("SourceHanSansLite.ttf", None, None)
+define opening_scope_wave_span = 635
+define opening_document_font = rememorial_ui_font
 
 
 init python:
@@ -83,7 +83,7 @@ screen opening_system_desktop(body_screen, body_args=None):
             style "opening_shell_ghost_window_frame"
 
             vbox:
-                spacing 10
+                spacing 13
                 xfill True
                 yfill True
 
@@ -101,7 +101,7 @@ screen opening_system_desktop(body_screen, body_args=None):
         frame:
             style "opening_shell_taskbar_frame"
 
-            add Solid("#a8bfd0") xpos 0 ypos 0 xsize config.screen_width ysize 2
+            add Solid("#a8bfd0") xpos 0 ypos 0 xsize config.screen_width ysize 3
 
             frame:
                 style "opening_shell_taskbar_content_frame"
@@ -109,13 +109,13 @@ screen opening_system_desktop(body_screen, body_args=None):
                 hbox:
                     xfill True
                     yfill True
-                    spacing 14
+                    spacing 19
 
                     frame:
                         style "opening_shell_taskbar_start_frame"
 
                         hbox:
-                            spacing 8
+                            spacing 11
                             xalign 0.5
                             yalign 0.5
 
@@ -160,7 +160,7 @@ screen opening_window_frame(title, body_screen, body_args=None):
                         yalign 0.5
 
                         hbox:
-                            spacing 10
+                            spacing 13
                             yalign 0.5
 
                             text title style "opening_shell_title_text"
@@ -169,7 +169,7 @@ screen opening_window_frame(title, body_screen, body_args=None):
                         null width 0 xfill True
 
                         hbox:
-                            spacing 4
+                            spacing 5
                             yalign 0.5
 
                             frame:
@@ -188,7 +188,7 @@ screen opening_window_frame(title, body_screen, body_args=None):
                     style "opening_shell_menu_bar_frame"
 
                     hbox:
-                        spacing 26
+                        spacing 35
                         yalign 0.5
 
                         text "文件" style "opening_shell_menu_text"
@@ -207,16 +207,16 @@ screen opening_scope_wave_segment(segment_x):
     fixed:
         xpos segment_x
         xsize opening_scope_wave_span
-        ysize 102
+        ysize 136
 
-        for beat_x in range(0, opening_scope_wave_span, 68):
-            add Solid(opening_color_phosphor + "b0") xpos beat_x ypos 62 xsize 28 ysize 2
-            add Solid(opening_color_phosphor + "b0") xpos beat_x + 28 ypos 58 xsize 2 ysize 6
-            add Solid(opening_color_phosphor + "b0") xpos beat_x + 30 ypos 58 xsize 8 ysize 2
-            add Solid(opening_color_phosphor + "b0") xpos beat_x + 38 ypos 22 xsize 2 ysize 38
-            add Solid(opening_color_phosphor + "b0") xpos beat_x + 40 ypos 22 xsize 3 ysize 2
-            add Solid(opening_color_phosphor + "b0") xpos beat_x + 43 ypos 22 xsize 2 ysize 42
-            add Solid(opening_color_phosphor + "b0") xpos beat_x + 45 ypos 62 xsize 23 ysize 2
+        for beat_x in range(0, opening_scope_wave_span, 91):
+            add Solid(opening_color_phosphor + "b0") xpos beat_x ypos 83 xsize 37 ysize 3
+            add Solid(opening_color_phosphor + "b0") xpos beat_x + 37 ypos 77 xsize 3 ysize 8
+            add Solid(opening_color_phosphor + "b0") xpos beat_x + 40 ypos 77 xsize 11 ysize 3
+            add Solid(opening_color_phosphor + "b0") xpos beat_x + 51 ypos 29 xsize 3 ysize 51
+            add Solid(opening_color_phosphor + "b0") xpos beat_x + 53 ypos 29 xsize 4 ysize 3
+            add Solid(opening_color_phosphor + "b0") xpos beat_x + 57 ypos 29 xsize 3 ysize 56
+            add Solid(opening_color_phosphor + "b0") xpos beat_x + 60 ypos 83 xsize 31 ysize 3
 
 
 screen opening_oscilloscope():
@@ -228,65 +228,39 @@ screen opening_oscilloscope():
             yfill True
             clipping True
 
-            text "BIO-SIGNAL MONITOR" style "opening_shell_scope_title_text" xpos 18 ypos 14
+            text "BIO-SIGNAL MONITOR" style "opening_shell_scope_title_text" xpos 24 ypos 19
 
-            for x in range(18, 472, 32):
-                add Solid(opening_color_phosphor + "24") xpos x ypos 54 xsize 1 ysize 180
+            for x in range(24, 629, 43):
+                add Solid(opening_color_phosphor + "24") xpos x ypos 72 xsize 1 ysize 240
 
-            for y in range(54, 235, 24):
-                add Solid(opening_color_phosphor + "20") xpos 18 ypos y xsize 450 ysize 1
+            for y in range(72, 313, 32):
+                add Solid(opening_color_phosphor + "20") xpos 24 ypos y xsize 600 ysize 1
 
             viewport:
-                xpos 18
-                ypos 70
-                xsize 450
-                ysize 102
+                xpos 24
+                ypos 93
+                xsize 600
+                ysize 136
                 draggable False
                 mousewheel False
                 clipping True
 
                 fixed:
                     xsize opening_scope_wave_span * 2
-                    ysize 102
+                    ysize 136
                     at opening_scope_scroll
 
                     use opening_scope_wave_segment(0)
                     use opening_scope_wave_segment(opening_scope_wave_span)
 
             hbox:
-                xpos 18
-                ypos 198
-                spacing 26
+                xpos 24
+                ypos 264
+                spacing 35
 
                 text "HR  72" style "opening_shell_scope_metric_text"
                 text "SpO2  98%" style "opening_shell_scope_metric_text"
                 text "GAIN  x1" style "opening_shell_scope_metric_text"
-
-
-screen opening_shell_preview_body():
-    hbox:
-        xfill True
-        yfill True
-        spacing 24
-
-        frame:
-            style "opening_shell_preview_paper_frame"
-
-            vbox:
-                spacing 16
-                xfill True
-                yfill True
-
-                text "电休克治疗知情同意确认书" style "opening_shell_preview_heading_text"
-                text "患者姓名：弗洛" style "opening_shell_preview_body_text"
-                text "档案号：INTERVIEW_RECORD_04" style "opening_shell_preview_body_text"
-                text "病历正文占位。后续任务可在此区域接入左侧约 68% 的病历、表单或访谈内容。" style "opening_shell_preview_body_text"
-                text "该纸张区域保持旧纸色、硬边裁切和轻微像素感，不越出主窗口正文边界。" style "opening_shell_preview_body_text"
-
-        frame:
-            style "opening_shell_preview_scope_frame"
-
-            use opening_oscilloscope
 
 
 style opening_shell_desktop_frame is frame:
@@ -296,29 +270,29 @@ style opening_shell_desktop_frame is frame:
     padding (0, 0)
 
 style opening_shell_ghost_window_frame is frame:
-    xpos 1440
-    ypos 78
-    xsize 360
-    ysize 212
+    xpos 1920
+    ypos 104
+    xsize 480
+    ysize 283
     background Solid(opening_color_desktop_dark + "d8")
-    padding (18, 16, 18, 16)
+    padding (24, 21, 24, 21)
 
 style opening_shell_ghost_title_text is gui_text:
-    size 23
+    size 31
     color opening_color_paper + "88"
     bold True
 
 style opening_shell_ghost_body_text is gui_text:
-    size 18
+    size 24
     color opening_color_paper + "68"
 
 style opening_shell_window_outer_frame is frame:
-    xpos 135
-    ypos 95
-    xsize 1590
-    ysize 780
+    xpos 180
+    ypos 127
+    xsize 2120
+    ysize 1040
     background Solid(opening_color_border_dark)
-    padding (4, 4, 4, 4)
+    padding (5, 5, 5, 5)
 
 style opening_shell_window_inner_frame is frame:
     xfill True
@@ -328,33 +302,33 @@ style opening_shell_window_inner_frame is frame:
 
 style opening_shell_title_bar_frame is frame:
     xfill True
-    ysize 38
+    ysize 51
     background Solid(opening_color_border)
-    padding (14, 6, 14, 6)
+    padding (19, 8, 19, 8)
 
 style opening_shell_title_text is gui_text:
-    size 22
+    size 29
     color "#f2f7fb"
     bold True
 
 style opening_shell_title_meta_text is gui_text:
-    size 16
+    size 21
     color "#dbe8f3"
 
 style opening_shell_window_control_frame is frame:
-    xsize 30
-    ysize 20
+    xsize 40
+    ysize 27
     background Solid("#85a7c5")
     padding (0, 0)
 
 style opening_shell_window_close_frame is frame:
-    xsize 30
-    ysize 20
+    xsize 40
+    ysize 27
     background Solid("#b5707c")
     padding (0, 0)
 
 style opening_shell_window_control_text is gui_text:
-    size 17
+    size 23
     bold True
     color "#f7fbff"
     xalign 0.5
@@ -362,42 +336,20 @@ style opening_shell_window_control_text is gui_text:
 
 style opening_shell_menu_bar_frame is frame:
     xfill True
-    ysize 26
+    ysize 35
     background Solid("#edf2f5")
-    padding (14, 3, 14, 3)
+    padding (19, 4, 19, 4)
 
 style opening_shell_menu_text is gui_text:
-    size 17
+    size 23
     color "#435765"
 
 style opening_shell_window_body_frame is frame:
     xfill True
     yfill True
     background Solid("#c5cbc7")
-    padding (18, 18, 18, 18)
+    padding (24, 24, 24, 24)
     clipping True
-
-style opening_shell_preview_paper_frame is frame:
-    xsize 1030
-    yfill True
-    background Solid(opening_color_paper)
-    padding (34, 30, 34, 30)
-
-style opening_shell_preview_scope_frame is frame:
-    xfill True
-    yfill True
-    background Solid("#5f6f68")
-    padding (12, 12, 12, 12)
-
-style opening_shell_preview_heading_text is gui_text:
-    size 31
-    color "#415248"
-    bold True
-
-style opening_shell_preview_body_text is gui_text:
-    size 22
-    color "#4d5a52"
-    line_spacing 5
 
 style opening_shell_scope_panel_frame is frame:
     xfill True
@@ -406,19 +358,19 @@ style opening_shell_scope_panel_frame is frame:
     padding (0, 0)
 
 style opening_shell_scope_title_text is gui_text:
-    size 20
+    size 27
     color opening_color_phosphor + "cc"
     bold True
 
 style opening_shell_scope_metric_text is gui_text:
-    size 18
+    size 24
     color opening_color_phosphor + "b4"
 
 style opening_shell_taskbar_frame is frame:
     xpos 0
-    ypos 1036
-    xsize 1920
-    ysize 44
+    ypos 1381
+    xsize 2560
+    ysize 59
     background Solid("#273138")
     padding (0, 0)
 
@@ -426,39 +378,39 @@ style opening_shell_taskbar_content_frame is frame:
     xfill True
     yfill True
     background None
-    padding (14, 6, 14, 6)
+    padding (19, 8, 19, 8)
 
 style opening_shell_taskbar_start_frame is frame:
-    xsize 88
-    ysize 28
+    xsize 117
+    ysize 37
     background Solid("#405560")
-    padding (10, 4, 10, 4)
+    padding (13, 5, 13, 5)
 
 style opening_shell_taskbar_start_icon_text is gui_text:
-    size 20
+    size 27
     bold True
     color "#d8e7f3"
 
 style opening_shell_taskbar_start_text is gui_text:
-    size 17
+    size 23
     color "#edf4f8"
 
 style opening_shell_taskbar_program_frame is frame:
-    xsize 228
-    ysize 28
+    xsize 304
+    ysize 37
     background Solid("#39434b")
-    padding (12, 4, 12, 4)
+    padding (16, 5, 16, 5)
 
 style opening_shell_taskbar_program_text is gui_text:
-    size 17
+    size 23
     color "#dde8ee"
 
 style opening_shell_taskbar_status_text is gui_text:
-    size 11
+    size 15
     color "#b8c7d2"
 
 style opening_shell_taskbar_time_text is gui_text:
-    size 14
+    size 19
     color "#e7eff5"
 
 
@@ -480,21 +432,11 @@ transform opening_loading_soft_pulse(delay=0.0):
 
 transform opening_drop_fall:
     xalign 0.5
-    ypos -72
+    ypos -96
     alpha 0.0
     linear 0.08 alpha 1.0
-    linear 0.48 ypos 484
+    linear 0.48 ypos 645
     linear 0.06 alpha 0.0
-
-
-transform opening_ripple_expand:
-    xalign 0.5
-    ypos 474
-    alpha 0.0
-    zoom 0.18
-    pause 0.46
-    linear 0.06 alpha 0.82 zoom 0.34
-    linear 0.42 alpha 0.0 zoom 2.15
 
 
 screen opening_disclaimer_one():
@@ -502,11 +444,31 @@ screen opening_disclaimer_one():
 
     add Solid("#000000")
 
-    text (
-        "【免责声明】\n\n"
-        "本作品为虚构故事。作品中的人物、团体、事件、医疗与心理描写均经过艺术加工；若与现实相似，均属巧合。\n\n"
-        "本作品涉及精神疾病、创伤记忆、失忆、血腥暴力、自伤意念、死亡及其他可能引起不适的内容。相关描写不构成医学、心理、法律或其他专业建议，也不应在现实中模仿或尝试。"
-    ) style "opening_disclaimer_text"
+    vbox:
+        xalign 0.5
+        yalign 0.5
+        xsize 1840
+        spacing 56
+
+        text (
+            "【免责声明】\n\n"
+            "本作品为虚构故事。作品中的人物、团体、事件、医疗与心理描写均经过艺术加工；若与现实相似，均属巧合。\n\n"
+            "本作品涉及精神疾病、创伤记忆、失忆、血腥暴力、自伤意念、死亡及其他可能引起不适的内容。相关描写不构成医学、心理、法律或其他专业建议，也不应在现实中模仿或尝试。\n\n"
+            "本作品包含闪烁画面、快速转场、画面抖动、强对比图像等视觉刺激。若您曾有癫痫、晕厥、光敏反应或相关病史，请在游玩前咨询专业医师。游玩中如出现头晕、恶心、视物异常、抽搐、意识模糊或其他不适，请立即停止游玩并寻求帮助。\n\n"
+            "继续游玩即表示您已阅读并理解以上内容。"
+        ) style "opening_disclaimer_text"
+
+        hbox:
+            xalign 0.5
+            spacing 37
+
+            textbutton "是":
+                style "opening_disclaimer_button"
+                action Return(True)
+
+            textbutton "否":
+                style "opening_disclaimer_button"
+                action [SetVariable("opening_active", False), MainMenu(confirm=False)]
 
 
 screen opening_disclaimer_two():
@@ -517,8 +479,8 @@ screen opening_disclaimer_two():
     vbox:
         xalign 0.5
         yalign 0.5
-        xsize 1320
-        spacing 42
+        xsize 1760
+        spacing 56
 
         text (
             "本作品包含闪烁画面、快速转场、画面抖动、强对比图像等视觉刺激。若您曾有癫痫、晕厥、光敏反应或相关病史，请在游玩前咨询专业医师。游玩中如出现头晕、恶心、视物异常、抽搐、意识模糊或其他不适，请立即停止游玩并寻求帮助。\n\n"
@@ -527,7 +489,7 @@ screen opening_disclaimer_two():
 
         hbox:
             xalign 0.5
-            spacing 28
+            spacing 37
 
             textbutton "是":
                 style "opening_disclaimer_button"
@@ -581,9 +543,6 @@ screen opening_water_drop(auto=True):
     text "●" at opening_drop_fall:
         style "opening_water_drop_text"
 
-    text "○" at opening_ripple_expand:
-        style "opening_water_ripple_text"
-
 
 screen opening_flash_once():
     zorder 120
@@ -598,8 +557,8 @@ screen opening_memory_overlay(lines):
     vbox:
         xalign 0.5
         yalign 0.5
-        xsize 1280
-        spacing 18
+        xsize 1707
+        spacing 24
 
         for line in lines:
             text line style "opening_memory_text"
@@ -609,7 +568,7 @@ screen opening_loading_body():
     hbox:
         xfill True
         yfill True
-        spacing 24
+        spacing 32
 
         frame:
             style "opening_loading_panel_frame"
@@ -617,7 +576,7 @@ screen opening_loading_body():
             vbox:
                 xfill True
                 yfill True
-                spacing 20
+                spacing 27
 
                 text "SYSTEM INITIAL LOAD" style "opening_loading_heading_text"
 
@@ -626,7 +585,7 @@ screen opening_loading_body():
                 text "正在加载记忆缓冲区……" style "opening_loading_body_text"
 
                 hbox:
-                    spacing 10
+                    spacing 13
 
                     text "■" at opening_loading_soft_pulse(0.00):
                         style "opening_loading_indicator_text"
@@ -646,7 +605,7 @@ screen opening_records_body(progress, status_text):
     hbox:
         xfill True
         yfill True
-        spacing 24
+        spacing 32
 
         frame:
             style "opening_records_panel_frame"
@@ -657,13 +616,13 @@ screen opening_records_body(progress, status_text):
 
                 frame:
                     style "opening_records_back_page_frame"
-                    xpos 52
-                    ypos 38
+                    xpos 69
+                    ypos 51
 
                 frame:
                     style "opening_records_back_page_frame"
-                    xpos 26
-                    ypos 19
+                    xpos 35
+                    ypos 25
 
                 frame:
                     style "opening_records_front_page_frame"
@@ -671,7 +630,7 @@ screen opening_records_body(progress, status_text):
                     vbox:
                         xfill True
                         yfill True
-                        spacing 18
+                        spacing 24
 
                         text "病历 / 访谈 / 诊断记录" style "opening_records_heading_text"
                         text "CASE FILE  ████████" style "opening_records_meta_text"
@@ -692,7 +651,7 @@ screen opening_notice_body(message):
     hbox:
         xfill True
         yfill True
-        spacing 24
+        spacing 32
 
         frame:
             style "opening_notice_panel_frame"
@@ -700,10 +659,10 @@ screen opening_notice_body(message):
             vbox:
                 xfill True
                 yfill True
-                spacing 24
+                spacing 32
 
                 text "SYSTEM NOTICE" style "opening_notice_meta_text"
-                add Solid(opening_color_border_dark) xsize 760 ysize 4
+                add Solid(opening_color_border_dark) xsize 1013 ysize 5
                 text message style "opening_notice_message_text"
                 null height 0 yfill True
                 text "市立精神卫生中心 / SERVICE TERMINAL" style "opening_notice_footer_text"
@@ -715,7 +674,7 @@ screen opening_verification_body(status_text, progress):
     hbox:
         xfill True
         yfill True
-        spacing 24
+        spacing 32
 
         frame:
             style "opening_verification_panel_frame"
@@ -723,10 +682,10 @@ screen opening_verification_body(status_text, progress):
             vbox:
                 xfill True
                 yfill True
-                spacing 24
+                spacing 32
 
                 text "SYSTEM VERIFICATION" style "opening_verification_meta_text"
-                add Solid(opening_color_border_dark) xsize 760 ysize 4
+                add Solid(opening_color_border_dark) xsize 1013 ysize 5
 
                 null height 0 yfill True
 
@@ -749,7 +708,7 @@ screen opening_countdown(number):
     text "[number]":
         xalign 0.5
         yalign 0.5
-        size 144
+        size 192
         color "#ffffff"
         bold True
 
@@ -758,7 +717,7 @@ screen opening_consent_body():
     hbox:
         xfill True
         yfill True
-        spacing 24
+        spacing 32
 
         frame:
             style "opening_consent_preview_frame"
@@ -766,11 +725,11 @@ screen opening_consent_body():
             vbox:
                 xfill True
                 yfill True
-                spacing 14
+                spacing 19
 
                 text "市立精神卫生中心" style "opening_consent_center_text"
                 text "特殊治疗知情同意书" style "opening_consent_title_text"
-                add Solid("#627168") xsize 850 ysize 2 xalign 0.5
+                add Solid("#627168") xsize 1133 ysize 3 xalign 0.5
                 text "姓名：弗洛　性别：男　年龄：24" style "opening_consent_preview_text"
                 text "病历号：████████" style "opening_consent_preview_text"
                 text "患者已知悉并理解以上信息。" style "opening_consent_note_text"
@@ -781,7 +740,7 @@ screen opening_consent_body():
             style "opening_consent_side_frame"
 
             vbox:
-                spacing 20
+                spacing 27
                 xfill True
 
                 text "DOCUMENT STATUS" style "opening_notice_meta_text"
@@ -803,19 +762,19 @@ screen opening_consent_document():
         vbox:
             xfill True
             yfill True
-            spacing 12
+            spacing 16
 
             viewport:
                 xfill True
-                ysize 572
+                ysize 763
                 yadjustment consent_adjustment
                 mousewheel True
                 draggable True
                 scrollbars "vertical"
 
                 vbox:
-                    xsize 1400
-                    spacing 14
+                    xsize 1867
+                    spacing 19
 
                     text "市立精神卫生中心" style "opening_consent_center_text"
                     text "特殊治疗知情同意书" style "opening_consent_title_text"
@@ -845,7 +804,7 @@ screen opening_consent_document():
                     text "上述信息一经签署，将作为本次治疗及后续系统评估的依据。如有遗漏、错误或隐瞒，患者及家属/监护人已知悉可能产生相应风险。" style "opening_consent_document_text"
                     text "姓名：弗洛；性别：男；年龄：24；ID：██████████████████" style "opening_consent_document_text"
                     text "初始属性（剩余可分配点数：x）" style "opening_consent_document_text"
-                    text "力量 敏捷 体质 智力 意志" style "opening_consent_document_text"
+                    text "力量 灵巧 体质 智识 意志" style "opening_consent_document_text"
                     text "患者已知悉并理解以上信息。" style "opening_consent_note_text"
                     text "请核对个人信息。" style "opening_consent_note_text"
 
@@ -865,7 +824,7 @@ screen opening_identity_preview_body():
     hbox:
         xfill True
         yfill True
-        spacing 24
+        spacing 32
 
         frame:
             style "opening_identity_preview_frame"
@@ -873,25 +832,25 @@ screen opening_identity_preview_body():
             vbox:
                 xfill True
                 yfill True
-                spacing 18
+                spacing 24
 
                 text "个人信息核对" style "opening_consent_title_text"
-                add Solid("#627168") xsize 850 ysize 2 xalign 0.5
+                add Solid("#627168") xsize 1133 ysize 3 xalign 0.5
                 text "姓名：弗洛" style "opening_identity_field_text"
                 text "性别：男" style "opening_identity_field_text"
                 text "年龄：24" style "opening_identity_field_text"
                 text "ID：████████" style "opening_identity_field_text"
 
                 hbox:
-                    spacing 18
+                    spacing 24
                     text "治疗日期：" style "opening_identity_field_text" yalign 0.5
                     frame:
                         background Solid("#526158")
-                        padding (3, 3, 3, 3)
+                        padding (4, 4, 4, 4)
 
                         frame:
-                            xsize 170
-                            ysize 42
+                            xsize 227
+                            ysize 56
                             background Solid(opening_color_paper)
                             padding (0, 0, 0, 0)
 
@@ -902,7 +861,7 @@ screen opening_identity_preview_body():
             style "opening_consent_side_frame"
 
             vbox:
-                spacing 20
+                spacing 27
                 xfill True
 
                 text "IDENTITY VERIFICATION" style "opening_notice_meta_text"
@@ -929,7 +888,7 @@ screen opening_name_insert():
     text "弗洛":
         xalign 0.5
         yalign 0.5
-        size 58
+        size 77
         color "#ffffff"
 
 
@@ -950,10 +909,10 @@ screen opening_date_insert():
     frame:
         xalign 0.5
         yalign 0.5
-        xsize 150
-        ysize 150
+        xsize 200
+        ysize 200
         background Solid("#ffffff")
-        padding (5, 5, 5, 5)
+        padding (7, 7, 7, 7)
 
         frame:
             xfill True
@@ -969,7 +928,7 @@ screen opening_stat_row(label_text, stat_name, value, locked=False):
         hbox:
             xfill True
             yalign 0.5
-            spacing 16
+            spacing 21
 
             text label_text style "opening_stat_label_text"
             text "[value]" style "opening_stat_value_text"
@@ -993,29 +952,29 @@ screen opening_identity_body(signature_hovered, signature_progress):
     hbox:
         xfill True
         yfill True
-        spacing 30
+        spacing 40
 
         vbox:
-            xsize 610
-            spacing 15
+            xsize 813
+            spacing 20
 
             text "个人信息核对" style "opening_consent_title_text"
-            add Solid("#627168") xsize 600 ysize 2 xalign 0.5
+            add Solid("#627168") xsize 800 ysize 3 xalign 0.5
             text "姓名：弗洛" style "opening_identity_field_text"
             text "性别：男" style "opening_identity_field_text"
             text "年龄：24" style "opening_identity_field_text"
             text "ID：████████" style "opening_identity_field_text"
 
             hbox:
-                spacing 18
+                spacing 24
                 text "治疗日期：" style "opening_identity_field_text" yalign 0.5
                 frame:
                     background Solid("#526158")
-                    padding (3, 3, 3, 3)
+                    padding (4, 4, 4, 4)
 
                     frame:
-                        xsize 170
-                        ysize 42
+                        xsize 227
+                        ysize 56
                         background Solid(opening_color_paper)
                         padding (0, 0, 0, 0)
 
@@ -1025,14 +984,14 @@ screen opening_identity_body(signature_hovered, signature_progress):
         vbox:
             xfill True
             yfill True
-            spacing 9
+            spacing 12
 
             text "初始属性" style "opening_consent_section_text"
-            use opening_stat_row("体质", "con", stat_con, locked=True)
-            use opening_stat_row("力量", "str", stat_str)
-            use opening_stat_row("敏捷", "dex", stat_dex)
-            use opening_stat_row("智力", "int", stat_int)
-            use opening_stat_row("意志", "pow", stat_pow)
+            use opening_stat_row("体质", "con", rm_opening_attribute_value("con"), locked=True)
+            use opening_stat_row("力量", "str", rm_opening_attribute_value("str"))
+            use opening_stat_row("灵巧", "dex", rm_opening_attribute_value("dex"))
+            use opening_stat_row("智识", "int", rm_opening_attribute_value("int"))
+            use opening_stat_row("意志", "pow", rm_opening_attribute_value("pow"), locked=True)
             text "剩余可分配点数：[opening_stat_points_remaining()]" style "opening_identity_remaining_text"
 
             frame:
@@ -1047,11 +1006,11 @@ screen opening_identity_body(signature_hovered, signature_progress):
                         xfill True
                         yfill True
                         background None
-                        padding (22, 15, 22, 15)
+                        padding (29, 20, 29, 20)
 
                         vbox:
                             xfill True
-                            spacing 8
+                            spacing 11
 
                             if opening_stats_complete():
                                 text "按住确认 1.5 秒完成签名" style "opening_signature_text"
@@ -1142,24 +1101,23 @@ screen opening_identity_document():
 
 
 style opening_disclaimer_text is gui_text:
-    xalign 0.5
-    yalign 0.5
-    text_align 0.5
-    size 30
+    xalign 0.0
+    text_align 0.0
+    size 40
     color "#f2f2f2"
-    line_spacing 10
-    xsize 1380
-    outlines [(2, "#000000", 0, 0)]
+    line_spacing 13
+    xfill True
+    outlines [(3, "#000000", 0, 0)]
 
 style opening_disclaimer_button is button:
     background Solid("#1f1f1f")
     hover_background Solid("#343434")
-    xminimum 180
-    yminimum 62
-    padding (24, 12, 24, 12)
+    xminimum 240
+    yminimum 83
+    padding (32, 16, 32, 16)
 
 style opening_disclaimer_button_text is gui_text:
-    size 28
+    size 37
     color "#f8f8f8"
     xalign 0.5
     yalign 0.5
@@ -1174,143 +1132,139 @@ style opening_clear_fullscreen_button is button:
 style opening_tap_prompt_text is gui_text:
     xalign 0.5
     yalign 0.5
-    size 54
+    size 72
     color "#f3f3f3"
     bold True
-    kerning 8
-    outlines [(3, "#000000", 0, 0)]
+    kerning 11
+    outlines [(4, "#000000", 0, 0)]
 
 style opening_water_drop_text is gui_text:
-    size 48
-    color "#f1f1f1"
-    outlines [(2, "#000000", 0, 0)]
-
-style opening_water_ripple_text is gui_text:
     size 64
-    color "#d7d7d7"
-    outlines [(2, "#000000", 0, 0)]
+    color "#f1f1f1"
+    outlines [(3, "#000000", 0, 0)]
 
-# SourceHanSansLite does not include 楷体, so this uses italic + wider kerning
+# The project layered Ming font does not include a true handwritten style, so this
+# uses italic + wider kerning and a softened gray-white color.
 # and a softened gray-white color to approximate a drifting memory script.
 style opening_memory_text is gui_text:
-    size 33
+    size 44
     color "#d8d2ca"
     italic True
-    kerning 2
+    kerning 3
     text_align 0.5
     xalign 0.5
-    outlines [(2, "#00000060", 0, 0)]
+    outlines [(3, "#00000060", 0, 0)]
 
 style opening_loading_panel_frame is frame:
-    xsize 910
+    xsize 1213
     yfill True
     background Solid("#d8ddd8")
-    padding (34, 30, 34, 30)
+    padding (45, 40, 45, 40)
 
 style opening_loading_heading_text is gui_text:
-    size 34
+    size 45
     color "#5c6261"
     bold True
-    kerning 2
+    kerning 3
 
 style opening_loading_body_text is gui_text:
-    size 24
+    size 32
     color "#666d6a"
-    line_spacing 4
+    line_spacing 5
 
 style opening_loading_indicator_text is gui_text:
-    size 30
+    size 40
     color "#909694"
 
 style opening_loading_status_text is gui_text:
-    size 21
+    size 28
     color "#7c8380"
-    kerning 2
+    kerning 3
 
 style opening_records_panel_frame is frame:
-    xsize 910
+    xsize 1213
     yfill True
     background Solid("#b8c1bb")
-    padding (20, 20, 20, 20)
+    padding (27, 27, 27, 27)
 
 style opening_records_back_page_frame is frame:
-    xsize 790
-    ysize 570
+    xsize 1053
+    ysize 760
     background Solid("#c9c8bb")
     padding (0, 0)
 
 style opening_records_front_page_frame is frame:
-    xsize 790
-    ysize 570
+    xsize 1053
+    ysize 760
     background Solid(opening_color_paper)
-    padding (32, 28, 32, 28)
+    padding (43, 37, 43, 37)
 
 style opening_records_heading_text is gui_text:
-    size 31
+    size 41
     color "#46564d"
     bold True
 
 style opening_records_meta_text is gui_text:
     font opening_document_font
-    size 18
+    size 24
     color "#7a817c"
     kerning 1
 
 style opening_records_line_text is gui_text:
-    size 24
+    size 32
     color "#56635b"
 
 style opening_records_status_text is gui_text:
-    size 25
+    size 33
     color "#3f6552"
     bold True
 
 style opening_records_progress_bar is bar:
-    xsize 710
-    ysize 26
+    xsize 947
+    ysize 35
     left_bar Solid("#729b83")
     right_bar Solid("#b9c1bb")
 
 style opening_records_percent_text is gui_text:
-    size 18
+    size 24
     color "#65736a"
     xalign 1.0
 
 style opening_notice_panel_frame is frame:
-    xsize 910
+    xsize 1213
     yfill True
     background Solid("#d7ddd8")
-    padding (44, 40, 44, 40)
+    padding (59, 53, 59, 53)
 
 style opening_notice_meta_text is gui_text:
-    size 19
+    size 25
     color "#6f7c75"
     bold True
-    kerning 2
+    kerning 3
 
 style opening_notice_message_text is gui_text:
-    size 34
+    size 45
     color "#40574b"
-    line_spacing 8
+    line_spacing 11
 
 style opening_notice_footer_text is gui_text:
-    size 16
+    size 21
     color "#7b8580"
 
 style opening_verification_panel_frame is frame:
-    xsize 910
+    xsize 1213
     yfill True
     background Solid("#d7ddd8")
-    padding (44, 40, 44, 40)
+    padding (59, 53, 59, 53)
 
 style opening_verification_meta_text is gui_text:
-    size 19
+    size 25
     color "#6f7c75"
     bold True
-    kerning 2
+    kerning 3
 
 style opening_verification_status_text is gui_text:
-    size 38
+    size 51
     color "#40574b"
     bold True
     xalign 0.5
@@ -1318,58 +1272,58 @@ style opening_verification_status_text is gui_text:
 
 style opening_verification_progress_bar is bar:
     xfill True
-    ysize 34
+    ysize 45
     left_bar Solid("#729b83")
     right_bar Solid("#b9c1bb")
 
 style opening_verification_percent_text is gui_text:
-    size 22
+    size 29
     color "#65736a"
     xalign 1.0
 
 style opening_verification_footer_text is gui_text:
-    size 16
+    size 21
     color "#7b8580"
     kerning 1
 
 style opening_consent_preview_frame is frame:
-    xsize 1030
+    xsize 1373
     yfill True
     background Solid(opening_color_paper)
-    padding (42, 30, 42, 30)
+    padding (56, 40, 56, 40)
 
 style opening_consent_side_frame is frame:
     xfill True
     yfill True
     background Solid("#5f6f68")
-    padding (20, 20, 20, 20)
+    padding (27, 27, 27, 27)
 
 style opening_consent_side_text is gui_text:
-    size 20
+    size 27
     color "#c3d1c6"
 
 style opening_consent_dialog_frame is frame:
-    xpos 153
-    ypos 178
-    xsize 1554
-    ysize 680
+    xpos 204
+    ypos 237
+    xsize 2072
+    ysize 907
     background Solid(opening_color_paper)
-    padding (34, 24, 34, 24)
+    padding (45, 32, 45, 32)
 
 style opening_consent_vscrollbar is vscrollbar:
-    xsize 18
+    xsize 24
     base_bar Solid("#4d5a52")
     thumb Solid("#617e6d")
 
 style opening_consent_center_text is gui_text:
-    size 23
+    size 31
     color "#45564d"
     bold True
     xalign 0.5
     text_align 0.5
 
 style opening_consent_title_text is gui_text:
-    size 34
+    size 45
     color "#34483d"
     bold True
     xalign 0.5
@@ -1377,125 +1331,125 @@ style opening_consent_title_text is gui_text:
 
 style opening_consent_preview_text is gui_text:
     font opening_document_font
-    size 22
+    size 29
     color "#4f5c54"
 
 style opening_consent_section_text is gui_text:
-    size 25
+    size 33
     color "#3d5046"
     bold True
-    top_margin 8
+    top_margin 11
 
 style opening_consent_document_text is gui_text:
     font opening_document_font
-    size 20
+    size 27
     color "#4a564f"
-    line_spacing 5
-    xsize 1360
+    line_spacing 7
+    xsize 1813
 
 style opening_consent_note_text is gui_text:
-    size 19
+    size 25
     color "#667c70"
     italic True
 
 style opening_consent_next_button is button:
     xalign 1.0
-    xminimum 180
-    yminimum 48
+    xminimum 240
+    yminimum 64
     background Solid("#617e6d")
     hover_background Solid("#769682")
     insensitive_background Solid("#a8aea9")
-    padding (24, 9, 24, 9)
+    padding (32, 12, 32, 12)
 
 style opening_consent_next_button_text is gui_text:
-    size 23
+    size 31
     color "#f4f2e8"
     insensitive_color "#d8d8d1"
     xalign 0.5
     yalign 0.5
 
 style opening_identity_preview_frame is frame:
-    xsize 1030
+    xsize 1373
     yfill True
     background Solid(opening_color_paper)
-    padding (42, 30, 42, 30)
+    padding (56, 40, 56, 40)
 
 style opening_identity_document_frame is frame:
-    xpos 153
-    ypos 178
-    xsize 1554
-    ysize 680
+    xpos 204
+    ypos 237
+    xsize 2072
+    ysize 907
     background Solid(opening_color_paper)
-    padding (38, 30, 38, 30)
+    padding (51, 40, 51, 40)
 
 style opening_identity_field_text is gui_text:
     font opening_document_font
-    size 25
+    size 33
     color "#46574e"
 
 style opening_stat_row_frame is frame:
     xfill True
-    ysize 57
+    ysize 76
     background Solid("#d5d8ce")
-    padding (16, 7, 16, 7)
+    padding (21, 9, 21, 9)
 
 style opening_stat_label_text is gui_text:
-    xsize 92
-    size 23
+    xsize 123
+    size 31
     color "#405248"
     bold True
     yalign 0.5
 
 style opening_stat_value_text is gui_text:
-    xsize 58
-    size 25
+    xsize 77
+    size 33
     color "#33493d"
     bold True
     text_align 0.5
     yalign 0.5
 
 style opening_stat_locked_text is gui_text:
-    xsize 132
-    size 20
+    xsize 176
+    size 27
     color "#7a827c"
     text_align 0.5
     yalign 0.5
 
 style opening_stat_button is button:
-    xsize 62
-    ysize 42
+    xsize 83
+    ysize 56
     background Solid("#617e6d")
     hover_background Solid("#769682")
     insensitive_background Solid("#afb5b0")
-    padding (8, 3, 8, 3)
+    padding (11, 4, 11, 4)
 
 style opening_stat_button_text is gui_text:
-    size 29
+    size 39
     color "#f4f2e8"
     insensitive_color "#d8d8d1"
     xalign 0.5
     yalign 0.5
 
 style opening_identity_remaining_text is gui_text:
-    size 22
+    size 29
     color "#41584b"
     bold True
     xalign 1.0
 
 style opening_signature_frame is frame:
     xfill True
-    ysize 98
+    ysize 131
     background Solid("#617e6d")
     padding (0, 0, 0, 0)
 
 style opening_signature_text is gui_text:
-    size 22
+    size 29
     color "#f4f2e8"
     xalign 0.5
     text_align 0.5
 
 style opening_signature_progress_bar is bar:
     xfill True
-    ysize 18
+    ysize 24
     left_bar Solid("#d7e4d8")
     right_bar Solid("#40564a")

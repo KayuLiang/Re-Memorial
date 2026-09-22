@@ -7,9 +7,9 @@
 
 default persistent.hue_separation_enabled = True
 
-define hue_separation_baseline_pixels = 3.0
-define hue_separation_peak_pixels_min = 8.0
-define hue_separation_peak_pixels_max = 18.0
+define hue_separation_baseline_pixels = 4.0
+define hue_separation_peak_pixels_min = (32.0 / 3.0)
+define hue_separation_peak_pixels_max = 24.0
 define hue_separation_wait_min = 6.0
 define hue_separation_wait_max = 12.0
 define hue_separation_peak_duration_min = 0.1

@@ -115,8 +115,8 @@ class UiTestSkinTests(unittest.TestCase):
         source = UI_TEST_SKIN_PATH.read_text(encoding="utf-8")
         dialogue_block = block_with_header(source, "screen rm_ui_test_dialogue_preview():")
 
-        self.assertIn("ypos 810", dialogue_block)
-        self.assertIn("ysize 270", dialogue_block)
+        self.assertIn("ypos 1080", dialogue_block)
+        self.assertIn("ysize 360", dialogue_block)
         self.assertIn("gui/story_ui/ui_notebook_canvas.png", dialogue_block)
         self.assertIn("gui/ui_test_skin/dialogue_photo_avatar.png", dialogue_block)
         self.assertIn("gui/ui_test_skin/name_tape.png", dialogue_block)
@@ -157,7 +157,9 @@ class UiTestSkinTests(unittest.TestCase):
 
         self.assertNotIn("gui/ui_test_skin", say_block)
         self.assertNotIn("gui/ui_test_skin", top_status_block)
-        self.assertIn("not rm_ui_test_skin_active", top_status_block)
+        self.assertIn("use rm_flat_status", top_status_block)
+        flat = (GAME_DIR / "ui/rm_hud_flat.rpy").read_text(encoding="utf-8")
+        self.assertIn("or rm_ui_test_skin_active", flat)
 
     def test_dice_and_test_schedule_styles_are_gated_by_ui_test_skin_flag(self):
         attribute_source = ATTRIBUTE_CHECKS_PATH.read_text(encoding="utf-8")

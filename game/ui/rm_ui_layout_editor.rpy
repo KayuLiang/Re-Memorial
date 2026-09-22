@@ -164,18 +164,18 @@ init python:
 
 
 screen rm_ui_layout_draw_grid():
-    for grid_x in range(0, 1921, 100):
+    for grid_x in range(0, config.screen_width + 1, 128):
         add Solid("#ffffff24"):
             xpos grid_x
             ypos 0
             xsize 1
-            ysize 1080
+            ysize 1440
 
-    for grid_y in range(0, 1081, 100):
+    for grid_y in range(0, config.screen_height + 1, 128):
         add Solid("#ffffff24"):
             xpos 0
             ypos grid_y
-            xsize 1920
+            xsize 2560
             ysize 1
 
 
@@ -183,36 +183,36 @@ screen rm_ui_layout_draw_safe_frame():
     add Solid("#ffef6f"):
         xpos 0
         ypos 0
-        xsize 1920
-        ysize 2
+        xsize 2560
+        ysize 3
     add Solid("#ffef6f"):
         xpos 0
-        ypos 1078
-        xsize 1920
-        ysize 2
+        ypos 1437
+        xsize 2560
+        ysize 3
     add Solid("#ffef6f"):
         xpos 0
         ypos 0
-        xsize 2
-        ysize 1080
+        xsize 3
+        ysize 1440
     add Solid("#ffef6f"):
-        xpos 1918
+        xpos 2557
         ypos 0
-        xsize 2
-        ysize 1080
+        xsize 3
+        ysize 1440
 
 
 screen rm_ui_layout_draw_center_lines():
     add Solid("#62d7ff80"):
-        xpos 960
+        xpos 1280
         ypos 0
-        xsize 2
-        ysize 1080
+        xsize 3
+        ysize 1440
     add Solid("#62d7ff80"):
         xpos 0
-        ypos 540
-        xsize 1920
-        ysize 2
+        ypos 720
+        xsize 2560
+        ysize 3
 
 
 screen rm_ui_layout_element_border(item, selected=False):
@@ -221,21 +221,21 @@ screen rm_ui_layout_element_border(item, selected=False):
         xpos item["x"]
         ypos item["y"]
         xsize item["w"]
-        ysize 2
+        ysize 3
     add Solid(border_color):
         xpos item["x"]
-        ypos item["y"] + item["h"] - 2
+        ypos item["y"] + item["h"] - 3
         xsize item["w"]
-        ysize 2
+        ysize 3
     add Solid(border_color):
         xpos item["x"]
         ypos item["y"]
-        xsize 2
+        xsize 3
         ysize item["h"]
     add Solid(border_color):
-        xpos item["x"] + item["w"] - 2
+        xpos item["x"] + item["w"] - 3
         ypos item["y"]
-        xsize 2
+        xsize 3
         ysize item["h"]
 
 
@@ -308,20 +308,20 @@ screen rm_ui_layout_editor(layout_name="dice_select"):
                 action SetScreenVariable("selected_id", item["id"])
 
     frame:
-        xpos 18
-        ypos 18
-        xsize 420
+        xpos 24
+        ypos 24
+        xsize 560
         background Solid("#f5f0dfdd")
-        padding (16, 14)
+        padding (21, 19)
 
         vbox:
-            spacing 8
-            text "UI Layout Editor: [layout_name]" size 22 color "#000000"
-            text "[rm_ui_layout_selected_info(layout_name, selected_id)]" size 18 color "#000000"
-            text "mouse: [mouse_pos[0]] / [mouse_pos[1]]" size 18 color "#000000"
+            spacing 11
+            text "UI Layout Editor: [layout_name]" size 29 color "#000000"
+            text "[rm_ui_layout_selected_info(layout_name, selected_id)]" size 24 color "#000000"
+            text "mouse: [mouse_pos[0]] / [mouse_pos[1]]" size 24 color "#000000"
 
             hbox:
-                spacing 8
+                spacing 11
                 textbutton "Save JSON":
                     action Function(save_ui_layout_to_json, layout_name)
                 textbutton "Copy Layout":

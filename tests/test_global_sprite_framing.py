@@ -40,8 +40,8 @@ class GlobalSpriteFramingTests(unittest.TestCase):
             with self.subTest(transform_name=transform_name):
                 block = block_with_header(source, f"transform {transform_name}:")
                 self.assertIn("yalign 1.0", block)
-                self.assertIn("yoffset 600", block)
-                self.assertIn("zoom 0.42", block)
+                self.assertIn("yoffset 800", block)
+                self.assertIn("zoom 0.56", block)
 
         self.assertIn("xalign 0.08", block_with_header(source, "transform fro_left:"))
         self.assertIn("xalign 0.08", block_with_header(source, "transform fro_underwear_left:"))
@@ -54,8 +54,8 @@ class GlobalSpriteFramingTests(unittest.TestCase):
 
         self.assertIn("xalign 0.92", block)
         self.assertIn("yalign 1.0", block)
-        self.assertIn("yoffset 490", block)
-        self.assertIn("zoom 1.85", block)
+        self.assertIn("yoffset 653", block)
+        self.assertIn("zoom (37.0 / 15.0)", block)
 
     def test_story_scenes_continue_to_use_named_sprite_transforms(self):
         story_source = "\n".join(
