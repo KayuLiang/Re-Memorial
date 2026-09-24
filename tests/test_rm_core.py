@@ -52,7 +52,8 @@ class RMCoreTests(unittest.TestCase):
         str_die = character.dice_for("str")[0]
         str_die.faces = [1, 6]
         str_die.enchantment = rm.ENCHANT_SWIFT
-        spec = rm.CheckSpec(attribute="str", requirement=4, dice_ids=[str_die.id], action_type=rm.ACTION_INSTANT)
+        spec = rm.CheckSpec(attribute="str", requirement=4, dice_ids=[str_die.id],
+                            action_type=rm.ACTION_INSTANT, bonus_die_ids=[str_die.id])
         swift = rm.perform_check(character, spec, rng=random.Random(1))
         self.assertEqual(swift.dice_results[0]["mode"], "bonus")
 

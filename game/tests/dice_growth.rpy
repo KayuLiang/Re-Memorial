@@ -55,6 +55,24 @@ testcase dice_growth.training_penalty_before_next_round:
     assert eval rm_player.current_time_slot == "morning_2"
     assert eval rm_player.degradation_progress["str"] == 0
 
+testcase dice_growth.training_target_survives_reentry:
+    run Start("rm_test_flow_start")
+    pause until screen "choice" timeout 5
+    $ rm_player.training_load = 1
+    click "不吃"
+    click "继续"
+    click "继续"
+    pause until screen "rm_test_schedule_select" timeout 5
+    click "负重训练（测试）"
+    pause until screen "attribute_dice_select" timeout 5
+    $ first_training_target = rm_test_requirement
+    click id "check_back"
+    pause until screen "rm_test_schedule_select" timeout 5
+    click "负重训练（测试）"
+    pause until screen "attribute_dice_select" timeout 5
+    assert eval rm_test_requirement == first_training_target
+    assert eval rm_player.current_time_slot == "morning_1"
+
 testcase dice_growth.sleep_converts_training_once:
     run Start("rm_test_flow_start")
     pause until screen "choice" timeout 5

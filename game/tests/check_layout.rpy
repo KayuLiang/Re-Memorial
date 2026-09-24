@@ -31,7 +31,7 @@ label rm_check_layout_wake:
     $ rm_core.continue_night(rm_player)
     $ rm_core.advance_time_slot(rm_player)
     $ rm_core.continue_night(rm_player)
-    $ rm_core.begin_sleep(rm_player,renpy.random)
+    $ rm_core.begin_sleep(rm_player,renpy.random,bonus_die_ids=[rm_core.usable_dice(rm_player,"con")[0].id] * 10)
     call rm_test_wake_flow
     return
 

@@ -9,6 +9,11 @@ class SleepCycleTests(unittest.TestCase):
     def setUp(self):
         self.player = rm.create_initial_character(rng=random.Random(7))
 
+    def sleep_with_selected_bonus(self, state, rng):
+        dice = rm.usable_dice(state, "con")
+        choices = [dice[0].id] * 10 if dice else []
+        return rm.begin_sleep(state, rng, bonus_die_ids=choices)
+
     def test_six_actions_and_three_meals_end_at_sleep_decision(self):
         p = self.player
         rm.start_day(p)
@@ -164,7 +169,7 @@ class SleepCycleTests(unittest.TestCase):
             rm.continue_night(p)
             rm.advance_time_slot(p)
         self.assertEqual(p.deep_fatigue["layers"], 1)
-        rm.begin_sleep(p, random.Random(7))
+        self.sleep_with_selected_bonus(p, random.Random(7))
         rm.finish_wake(p, rm.RESULT_SUCCESS)
         self.assertEqual(p.deep_fatigue["layers"], 2)
         self.assertEqual(p.deep_fatigue["last_night"], 7)
@@ -176,7 +181,7 @@ class SleepCycleTests(unittest.TestCase):
         for _ in range(late):
             rm.continue_night(p)
             rm.advance_time_slot(p)
-        sleep = rm.begin_sleep(p, random.Random(7))
+        sleep = self.sleep_with_selected_bonus(p, random.Random(7))
         rng = random.Random(0)
         if draws is not None:
             values = iter(draws)
@@ -293,7 +298,7 @@ class SleepCycleTests(unittest.TestCase):
         rm.start_turn(p, "sleep_decision")
         rm.continue_night(p)
         rm.advance_time_slot(p)
-        rm.begin_sleep(p, random.Random(7))
+        self.sleep_with_selected_bonus(p, random.Random(7))
         p.energy = 0
         result = rm.CheckResult(attribute="pow", rank=rm.RESULT_BIG_FAILURE)
         rm.finish_wake(p, result)
@@ -313,7 +318,7 @@ class SleepCycleTests(unittest.TestCase):
         rm.start_turn(p, "sleep_decision")
         rng = random.Random(7)
         rng.random = lambda: 0.0
-        events = rm.begin_sleep(p, rng)["events"]
+        events = self.sleep_with_selected_bonus(p, rng)["events"]
         self.assertLess(events.index("value_to_formal:con"), events.index("deep_fatigue_permanent_loss:2"))
         self.assertEqual(p.formal_attributes["con"], 0)
         self.assertEqual(p.degradation_penalty_pending["con"], 2)

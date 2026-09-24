@@ -196,6 +196,9 @@ def training_day(state, attr, policy, rng, counts):
         spec = rm.CheckSpec(attr, requirement, [d.id for d in dice], big_failure_slack=0,
                             allowed_dice_attributes=('con', 'str', 'dex') if attr == 'con' else (attr,),
                             required_dice_attributes=('con',) if attr == 'con' else ())
+        if dice:
+            bonus, penalty = rm.check_advantage_counts(state, spec, dice=dice)
+            spec.bonus_die_ids = (dice[0].id,) * max(0, bonus - penalty)
         result = rm.perform_check(state, spec, rng) if dice else None
         if result is None or not result.available:
             rm.resolve_test_day_rest(state, rng)

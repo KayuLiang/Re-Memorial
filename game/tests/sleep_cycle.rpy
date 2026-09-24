@@ -46,7 +46,7 @@ testcase sleep_cycle.day_flow:
     python:
         for night in range(6):
             rm_core.start_turn(rm_player, "sleep_decision")
-            rm_core.begin_sleep(rm_player, renpy.random)
+            rm_core.begin_sleep(rm_player, renpy.random, bonus_die_ids=[rm_core.usable_dice(rm_player, "con")[0].id] * 10)
     assert eval rm_player.good_routine
     assert eval rm_player.day == 108
 
@@ -122,11 +122,11 @@ testcase sleep_cycle.disease_deadline:
         rm_core.start_turn(rm_player, "sleep_decision")
         rm_core.continue_night(rm_player)
         rm_core.advance_time_slot(rm_player)
-        rm_core.begin_sleep(rm_player, renpy.random)
+        rm_core.begin_sleep(rm_player, renpy.random, bonus_die_ids=[rm_core.usable_dice(rm_player, "con")[0].id] * 10)
         rm_core.finish_wake(rm_player, rm_core.RESULT_FAILURE)
         for night in range(6):
             rm_core.start_turn(rm_player, "sleep_decision")
-            rm_core.begin_sleep(rm_player, renpy.random)
+            rm_core.begin_sleep(rm_player, renpy.random, bonus_die_ids=[rm_core.usable_dice(rm_player, "con")[0].id] * 10)
     assert eval rm_player.day == 108
     assert eval rm_player.deep_fatigue is None
     assert eval rm_player.formal_attributes["con"] == 4

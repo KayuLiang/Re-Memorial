@@ -114,7 +114,7 @@ testcase health.wake_death:
         rm_core.start_turn(rm_player, "sleep_decision")
         rm_core.continue_night(rm_player)
         rm_core.advance_time_slot(rm_player)
-        rm_core.begin_sleep(rm_player, renpy.random)
+        rm_core.begin_sleep(rm_player, renpy.random, bonus_die_ids=[rm_core.usable_dice(rm_player, "con")[0].id] * 10)
         rm_core.finish_wake(rm_player, rm_core.RESULT_FAILURE, renpy.random)
     run Function(renpy.restart_interaction)
     pause .2

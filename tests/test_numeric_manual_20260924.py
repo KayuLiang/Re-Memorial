@@ -58,6 +58,25 @@ class NumericManualTests(unittest.TestCase):
         rm.process_small_rest(state, FixedRandom())
         self.assertEqual(state.training_load, 0)
 
+    def test_training_target_is_fixed_when_reentering_same_schedule(self):
+        state = self.player()
+        state.training_load = 1
+        state.current_time_slot = "morning_1"
+        base = rm.test_training_requirement(state, "str")
+        first = rm.test_training_requirement_for_schedule(
+            state, "test_strength_training", FixedRandom(integers=[2]))
+        retry_rng = FixedRandom(integers=[4])
+        second = rm.test_training_requirement_for_schedule(
+            state, "test_strength_training", retry_rng)
+        self.assertEqual((first, second), (base + 2, base + 2))
+        self.assertEqual(retry_rng.randint(1, 4), 4)
+        state.current_time_slot = "morning_2"
+        self.assertEqual(rm.test_training_requirement_for_schedule(
+            state, "test_strength_training", FixedRandom(integers=[4])), base + 4)
+        state.day += 1
+        self.assertEqual(rm.test_training_requirement_for_schedule(
+            state, "test_strength_training", FixedRandom(integers=[1])), base + 1)
+
     def test_growth_thresholds_and_direct_formal_change(self):
         state = self.player()
         rm.add_attribute_bonus(state, "str", 3)
@@ -177,6 +196,21 @@ class NumericManualTests(unittest.TestCase):
         result = rm.perform_check(state, spec, FixedRandom(choices=[4]))
         self.assertEqual((result.advantage_count, result.disadvantage_count), (1, 1))
         self.assertEqual(result.dice_results[0]["rolls"], [4])
+
+    def test_positive_bonus_requires_an_invested_target(self):
+        state = self.player()
+        state.dice_pool = [rm.RMDice("a", "str", [1, 4], rm.ENCHANT_SWIFT)]
+        before = state.energy
+        result = rm.perform_check(state, rm.CheckSpec("str", 3, ["a"]), FixedRandom())
+        self.assertFalse(result.available)
+        self.assertEqual(result.reason, "bonus_choice_required")
+        self.assertEqual(state.energy, before)
+
+        state.dice_pool = [rm.RMDice("con", "con", [1, 4])]
+        state.current_weather = rm.WEATHER_LIGHT_RAIN
+        result = rm.perform_sleep_quality_check(state, FixedRandom())
+        self.assertFalse(result.available)
+        self.assertEqual(result.reason, "bonus_choice_required")
 
     def test_sleep_uses_selected_bonus_die_and_updates_long_emotion_streak(self):
         state = self.player()

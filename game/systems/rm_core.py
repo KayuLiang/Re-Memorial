@@ -193,6 +193,8 @@ class RMCharacterState(RevertableObject):
         self.test_growth_progress = RevertableDict((name, 0) for name in TEST_TRAINING_ATTRIBUTES)
         self.training_fatigue = RevertableDict((name, 0) for name in TEST_TRAINING_SCHEDULE_ATTRIBUTES)
         self.training_load = 0
+        self.training_target_day = None
+        self.training_target_cache = RevertableDict()
         self.special_training_progress = self.test_growth_progress
         self.dice_growth_progress = RevertableDict((name, 0) for name in ATTRIBUTES)
         self.growth_reward_pending = RevertableDict((name, 0) for name in ATTRIBUTES)
@@ -889,10 +891,23 @@ def training_fatigue_big_failure_slack(character, schedule_id):
 
 
 def test_training_requirement_for_schedule(character, schedule_id, rng=None):
+    ensure_second_stage_state(character)
     attribute = test_training_schedule_attribute(schedule_id)
     if attribute is None:
         raise ValueError("Unknown test training schedule: {!r}".format(schedule_id))
-    return test_training_requirement(character, attribute) + training_fatigue_requirement_penalty(character, schedule_id, rng)
+    slot = character.current_time_slot
+    if slot in TIME_SLOTS:
+        if character.training_target_day != character.day:
+            character.training_target_cache.clear()
+            character.training_target_day = character.day
+        key = (slot, schedule_id)
+        if key in character.training_target_cache:
+            return character.training_target_cache[key]
+    requirement = test_training_requirement(character, attribute) + training_fatigue_requirement_penalty(
+        character, schedule_id, rng)
+    if slot in TIME_SLOTS:
+        character.training_target_cache[key] = requirement
+    return requirement
 
 
 def training_schedule_legal(state, schedule_id, location, slot=None):
@@ -1588,10 +1603,12 @@ def perform_check(character, spec, rng=None):
         return unavailable_result(spec, "energy_shortage")
     advantage_count, disadvantage_count = check_advantage_counts(character, spec, weather, dice)
     net_advantage = advantage_count - disadvantage_count
+    if net_advantage > len(spec.bonus_die_ids):
+        return unavailable_result(spec, "bonus_choice_required")
     rolls = [roll_die(die, rng, force_mode="normal") for die in dice]
     for index in range(abs(net_advantage)):
         if net_advantage > 0:
-            chosen_id = spec.bonus_die_ids[index] if index < len(spec.bonus_die_ids) else dice[0].id
+            chosen_id = spec.bonus_die_ids[index]
             die_index = next((i for i, die in enumerate(dice) if die.id == chosen_id), None)
             if die_index is None:
                 raise ValueError("Bonus reroll die was not invested: {}".format(chosen_id))
@@ -2045,6 +2062,7 @@ def ensure_second_stage_state(character):
         "coffee_count_today": 0,
         "daytime_sleep_pending": None,
         "training_load": None,
+        "training_target_day": None,
         "current_pain": None,
         "last_hospital_day": None,
         "emergency_rescue_used": False,
@@ -2099,6 +2117,7 @@ def ensure_second_stage_state(character):
         "drug_free_days": {},
         "withdrawal_ember_multipliers": {},
         "home_equipment": {},
+        "training_target_cache": {},
         "ordinary_medicine_taken_today": {},
         "ordinary_treatment_streak": {"cold": 0, "heat": 0},
         "ordinary_treatment_today": {},
@@ -4359,10 +4378,12 @@ def perform_sleep_quality_check(state, rng=None, bonus_die_ids=None):
     rng = _rng(rng)
     advantage_count, disadvantage_count = sleep_advantage_counts(state, dice)
     net = advantage_count - disadvantage_count
+    if net > len(bonus_die_ids or ()):
+        return CheckResult(available=False, reason="bonus_choice_required", attribute="con")
     rolls = [roll_die(die, rng, force_mode="normal") for die in dice]
     for step in range(abs(net)):
         if net > 0:
-            chosen = bonus_die_ids[step] if bonus_die_ids is not None and step < len(bonus_die_ids) else dice[0].id
+            chosen = bonus_die_ids[step]
             index = next((i for i, die in enumerate(dice) if die.id == chosen), None)
             if index is None:
                 raise ValueError("Sleep bonus reroll die was not invested: {}".format(chosen))
