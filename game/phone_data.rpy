@@ -7,6 +7,9 @@ default phone_chat_history = {}
 default phone_story_ami_count = 0
 default phone_story_ami_reply_ready = False
 default phone_story_ami_sent = False
+default phone_story_ami_sent_reply = None
+default phone_reply_selection = None
+default phone_reply_sending = False
 default phone_story_ami_active = False
 default phone_read_counts = {}
 
@@ -29,9 +32,10 @@ init python:
         lines = []
         if contact_id == "ami":
             lines = list(store.phone_chats["ami"][:phone_received_count("ami")])
-            if store.phone_story_ami_sent:
-                lines.append(("我", store.phone_story_ami_reply_text))
-        return lines + list(store.phone_chat_history.get(contact_id, []))
+        lines += list(store.phone_chat_history.get(contact_id, []))
+        if contact_id == "ami" and store.phone_story_ami_sent:
+            lines.append(("我", store.phone_story_ami_sent_reply or store.phone_story_ami_reply_text))
+        return lines
 
     def phone_preview(contact_id):
         lines = phone_history(contact_id)
@@ -64,6 +68,17 @@ init python:
                 and store.phone_story_ami_reply_ready and not store.phone_story_ami_sent
                 and phone_received_count("ami") == 4)
 
+    def phone_chat_phase(contact_id, story_mode):
+        if contact_id != "ami" or not story_mode:
+            return "history"
+        if store.phone_story_ami_sent:
+            return "sent"
+        if phone_can_reply(story_mode):
+            return "reply"
+        if store.phone_story_ami_active:
+            return "incoming" if phone_received_count("ami") < 4 else "reply_prompt"
+        return "history"
+
     def phone_next_story_ami(expected_count):
         # Ignore a stale rapid click; each action reveals at most one authored line.
         if (store.phone_story_ami_active and not store.phone_story_ami_sent
@@ -76,13 +91,17 @@ init python:
             store.phone_draft_message = store.phone_story_ami_reply_text
             store.phone_story_ami_reply_ready = True
 
-    def phone_send_story_ami_reply():
-        if phone_can_reply(True):
+    def phone_send_story_ami_reply(choice=None):
+        choice = choice or store.phone_story_ami_reply_options[0]
+        if phone_can_reply(True) and choice in store.phone_story_ami_reply_options:
+            store.phone_story_ami_sent_reply = choice[1]
             store.phone_story_ami_sent = True
             store.phone_story_ami_reply_ready = False
             store.phone_story_ami_active = False
             store.phone_draft_message = ""
             store.phone_read_counts["ami"] = 4
+            return True
+        return False
 
     def phone_calculate():
         expr = store.phone_calc_expr
@@ -98,6 +117,7 @@ init python:
             store.phone_calc_result = "计算错误"
 
 define phone_story_ami_reply_text = "\u8c22\u8c22\u4f60\u7ed9\u6211\u9001\u7684\u8863\u670d\uff0c\u5f88\u5408\u8eab\u3002\u6211\u9a6c\u4e0a\u51fa\u6765\u4e86\u3002"
+define phone_story_ami_reply_options = (("thanks", phone_story_ami_reply_text),)
 
 define phone_apps = [
     ("phone", "\u7535\u8bdd", "\u260e", "#34C759"),

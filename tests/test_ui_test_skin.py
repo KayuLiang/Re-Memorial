@@ -161,27 +161,15 @@ class UiTestSkinTests(unittest.TestCase):
         flat = (GAME_DIR / "ui/rm_hud_flat.rpy").read_text(encoding="utf-8")
         self.assertIn("or rm_ui_test_skin_active", flat)
 
-    def test_dice_and_test_schedule_styles_are_gated_by_ui_test_skin_flag(self):
+    def test_refactored_choices_keep_test_exit_and_legacy_schedule_skin(self):
         attribute_source = ATTRIBUTE_CHECKS_PATH.read_text(encoding="utf-8")
         schedule_source = TEST_SCHEDULES_PATH.read_text(encoding="utf-8")
-
-        for filename in (
-            "dice_check_panel.png",
-            "check_stage.png",
-            "dice_list.png",
-            "dice_card.png",
-            "option_button.png",
-        ):
-            with self.subTest(filename=filename):
-                self.assertIn(f"gui/ui_test_skin/{filename}", attribute_source + schedule_source)
-
-        self.assertGreaterEqual((attribute_source + schedule_source).count("rm_ui_test_skin_active"), 8)
-        self.assertIn("ConditionSwitch", attribute_source)
+        self.assertIn("if rm_ui_test_skin_active:", attribute_source)
+        self.assertIn("use rm_ui_test_close_button()", attribute_source)
         self.assertIn("ConditionSwitch", schedule_source)
-        self.assertIn('color "#000000"', attribute_source)
-        self.assertIn('color "#000000"', schedule_source)
-        self.assertNotIn('color "#f3eadb"', attribute_source + schedule_source)
-        self.assertNotIn('hover_color "#ffffff"', attribute_source + schedule_source)
+        self.assertIn("gui/ui_test_skin/dice_list.png", schedule_source)
+        self.assertIn('font rememorial_ui_font', attribute_source)
+        self.assertIn('bold False', attribute_source)
 
 
 if __name__ == "__main__":

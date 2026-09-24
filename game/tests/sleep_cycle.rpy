@@ -78,6 +78,7 @@ testcase sleep_cycle.coma_wake_and_shield:
     assert eval rm_player.current_time_slot == "wake_check"
     click "继续"
     click "继续"
+    click "选择起床骰子"
     pause until screen "attribute_dice_select" timeout 5
     assert eval rm_wake_requirement == 22
     assert eval renpy.get_screen_variable("requirement", "attribute_dice_select") == 22
@@ -87,11 +88,15 @@ testcase sleep_cycle.coma_wake_and_shield:
     run Function(renpy.restart_interaction)
     pause .2
     assert eval renpy.get_screen_variable("selected_die_ids", "attribute_dice_select") == ["pow_1", "pow_2"]
-    click "确认骰子"
+    click id "check_review"
     pause .2
     assert eval renpy.get_screen_variable("confirm_open", "attribute_dice_select")
     assert eval attribute_check_energy_cost("pow", ["pow_1", "pow_2"], rm_core.ACTION_WAKE) == 0
     click "确认"
+    pause until screen "attribute_check_roll_animation" timeout 5
+    click id "check_roll_action"
+    pause until eval renpy.get_screen_variable('roll_finished','attribute_check_roll_animation') timeout 6
+    click id "check_roll_action"
     pause until screen "attribute_check_result" timeout 5
     assert eval rm_wake_result.rank == rm_core.RESULT_BIG_SUCCESS
     assert eval rm_wake_result.base_requirement == 22

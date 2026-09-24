@@ -126,8 +126,7 @@ init python:
             allowed_dice_attributes=_normal_attribute_tuple(allowed_attributes, attribute),
             required_dice_attributes=tuple(required_die_attributes or ()),
         )
-        dice = _rm_core.selected_dice(character, spec, _rm_core.max_dice_for_check(spec, profile), renpy.random)
-        return _rm_core.total_energy_cost(dice, spec, profile)
+        return rm_dice_view.check_selection(character, spec, renpy.random)["cost"]
 
     def attribute_check_rank_label(rank):
         labels = {
@@ -202,6 +201,7 @@ init python:
         rolls = tuple(item["value"] for item in result.dice_results)
         roll_value = result.dice_results[0]["value"] if result.dice_results else None
         return {
+            "_result": result,
             "available": result.available,
             "reason": result.reason,
             "stat": attribute,

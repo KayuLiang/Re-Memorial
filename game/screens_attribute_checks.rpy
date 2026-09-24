@@ -1,4 +1,5 @@
 init python:
+    from collections import Counter
     ATTRIBUTE_DICE_TABS = (
         ("all", "全部骰子"),
         ("usable", "可用骰子"),
@@ -42,507 +43,460 @@ init python:
         return ""
 
 
-transform attribute_die_to_stage:
-    alpha 0.0
-    yoffset 253
-    zoom 0.72
-    rotate -16
-    linear 0.18 alpha 1.0 yoffset 0 zoom 1.0 rotate 0
-    easeout 0.10 yoffset -16 zoom 1.04
-    easein 0.10 yoffset 0 zoom 1.0
 
-transform attribute_die_roll_body:
-    subpixel True
-    rotate 0
-    xoffset 0
-    yoffset 0
-    zoom 1.0
-    linear 0.07 rotate 38 xoffset -45 yoffset -27 zoom 1.06
-    linear 0.07 rotate -26 xoffset 37 yoffset 19 zoom 0.98
-    linear 0.07 rotate 51 xoffset -27 yoffset -16 zoom 1.08
-    linear 0.07 rotate -18 xoffset 32 yoffset 11 zoom 1.0
-    repeat 5
+    def rm_check_die_label(die, faces=None):
+        serial = next(i for i, item in enumerate(rm_ensure_player().dice_for(die.attribute), 1) if item.id == die.id)
+        return "{} d{} · {:02d}".format(rm_core.ATTRIBUTE_LABELS[die.attribute],len(die.faces if faces is None else faces),serial)
 
-transform attribute_die_land:
-    subpixel True
-    rotate -8
-    yoffset -13
-    zoom 1.16
-    easeout 0.16 rotate 0 yoffset 0 zoom 1.0
-    easeout 0.10 yoffset -5
-    easein 0.08 yoffset 0
+    def rm_check_rows(result):
+        core = result.get("_result")
+        ids = core.dice_ids if core else result.get("die_ids", (result.get("die_id"),))
+        values = [item["value"] for item in core.dice_results] if core else result.get("rolls", ())
+        rows = []
+        for index, value in enumerate(values):
+            die = rm_ensure_player().find_die(ids[index]) if index < len(ids) else None
+            entry = core.dice_results[index] if core else {}
+            # Old saves predate face snapshots; only those use the live die.
+            faces = tuple(entry.get("faces", die.faces if die else result.get("die_faces", ())))
+            label = rm_check_die_label(die,faces) if die else "骰子 {}".format(index+1)
+            attempts = entry.get("rolls", ())
+            mode = entry.get("mode", "normal")
+            attempts_text = " / ".join(str(v) for v in attempts) if len(attempts)>1 else ""
+            if attempts_text:
+                attempts_text += " · " + {"bonus":"取较高", "penalty":"取较低", "normal":"普通投掷"}[mode]
+            rows.append(dict(die_id=entry.get('die_id',ids[index] if index<len(ids) else str(index)),label=label, value=value, faces=faces, attempts=attempts_text))
+        return rows
 
-transform attribute_die_result_flash:
-    alpha 0.0
-    zoom 0.86
-    linear 0.12 alpha 1.0 zoom 1.12
-    easeout 0.14 zoom 1.0
+    def rm_check_reason(reason):
+        labels = dict(energy_shortage="精力不足", forced_energy_shortage="精力不足，强制行动按失败结算",
+            no_usable_dice="没有可用骰子", no_usable_con_die="没有可用的体质骰子",
+            attribute_dice_not_configured="尚未配置属性骰子", storm_blocks_outdoors="暴风雨阻止了户外行动",
+            rain_blocks_outdoor_sport="当前降雨阻止了户外运动", weather_blocked="当前天气阻止了行动")
+        if reason and reason.startswith("missing_required_die:"):
+            return "缺少必需的{}骰子".format(rm_core.ATTRIBUTE_LABELS.get(reason.split(":")[1], ""))
+        return labels.get(reason, reason or "未完成投掷")
 
+    def rm_check_formula(preview, attribute):
+        value = "骰面合计 × {:g}  +  {}贡献 {:g}".format(preview['dice_multiplier'], rm_core.ATTRIBUTE_LABELS[attribute], preview['attribute_modifier'])
+        if preview['extra_modifier']:
+            value += "  {:+g}".format(preview['extra_modifier'])
+        if preview['final_multiplier'] != 1:
+            value = "（{}）× {:g}".format(value, preview['final_multiplier'])
+        return value + "  ≥  目标 {:g}".format(preview['target'])
 
-screen attribute_die_entity(die_label, faces_text, face_text="?", active=True):
-    $ die_label_color = "#edf5e9" if active else "#a6aea9"
-    $ die_face_color = "#ffffff" if active else "#b6bdb8"
-    $ die_faces_color = "#bcd0c0" if active else "#8e9691"
+    def rm_check_face_summary(faces):
+        if len(faces) >= 8 and tuple(faces) == tuple(range(1,len(faces)+1)):
+            return "1–{} · 各一面".format(len(faces))
+        if len(faces) <= 6 or tuple(faces) == tuple(range(1,21)):
+            return format_die_faces(faces)
+        return " / ".join(str(value) if count == 1 else "{}×{}".format(value,count) for value,count in sorted(Counter(faces).items()))
 
-    frame:
-        xsize 176
-        ysize 176
-        background (Frame("gui/ui_test_skin/dice_card.png", 34, 34) if rm_ui_test_skin_active else Solid("#edf5e9" if active else "#606964"))
-        padding (11, 11, 11, 11)
-
-        frame:
-            xfill True
-            yfill True
-            background Solid("#32463a" if active else "#4c5550")
-            padding (11, 11, 11, 11)
-
-            vbox:
-                xalign 0.5
-                yalign 0.5
-                spacing 5
-
-                text die_label:
-                    xalign 0.5
-                    size 27
-                    color die_label_color
-
-                text face_text:
-                    xalign 0.5
-                    size 64
-                    color die_face_color
-
-                text faces_text:
-                    xalign 0.5
-                    size 20
-                    color die_faces_color
-
-
-screen attribute_dice_select(required_stat, min_dice=1, max_dice=3, requirement=6, check_kind=None, action_type="instant", allowed_stats=None, required_die_stats=None):
+screen attribute_dice_select(required_stat, min_dice=1, max_dice=3, requirement=6, check_kind=None, action_type="instant", allowed_stats=None, required_die_stats=None, thought=None):
     modal True
     zorder 230
     default selected_die_ids = []
     default selected_tab = "usable"
     default confirm_open = False
-    default invalid_open = False
-
+    default details_open = False
+    default selection_table = RMRealtimeDice([],selection=True)
     use rm_allow_game_menu
     use modal_dim_background
-
-    $ selected_preview = preview_attribute_check(required_stat, selected_die_ids, allowed_stats) if selected_die_ids else None
-    $ required_stat_label = rm_core.ATTRIBUTE_LABELS[required_stat]
+    $ character = rm_ensure_player()
+    $ allowed = _normal_attribute_tuple(allowed_stats, required_stat)
+    $ spec = rm_core.CheckSpec(required_stat, requirement, selected_die_ids, action_type=action_type, max_dice=max_dice, min_dice=min_dice, allowed_dice_attributes=allowed, required_dice_attributes=tuple(required_die_stats or ()), is_late_night=character.current_time_slot in rm_core.TIME_SLOTS[6:])
+    if action_type == rm_core.ACTION_WAKE:
+        # This caller already passes the effective cap. Match perform_wake_check's
+        # base spec so the mood reduction is applied exactly once.
+        $ spec = rm_core.CheckSpec("pow", requirement, selected_die_ids, action_type=rm_core.ACTION_WAKE)
+    $ preview = rm_dice_view.check_selection(character, spec, renpy.random)
+    $ actual_ids = [die.id for die in preview['dice']]
+    $ selection_table.sync([dict(die_id=die.id,faces=tuple(die.faces),value=die.faces[0]) for die in preview['dice']])
     $ check_header = attribute_check_header(required_stat, requirement, action_type, check_kind)
-    $ energy_cost = attribute_check_energy_cost(required_stat, selected_die_ids, action_type, allowed_stats, required_die_stats)
-    $ required_selection_met = attribute_selection_meets_requirements(selected_die_ids, required_die_stats)
-    $ invalid_reason = attribute_dice_selection_error(required_stat, selected_die_ids, min_dice, required_die_stats)
+    $ invalid_reason = attribute_dice_selection_error(required_stat, actual_ids, min_dice, required_die_stats)
+    $ options = attribute_dice_options_for_tab(required_stat, selected_tab, allowed_stats)
+    $ can_confirm = not invalid_reason and not preview['reason']
 
-    frame:
-        style "attribute_check_panel"
-
-        vbox:
-            spacing 16
-            xfill True
-
-            text "选择骰子" style "attribute_check_title"
-            text "本次行动需要使用【[required_stat_label]】骰子。选中的骰子会被放到上方检定台。" style "attribute_check_body"
-
-            frame:
-                style "attribute_check_summary_frame"
-                grid 4 1:
-                    spacing 16
-                    xfill True
-
+    $ usable_count = len(attribute_dice_options_for_tab(required_stat, "usable", allowed_stats))
+    fixed:
+        align (.5,.5) xysize (2048,1360)
+        frame:
+            xysize (2048,1240) padding (56,36)
+            background "#f3eee3"
+            fixed:
+                text check_header['kind'] style "attribute_check_title" id "check_title"
+                text check_header['action_type_label'] style "attribute_check_muted_text" xalign 1.0 ypos 18
+                add Solid("#b4aa96") ypos 76 xysize (1936,2)
+                # Match the existing Fro avatar crop used by the phone.
+                add Transform(Crop((1060,210,750,750), "images/sprites/fro/spr_fro_casual_default.png"), xysize=(160,160)) pos (0,92)
+                add "gui/dice_obsidian/check-thought-tail.svg" pos (172,142)
+                frame:
+                    pos (198,100) xysize (1738,165) padding (28,16)
+                    background "#e6dfd0"
                     vbox:
-                        spacing 5
-                        text "检定类型" style "attribute_check_summary_label"
-                        text "[check_header['kind']]" style "attribute_check_summary_value"
-
-                    vbox:
-                        spacing 5
-                        text "目标数值" style "attribute_check_summary_label"
-                        text "[check_header['target']]" style "attribute_check_summary_value"
-
-                    vbox:
-                        spacing 5
-                        text "固定修正合计" style "attribute_check_summary_label"
-                        text "[check_header['fixed']]" style "attribute_check_summary_value"
-
-                    vbox:
-                        spacing 5
-                        text "至少还需要投出" style "attribute_check_summary_label"
-                        text "[check_header['needed_roll']]" style "attribute_check_summary_value"
-
-            frame:
-                style "attribute_stage_frame"
-
+                        spacing 4
+                        text "弗洛 · 心想" style "attribute_check_hint_text" size 24
+                        text (thought or "（弗洛对现状的理解，文案待补充。）") style "attribute_check_body" size 30 xsize 1682 id "check_thought"
+                text rm_check_formula(preview,required_stat):
+                    id "check_formula"
+                    style "attribute_check_section_title"
+                    xalign .5 ypos 286
+                    size 34
                 vbox:
-                    xfill True
-                    spacing 16
-
-                    text "检定台" style "attribute_check_section_title"
-
-                    fixed:
-                        xfill True
-                        ysize 240
-
-                        if selected_preview:
-                            add Solid("#8fb39a") xalign 0.5 yalign 0.78 xsize 347 ysize 21
-                            hbox:
-                                xalign 0.5
-                                yalign 0.45
-                                spacing 16
-                                at attribute_die_to_stage
-                                for selected_die in selected_preview["dice"]:
-                                    use attribute_die_entity(selected_die["label"], format_die_faces(selected_die["faces"]), "?", True)
-                        else:
-                            frame:
-                                xalign 0.5
-                                yalign 0.5
-                                xsize 400
-                                ysize 157
-                                background Solid("#1d2822")
-                                padding (24, 19, 24, 19)
-
-                                text "从下方选择 1-3 颗可用骰子" xalign 0.5 yalign 0.5 style "attribute_check_muted_text"
-
-            text "骰子池" style "attribute_check_section_title"
-
-            hbox:
-                spacing 11
-                xfill True
-
-                for tab_id, tab_label in ATTRIBUTE_DICE_TABS:
-                    textbutton tab_label:
-                        style "attribute_check_tab_button"
-                        selected selected_tab == tab_id
-                        action SetScreenVariable("selected_tab", tab_id)
-
-            vpgrid:
-                cols 3
-                spacing 19
-                xfill True
-                ymaximum 333
-                mousewheel True
-                draggable True
-
-                for die in attribute_dice_options_for_tab(required_stat, selected_tab, allowed_stats):
-                    $ selectable = die["selectable"]
-                    $ selected = die["id"] in selected_die_ids
-
+                    pos (0,388) xsize 440 spacing 10
+                    text "当前组合成功率" style "attribute_check_hint_text"
+                    text rm_dice_view.probability_text(preview['success_probability']) style "attribute_check_total" id "check_probability"
+                    text ("含困难成功与大成功" if preview['success_probability'] is not None else ("精力不足，无法投掷" if preview['remaining'] < 0 else "选齐骰组后显示")) style "attribute_check_hint_text" size 24
+                vbox:
+                    pos (1570,388) xsize 366 spacing 14
+                    text "本次精力" style "attribute_check_hint_text"
+                    text ("消耗 {}".format(preview['cost'])) style "attribute_check_section_title" id "check_cost"
+                    text (("投后剩余 {}".format(preview['remaining'])) if preview['remaining'] >= 0 else "还差 {} 精力".format(-preview['remaining'])):
+                        style "attribute_check_body"
+                        color ("#292923" if preview['remaining'] >= 0 else "#8b4436")
+                        id "check_remaining"
+                    text ("当前 {}".format(character.energy)) style "attribute_check_hint_text" size 24
+                add selection_table pos (0,310) id "check_selection_table"
+                if not preview['dice']:
+                    text "从下方卡片选择骰子" style "attribute_check_hint_text" xalign .5 ypos 470
+                for slot,selected_die in enumerate(preview['dice']):
                     button:
-                        xsize 389
-                        ysize 163
-                        padding (16, 13, 16, 13)
-                        background (Frame("gui/ui_test_skin/dice_card.png", 34, 34) if rm_ui_test_skin_active else Solid("#dfe7dc" if selected else ("#eef5ef" if selectable else "#4e5652")))
-                        hover_background (Frame("gui/ui_test_skin/dice_card.png", 34, 34) if rm_ui_test_skin_active and selectable else Solid("#d8eadb" if selectable else "#4e5652"))
-                        sensitive selectable
-                        action SetScreenVariable("selected_die_ids", attribute_toggle_die_selection(selected_die_ids, die["id"], max_dice))
-
-                        hbox:
-                            spacing 16
-                            yalign 0.5
-
-                            use attribute_die_entity(die["label"], format_die_faces(die["faces"]), "?", selectable)
-
-                            vbox:
-                                yalign 0.5
-                                spacing 7
-
-                                text die["label"] style ("attribute_check_die_text" if selectable else "attribute_check_die_disabled_text")
-                                text format_die_faces(die["faces"]) style ("attribute_check_faces_text" if selectable else "attribute_check_faces_disabled_text")
-                                if selectable:
-                                    text ("已放入检定台" if selected else "可选择") style "attribute_check_hint_text"
-                                else:
-                                    text "本次不可用" style "attribute_check_disabled_hint_text"
-
-            hbox:
-                xalign 1.0
-                spacing 19
-
-                if rm_ui_test_skin_active:
-                    textbutton "确认骰子":
-                        style "rm_ui_test_prominent_button"
-                        action If(len(selected_die_ids) >= min_dice and required_selection_met, [SetScreenVariable("invalid_open", False), SetScreenVariable("confirm_open", True)], [SetScreenVariable("confirm_open", False), SetScreenVariable("invalid_open", True)])
-                else:
-                    textbutton "确认骰子":
-                        style "attribute_check_button"
-                        action If(len(selected_die_ids) >= min_dice and required_selection_met, [SetScreenVariable("invalid_open", False), SetScreenVariable("confirm_open", True)], [SetScreenVariable("confirm_open", False), SetScreenVariable("invalid_open", True)])
-
+                        id ("check_slot_"+str(slot))
+                        pos (int(968+(slot-(len(actual_ids)-1)/2)*280-112),350)
+                        xysize (224,240) padding (0,0)
+                        background None hover_background None
+                        action (SetScreenVariable("selected_die_ids", attribute_toggle_die_selection(selected_die_ids,selected_die.id,preview['limit'])) if selected_die.id in selected_die_ids else NullAction())
+                        fixed:
+                            text rm_check_die_label(selected_die) style "attribute_check_body" size 24 xalign .5 ypos 172
+                            text ("点击移除" if selected_die.id in selected_die_ids else "枷锁联动加入") style "attribute_check_hint_text" size 22 color "#eee8d8" xalign .5 ypos 210
+                hbox:
+                    ypos 628 spacing 46
+                    text ("可用 {}".format(usable_count)) style "attribute_check_body"
+                    text ("已选 {} / {}".format(len(actual_ids),preview['limit'])) style "attribute_check_body" id "check_selected_count"
+                text ("可用属性："+"、".join(rm_core.ATTRIBUTE_LABELS[a] for a in allowed)) style "attribute_check_hint_text" xpos 520 ypos 632 xsize 610
+                textbutton "骰面与规则详情":
+                    id "check_details"
+                    style "attribute_check_tab_button"
+                    xalign 1.0 ypos 612 xsize 360
+                    action SetScreenVariable("details_open", True)
+                add Solid("#b4aa96") ypos 676 xysize (1936,2)
+                hbox:
+                    ypos 686 spacing 10
+                    for tab_id, tab_label in ATTRIBUTE_DICE_TABS:
+                        textbutton tab_label.replace("骰子", ""):
+                            id ("check_tab_"+tab_id)
+                            style "attribute_check_tab_button"
+                            xsize 268
+                            selected selected_tab == tab_id
+                            action SetScreenVariable("selected_tab", tab_id)
+                vpgrid:
+                    id "check_pool"
+                    ypos 754 xalign .5 xysize (min(6,max(1,len(options)))*288+min(6,max(1,len(options)))*24,414)
+                    cols min(6,max(1,len(options))) spacing 24
+                    mousewheel True draggable True
+                    scrollbars "vertical"
+                    vscrollbar_xsize 10
+                    vscrollbar_base_bar "#dfd7c8"
+                    vscrollbar_thumb "#9c8d70"
+                    vscrollbar_hover_thumb "#6c6048"
+                    vscrollbar_unscrollable "hide"
+                    for die in options:
+                        $ chosen = die['id'] in actual_ids
+                        $ manual_choice = die['id'] in selected_die_ids
+                        $ clickable = die['selectable'] and (manual_choice or (not chosen and len(actual_ids) < preview['limit']))
+                        $ change = rm_dice_view.check_selection_change(character, spec, renpy.random, die['id']) if clickable else None
+                        button:
+                            id ("check_die_"+die['id'])
+                            style "attribute_check_choice"
+                            padding (20,12) xysize (288,402)
+                            background Transform("gui/dice_obsidian/card-stock-approved.png",xysize=(288,402))
+                            hover_background Transform("gui/dice_obsidian/card-stock-approved.png",xysize=(288,402),matrixcolor=BrightnessMatrix(.10))
+                            selected_background Transform("gui/dice_obsidian/card-stock-approved.png",xysize=(288,402),matrixcolor=BrightnessMatrix(.06))
+                            selected_hover_background Transform("gui/dice_obsidian/card-stock-approved.png",xysize=(288,402),matrixcolor=BrightnessMatrix(.14))
+                            insensitive_background Transform("gui/dice_obsidian/card-stock-approved.png",xysize=(288,402),matrixcolor=SaturationMatrix(0))
+                            selected chosen
+                            sensitive clickable and not confirm_open and not details_open
+                            action SetScreenVariable("selected_die_ids", attribute_toggle_die_selection(selected_die_ids, die['id'], preview['limit']))
+                            fixed:
+                                text rm_check_die_label(character.find_die(die['id'])) style "attribute_check_body" size 26 color "#f0ede4" xalign .5
+                                text (("已选" if manual_choice else "联动") if chosen else (("已满" if len(actual_ids) >= preview['limit'] else "可选") if die['selectable'] else ("封印" if character.find_die(die['id']).is_sealed() else "属性不符"))) style "attribute_check_hint_text" size 20 color "#ead09a" xalign 1.0 ypos 36
+                                text rm_core.enchantment_label(character.find_die(die['id']).enchantment) style "attribute_check_hint_text" size 20 color "#c6b98f" ypos 36
+                                add rm_live_thumbnail(die['faces'],size=192) xalign .5 ypos 68
+                                text rm_check_face_summary(die['faces']) style "attribute_check_faces_text" size 20 line_spacing 0 color "#eee4ce" xsize 248 text_align .5 ypos 244
+                                text (rm_dice_view.check_change_text(preview,change,manual_choice).replace(" · ","\n") if change else ("自动参与骰组" if chosen else ("先移除一颗已选骰" if die['selectable'] else "本次不可选"))):
+                                    style "attribute_check_hint_text"
+                                    size 20 line_spacing 0 color "#ead09a" xsize 248 text_align .5 ypos 306
+                if not options:
+                    text "此分类没有骰子，请切换上方分类。" style "attribute_check_muted_text" xalign .5 ypos 898
+        textbutton "取消":
+            id "check_back"
+            style "attribute_check_button"
+            ypos 1272 xsize 420
+            action Return("__rm_check_cancel__")
+        textbutton "确认":
+            id "check_review"
+            style "attribute_check_button"
+            xpos 1628 ypos 1272 xsize 420
+            sensitive can_confirm and not confirm_open and not details_open
+            action [Function(selection_table.finish_snap),SetScreenVariable("confirm_open", True)]
+        text (invalid_reason or (rm_check_reason(preview['reason']) if preview['reason'] else "点击上方骰子可移除；确认后进入投掷。")):
+            style "attribute_check_hint_text"
+            color "#f3eee3"
+            xalign .5 ypos 1284 xsize 1120 text_align .5
     if confirm_open:
+        key "game_menu" action SetScreenVariable("confirm_open", False)
         button:
             style "attribute_check_confirm_dim"
-            action NullAction()
-
+            action SetScreenVariable("confirm_open", False)
         frame:
             style "attribute_check_confirm_modal"
-
             vbox:
-                spacing 24
-                xfill True
-
-                text "确认检定" style "attribute_check_section_title"
-                text "确认要花费[energy_cost]点精力使用当前骰子组合进行[check_header['kind']]（[check_header['action_type_label']]）的检定吗？" style "attribute_check_body"
-
+                spacing 28 xfill True
+                text "确认检定" style "attribute_check_title"
+                text ("参与骰组："+"、".join(rm_check_die_label(die) for die in preview['dice'])) style "attribute_check_body"
+                text ("目标 {}  ·  成功率 {}".format(preview['target'], rm_dice_view.probability_text(preview['success_probability']))) style "attribute_check_section_title"
+                text ("消耗精力 {}  ·  投后剩余 {}".format(preview['cost'], preview['remaining'])) style "attribute_check_body"
+                text "取消可继续调整骰组。" style "attribute_check_muted_text"
                 hbox:
-                    xalign 1.0
-                    spacing 19
-
-                    if rm_ui_test_skin_active:
-                        textbutton "取消":
-                            style "rm_ui_test_option_button"
-                            action SetScreenVariable("confirm_open", False)
-
-                        textbutton "确认":
-                            style "rm_ui_test_option_button"
-                            action Return(selected_die_ids)
-                    else:
-                        textbutton "取消":
-                            style "attribute_check_button"
-                            action SetScreenVariable("confirm_open", False)
-
-                        textbutton "确认":
-                            style "attribute_check_button"
-                            action Return(selected_die_ids)
-
-    if invalid_open:
+                    xalign 1.0 spacing 24
+                    textbutton "取消" id "check_cancel" style "attribute_check_button" action SetScreenVariable("confirm_open", False)
+                    textbutton "确认" id "check_confirm" style "attribute_check_button" action Return(actual_ids)
+    if details_open:
+        key "game_menu" action SetScreenVariable("details_open", False)
         button:
             style "attribute_check_confirm_dim"
-            action SetScreenVariable("invalid_open", False)
-
-            frame:
-                style "attribute_check_confirm_modal"
-
-                vbox:
-                    spacing 24
-                    xfill True
-
-                    text "骰组不合法" style "attribute_check_section_title"
-                    text "[invalid_reason]" style "attribute_check_body"
-                    text "点击屏幕以重新选择。" style "attribute_check_invalid_hint"
-
+            action SetScreenVariable("details_open", False)
+        frame:
+            style "attribute_check_confirm_modal"
+            xsize 1500
+            vbox:
+                spacing 22 xfill True
+                text "骰面与规则" style "attribute_check_title"
+                text "成功率按实际骰面和当前修正计算，包含所有成功等级。" style "attribute_check_hint_text"
+                viewport:
+                    ysize 650 mousewheel True draggable True
+                    scrollbars "vertical"
+                    vscrollbar_xsize 10
+                    vscrollbar_base_bar "#dfd7c8"
+                    vscrollbar_thumb "#9c8d70"
+                    vscrollbar_hover_thumb "#6c6048"
+                    vscrollbar_unscrollable "hide"
+                    vbox:
+                        xsize 1340 spacing 20
+                        text rm_check_formula(preview, required_stat) style "attribute_check_body"
+                        if preview['total_range']:
+                            text ("最终值范围 {:g}–{:g} · 失败率 {}".format(*preview['total_range'],rm_dice_view.probability_text(1-preview['success_probability']))) style "attribute_check_body"
+                        text ("心境：{} · 骰面倍率 ×{:g}".format(rm_core.mood_label(rm_core.mood_state(character)),preview['dice_multiplier'])) style "attribute_check_body"
+                        text ("奖励来源 {} / 惩罚来源 {} · 抵消后逐次重投；奖励可选目标，惩罚随机。".format(preview['advantage'],preview['disadvantage'])) style "attribute_check_hint_text"
+                        for factor in rm_dice_view.check_factor_details(character,spec,len(actual_ids)):
+                            text factor style "attribute_check_hint_text"
+                        if preview['dice']:
+                            for index, selected_die in enumerate(preview['dice']):
+                                frame:
+                                    background "#e6dfd0" padding (24,18) xfill True
+                                    vbox:
+                                        spacing 6
+                                        text (rm_check_die_label(selected_die)+" · "+rm_core.enchantment_label(selected_die.enchantment)) style "attribute_check_body"
+                                        text ("骰面："+format_die_faces(selected_die.faces)) style "attribute_check_hint_text" xsize 1240
+                                        text ({'normal':'投一次，采用该点数','bonus':'投两次，取较高点数','penalty':'投两次，取较低点数'}[preview['modes'][index]]) style "attribute_check_hint_text"
+                        else:
+                            text "先选骰子，再查看本次骰面的投掷规则。" style "attribute_check_hint_text"
+                        text "重复的面值会分别计入概率；更换骰组后，概率与精力同步更新。" style "attribute_check_hint_text"
+                textbutton "返回选骰":
+                    id "check_details_close"
+                    style "attribute_check_button"
+                    xalign 1.0
+                    action SetScreenVariable("details_open", False)
     if rm_ui_test_skin_active:
         use rm_ui_test_close_button()
 
+screen attribute_check_choose_bonus_dice(dice_ids, count):
+    modal True
+    zorder 230
+    default chosen = []
+    use rm_allow_game_menu
+    use modal_dim_background
+    frame:
+        style "attribute_check_confirm_modal"
+        align (.5, .5)
+        xsize 900
+        vbox:
+            spacing 22
+            text "选择奖励骰重投目标" style "attribute_check_title"
+            text "每个奖励骰重投一颗已投入骰并取较高点数；可重复选择同一颗。" style "attribute_check_body"
+            text "已选择 [len(chosen)] / [count]" style "attribute_check_section_title"
+            if len(chosen) < count:
+                for die_id in dice_ids:
+                    $ die = rm_ensure_player().find_die(die_id)
+                    if die is not None:
+                        textbutton rm_check_die_label(die):
+                            style "attribute_check_button"
+                            action SetScreenVariable("chosen", chosen + [die_id])
+            else:
+                textbutton "开始投骰":
+                    style "attribute_check_button"
+                    action Return(chosen)
 
 screen attribute_check_roll_animation(result):
     modal True
     zorder 231
-    default roll_finished = False
-
+    default roll_table = RMRealtimeDice(rm_check_rows(result))
     use rm_allow_game_menu
     use modal_dim_background
-
-    timer 1.32 action Return()
-
+    $ rows = rm_check_rows(result)
+    $ phase = roll_table.world['phase']
+    $ roll_finished = phase == "settled"
+    if phase == "ready" and rows:
+        key "K_SPACE" action Function(roll_table.launch)
     frame:
         style "attribute_check_panel"
-
-        vbox:
-            spacing 27
-            xfill True
-
-            text "检定投掷" style "attribute_check_title"
-
-            frame:
-                style "attribute_stage_frame"
-
-                fixed:
-                    xfill True
-                    ysize 413
-
-                    add Solid("#8fb39a") xalign 0.5 yalign 0.74 xsize 693 ysize 24
-
-                    if roll_finished and result["available"] and result["rolls"]:
-                        frame:
-                            background None
-                            xalign 0.5
-                            yalign 0.44
-                            at attribute_die_land
-                            use attribute_die_entity(result["die_label"], result["die_faces_text"], str(result["rolls"][0]), True)
-
-                        text str(result["rolls"][0]):
-                            xalign 0.5
-                            yalign 0.08
-                            size 96
-                            color "#000000"
-                            at attribute_die_result_flash
-                    elif roll_finished:
-                        frame:
-                            background None
-                            xalign 0.5
-                            yalign 0.44
-                            use attribute_die_entity(result["die_label"], result["die_faces_text"], "!", False)
-
-                        text "本次没有完成掷骰":
-                            xalign 0.5
-                            yalign 0.10
-                            size 45
-                            color "#000000"
-                    else:
-                        frame:
-                            background None
-                            xalign 0.5
-                            yalign 0.44
-                            at attribute_die_roll_body
-                            use attribute_die_entity(result["die_label"], result["die_faces_text"], "?", True)
-
-                    text ("点数落定" if roll_finished else "骰子滚动中……") xalign 0.5 yalign 0.94 style "attribute_check_body"
-
-            text "掷骰结束后将自动显示结果。" style "attribute_check_body"
-
+        xysize (2048,1240) padding (56,36) yoffset -60
+        fixed:
+            text ("点数落定" if roll_finished else "掷出骰子") style "attribute_check_title"
+            text ("目标 {:g}".format(result['success_threshold'])) style "attribute_check_section_title" xalign 1.0 ypos 10
+            text ({'ready':'按住桌面，向想投出的方向拖拽后松手；也可以点击掷骰。','rolling':'骰子正在翻滚……','settled':'点数已落定，确认后查看完整结算。'}[phase]) style "attribute_check_hint_text" ypos 82
+            if rows:
+                add roll_table pos (0,145) id "check_roll_table"
+                hbox:
+                    xalign .5 ypos 854 spacing 60
+                    for index,row in enumerate(rows):
+                        vbox:
+                            id ("check_roll_die_"+str(index))
+                            xsize 560 spacing 8
+                            text (row['label']+(("  ·  "+str(row['value'])) if roll_finished else "")) style "attribute_check_section_title" xalign .5
+                            if roll_finished and row['attempts']:
+                                text ("投出 "+row['attempts']) style "attribute_check_hint_text" xalign .5 size 26
+            else:
+                text rm_check_reason(result.get('reason')) style "attribute_check_section_title" align (.5,.5)
+            add Solid("#b4aa96") ypos 958 xysize (1936,2)
+            text ("拖拽方向与距离决定投掷轨迹" if phase == 'ready' else "本次投掷已确认") style "attribute_check_hint_text" ypos 1002
+            textbutton ("查看结果" if roll_finished or not rows else ("掷出骰子" if phase == 'ready' else "骰子滚动中")):
+                id "check_roll_action"
+                style "attribute_check_button"
+                xpos 1516 ypos 984 xsize 420
+                sensitive phase != 'rolling'
+                action (Return() if roll_finished or not rows else Function(roll_table.launch))
 
 screen attribute_check_result(result):
     modal True
     zorder 232
-
     use rm_allow_game_menu
     use modal_dim_background
-
+    $ core = result.get('_result')
+    $ rows = rm_check_rows(result)
+    $ completed = result.get('available', False)
     frame:
         style "attribute_check_panel"
-
-        vbox:
-            spacing 24
-            xfill True
-
+        fixed:
             text "检定结果" style "attribute_check_title"
-
-            hbox:
-                spacing 35
-                xfill True
-
-                use attribute_die_entity(result["die_label"], result["die_faces_text"], str(result["rolls"][0]) if result["rolls"] else "!", result["available"] and result["rolls"])
-
-                vbox:
-                    yalign 0.5
-                    spacing 11
-
-                    if result["available"] and result["rolls"]:
-                        text "[result['stat_label']]检定：[result['stat_half']] + 骰组[result.get('dice_total', sum(result['rolls']))] + 修正[result['mood_modifier']] = [result['total']]" style "attribute_check_body"
-                        text "目标值：[result['success_threshold']]  成功级别：[attribute_check_rank_label(result['rank'])]" style "attribute_check_body"
-                    else:
-                        text "本次没有完成掷骰：[result['reason']]" style "attribute_check_body"
-                        text "目标值：[result['success_threshold']]  结果：无法执行" style "attribute_check_body"
-
-            if rm_ui_test_skin_active:
-                textbutton "继续":
-                    xalign 1.0
-                    style "rm_ui_test_prominent_button"
-                    action Return()
-            else:
-                textbutton "继续":
-                    xalign 1.0
-                    style "attribute_check_button"
-                    action Return()
-
+            add Solid("#b4aa96") ypos 88 xysize (1936,2)
+            vbox:
+                xpos 0 ypos 138 spacing 28 xsize 1080
+                text (attribute_check_rank_label(result['rank']) if completed else "无法执行") style "attribute_check_total" id "check_rank"
+                if rows:
+                    text ("最终值 {:g}  /  目标 {:g}".format(result['total'], result['success_threshold'])) style "attribute_check_title"
+                    text "各骰落点" style "attribute_check_section_title"
+                    for index, row in enumerate(rows):
+                        frame:
+                            id ("check_result_die_"+str(index))
+                            background "#e6dfd0" padding (24,16) xsize 1080
+                            fixed:
+                                ysize 56
+                                text row['label'] style "attribute_check_body" xsize 360
+                                text str(row['value']) style "attribute_check_section_title" xpos 390
+                                if row['attempts']:
+                                    text ("投出 "+row['attempts']) style "attribute_check_muted_text" xpos 580
+                else:
+                    text rm_check_reason(result.get('reason')) style "attribute_check_body"
+            add Solid("#b4aa96") xpos 1192 ypos 138 xysize (1,740)
+            vbox:
+                xpos 1232 ypos 146 spacing 28 xsize 704
+                text "结算明细" style "attribute_check_section_title"
+                if rows:
+                    text ("属性贡献  {:g}".format(result['stat_half'])) style "attribute_check_body"
+                    text ("骰组点数  {:g}".format(core.dice_total if core else result.get('dice_total', sum(result['rolls'])))) style "attribute_check_body"
+                    if core:
+                        text ("骰组倍率  ×{:g}".format(core.dice_multiplier)) style "attribute_check_body"
+                    text ("额外修正  {:+g}".format(result['mood_modifier'])) style "attribute_check_body"
+                    if core:
+                        text ("总值倍率  ×{:g}".format(getattr(core, 'final_multiplier', 1.0))) style "attribute_check_body"
+                if core:
+                    text ("精力成本  {}".format(core.energy_cost if core.available else 0)) style "attribute_check_section_title"
+                text "继续后回到当前行动，查看后续结果。" style "attribute_check_muted_text"
+            add Solid("#b4aa96") ypos 958 xysize (1936,2)
+            textbutton "继续":
+                id "check_continue"
+                style "attribute_check_button"
+                xpos 1516 ypos 984 xsize 420
+                action Return()
 
 style attribute_check_panel is frame:
-    xalign 0.5
-    yalign 0.5
-    xsize 2048
-    ysize 1152
-    background ConditionSwitch("rm_ui_test_skin_active", Frame("gui/ui_test_skin/dice_check_panel.png", 90, 90), "True", Solid("#243029"))
-    padding (37, 32, 37, 32)
-
-style attribute_stage_frame is frame:
-    xfill True
-    background ConditionSwitch("rm_ui_test_skin_active", Frame("gui/ui_test_skin/check_stage.png", 70, 24), "True", Solid("#18241d"))
-    padding (29, 24, 29, 24)
-
-style attribute_check_summary_frame is frame:
-    xfill True
-    background ConditionSwitch("rm_ui_test_skin_active", Frame("gui/ui_test_skin/dice_list.png", 60, 34), "True", Solid("#18241d"))
-    padding (21, 16, 21, 16)
-
-style attribute_check_summary_label is text:
-    size 24
-    color "#000000"
-
-style attribute_check_summary_value is text:
+    align (.5,.5)
+    xysize (2048,1152)
+    background "#f3eee3"
+    padding (56,48)
+style attribute_check_title is gui_text:
+    font rememorial_ui_font
+    size 52
+    color "#292923"
+    bold False
+    outlines []
+style attribute_check_total is attribute_check_title:
+    size 92
+style attribute_check_section_title is attribute_check_title:
+    size 38
+style attribute_check_body is attribute_check_title:
     size 32
-    color "#000000"
-
-style attribute_check_tab_button is button:
-    xsize 197
-    ysize 53
-    background ConditionSwitch("rm_ui_test_skin_active", Frame("gui/ui_test_skin/option_button.png", 40, 16), "True", Solid("#35443a"))
-    hover_background ConditionSwitch("rm_ui_test_skin_active", Frame("gui/ui_test_skin/option_button.png", 40, 16), "True", Solid("#425846"))
-    selected_background ConditionSwitch("rm_ui_test_skin_active", Frame("gui/ui_test_skin/option_button.png", 40, 16), "True", Solid("#dfe7dc"))
-    padding (0, 0)
-
-style attribute_check_tab_button_text is button_text:
-    size 24
-    color "#000000"
-    hover_color "#000000"
-    selected_color "#000000"
-    xalign 0.5
-    yalign 0.5
-
+    line_spacing 6
+style attribute_check_muted_text is attribute_check_body:
+    color "#625b50"
+style attribute_check_hint_text is attribute_check_muted_text:
+    size 28
+style attribute_check_faces_text is attribute_check_body:
+    size 26
+style attribute_check_notice is attribute_check_body:
+    color "#8b4436"
+style attribute_check_button is button:
+    background "#393c32"
+    hover_background "#6c6048"
+    insensitive_background "#d9d2c4"
+    padding (28,18)
+    keyboard_focus True
+style attribute_check_button_text is attribute_check_body:
+    color "#f3eee3"
+    hover_color "#ffffff"
+    insensitive_color "#81796c"
+    align (.5,.5)
+style attribute_check_tab_button is attribute_check_button:
+    xsize 155
+    padding (0,14)
+    background "#e6dfd0"
+    hover_background "#d4c7af"
+    selected_background "#393c32"
+style attribute_check_tab_button_text is attribute_check_body:
+    size 28
+    color "#292923"
+    selected_color "#f3eee3"
+    align (.5,.5)
+style attribute_check_choice is button:
+    background "#e6dfd0"
+    hover_background "#ddd0b7"
+    selected_background "#c9bb9e"
+    selected_hover_background "#bfae89"
+    insensitive_background "#eee9df"
+    padding (24,18)
+    keyboard_focus True
+style attribute_check_die_frame is frame:
+    background "#e6dfd0"
+    padding (36,48)
+    xysize (480,340)
 style attribute_check_confirm_dim is button:
     xfill True
     yfill True
-    background Solid("#00000099")
-    hover_background Solid("#00000099")
-    padding (0, 0)
-
+    background "#292923aa"
+    hover_background "#292923aa"
+    padding (0,0)
 style attribute_check_confirm_modal is frame:
-    xalign 0.5
-    yalign 0.5
-    xsize 1013
-    background ConditionSwitch("rm_ui_test_skin_active", Frame("gui/ui_test_skin/dice_list.png", 60, 34), "True", Solid("#101812f2"))
-    padding (35, 29, 35, 29)
-
-style attribute_check_invalid_hint is text:
-    size 24
-    color "#000000"
-    xalign 0.5
-
-style attribute_check_title is text:
-    size 48
-    color "#000000"
-
-style attribute_check_section_title is text:
-    size 33
-    color "#000000"
-
-style attribute_check_body is text:
-    size 32
-    color "#000000"
-    line_spacing 5
-
-style attribute_check_muted_text is text:
-    size 31
-    color "#000000"
-
-style attribute_check_die_text is text:
-    size 32
-    color "#000000"
-
-style attribute_check_faces_text is text:
-    size 25
-    color "#000000"
-
-style attribute_check_hint_text is text:
-    size 24
-    color "#000000"
-
-style attribute_check_die_disabled_text is text:
-    size 32
-    color "#000000"
-
-style attribute_check_faces_disabled_text is text:
-    size 25
-    color "#000000"
-
-style attribute_check_disabled_hint_text is text:
-    size 24
-    color "#000000"
-
-style attribute_check_button is button:
-    background ConditionSwitch("rm_ui_test_skin_active", Frame("gui/ui_test_skin/option_button.png", 40, 16), "True", Solid("#35443a"))
-    hover_background ConditionSwitch("rm_ui_test_skin_active", Frame("gui/ui_test_skin/option_button.png", 40, 16), "True", Solid("#425846"))
-    padding (27, 13, 27, 13)
-
-style attribute_check_button_text is button_text:
-    size 32
-    color "#000000"
-    hover_color "#000000"
+    align (.5,.5)
+    xsize 1200
+    background "#f3eee3"
+    padding (56,48)

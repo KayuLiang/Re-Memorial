@@ -52,7 +52,7 @@ class OpeningRMIntegrationTests(unittest.TestCase):
 
         self.assertNotIn("grid 3 2:", attribute_screen)
         self.assertIn("vpgrid:", attribute_screen)
-        self.assertIn("cols 3", attribute_screen)
+        self.assertIn("cols min(6,max(1,len(options)))", attribute_screen)
 
 
 if __name__ == "__main__":

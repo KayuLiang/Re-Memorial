@@ -45,12 +45,13 @@ class StrengthTrainingBonusRuleTests(unittest.TestCase):
         character = rm.create_initial_character({"str": 1, "dex": 4, "int": 3}, rng=random.Random(1))
         result = rm.CheckResult(available=True, attribute="str", rank=rm.RESULT_HARD_SUCCESS, success=True)
 
-        summary = rm.apply_strength_training_str_bonus(character, result, rng=random.Random(2))
+        summary = rm.apply_strength_training_str_bonus(character, result, rng=AlwaysSuccessRandom(2))
 
         self.assertEqual(summary["success_count"], 3)
         self.assertEqual(summary["roll_plan"], [1.0, 1.0, 1.0])
         self.assertEqual(rm.current_attribute(character, "str"), 4)
-        self.assertEqual(character.attribute_bonus_gain_counters["str"], 3)
+        self.assertEqual(character.attribute_bonus_gain_counters["str"], 0)
+        self.assertEqual(character.growth_reward_pending["str"], 1)
         self.assertTrue(all(item["source"] == "test_strength_training" for item in character.attribute_bonuses["str"]))
 
     def test_apply_strength_training_bonus_uses_current_strength_before_adding_layers(self):

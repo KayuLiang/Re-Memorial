@@ -33,7 +33,8 @@ class RMSecondStageTests(unittest.TestCase):
 
         for _ in range(4):
             rm.add_attribute_bonus(character, "str", 1)
-        self.assertEqual(character.dice_growth_progress["str"], 6)
+        self.assertEqual(character.dice_growth_progress["str"], 0)
+        self.assertEqual(character.growth_reward_pending["str"], 1)
 
         character.attribute_bonuses["str"] = [{"value": 1, "source": "a"}]
         rm.process_small_rest(character, rng=random.Random(0))

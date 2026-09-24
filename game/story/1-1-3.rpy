@@ -228,6 +228,8 @@ label story_1_1_3:
 
     "我是不是应该做些什么？"
 
+label story_1_1_3_thief_choice:
+
     menu:
         "做！":
             $ thief_helped = True
@@ -263,8 +265,11 @@ label story_1_1_3_help_thief:
     $ selected_die_id = None
 
     while selected_die_id is None:
-        call screen attribute_dice_select("dex")
+        call screen attribute_dice_select("dex", thought="逃窜的小偷似乎正打算从我们这节车厢前面的车门逃走。\n我是不是应该做些什么？")
         $ selected_die_id = _return
+        if selected_die_id == "__rm_check_cancel__":
+            $ thief_helped = False
+            jump story_1_1_3_thief_choice
 
     $ thief_check_result = perform_attribute_check("dex", selected_die_id)
 

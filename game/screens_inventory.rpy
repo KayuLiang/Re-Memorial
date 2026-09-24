@@ -40,14 +40,6 @@ init -5 python:
         get("image_x").change(max(0,(1200*zoom-1900)/2))
         get("image_y").change(max(0,(1200*zoom-980)/2))
 
-    def rm_ui_take_medicine(medicine, confirm_repeat=False):
-        result = rm_core.take_medicine(rm_ensure_player(), medicine, rng=renpy.random, confirm_repeat=confirm_repeat)
-        if result.get("available"):
-            store.inventory_message = "已服用{}。".format(rm_core.MEDICINE_LABELS[medicine])
-        elif result.get("reason") == "out_of_stock":
-            store.inventory_message = "库存不足。"
-        return result
-
     class RMInventoryMark(renpy.Displayable):
         def __init__(self, kind="search", color=INV_PAPER, **kwargs):
             super(RMInventoryMark,self).__init__(**kwargs)
@@ -214,44 +206,6 @@ screen inventory_panel(start_category="all"):
                     alt (item["verb"]+"，"+rm_inventory.use_blocked_reason(item))
                     text item["verb"] style "rm_inventory_textbutton_text"
     text "物品美术为示意" pos (58,1363) size 27 color "#85877d"
-
-# Medicine keeps its simple interim layout, using the same catalog and stock.
-screen medicine_panel():
-    default repeat_confirmation = None
-    modal True
-    zorder 200
-    use modal_dim_background
-    key "game_menu" action Hide("medicine_panel")
-    $ medicine_state = rm_ensure_player()
-    $ medicines = [(medicine, count) for medicine, count in medicine_state.medicine_counts.items() if count > 0]
-    frame:
-        pos (448,331) xysize (1664,779) padding (53,43) background "#f3eee3"
-        vbox:
-            spacing 32
-            hbox:
-                xfill True
-                text "药盒" size 51 color INV_INK
-                button:
-                    xalign 1.0 xysize (80,80) background None
-                    action Hide("medicine_panel")
-                    alt "关闭药盒"
-                    add RMCaseMark() align (.5,.5)
-            if not medicines:
-                text "药盒里没有可用药物。" size 35 color INV_MUTED
-            else:
-                for medicine, count in medicines:
-                    hbox:
-                        spacing 32
-                        text "{} ×{}".format(rm_core.MEDICINE_LABELS[medicine], count) size 40 color INV_INK xsize 900
-                        $ repeated = int(getattr(medicine_state, "medicine_taken_today", {}).get(medicine, 0)) > 0
-                        textbutton ("确认重复服用" if repeat_confirmation == medicine else "服用"):
-                            style "rm_inventory_textbutton"
-                            if repeated and repeat_confirmation != medicine:
-                                action SetScreenVariable("repeat_confirmation", medicine)
-                            else:
-                                action [Function(rm_ui_take_medicine, medicine, repeated), SetScreenVariable("repeat_confirmation", None)]
-                if inventory_message:
-                    text inventory_message size 32 color INV_MUTED
 
 style rm_inventory_text is gui_text:
     font rememorial_ui_font

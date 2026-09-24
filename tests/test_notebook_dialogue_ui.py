@@ -47,7 +47,7 @@ class NotebookDialogueUiTests(unittest.TestCase):
         self.assertIn('gui/hud_flat/photo_mount.svg', say)
         self.assertIn('照片待绘', say)
         self.assertNotIn('rm_hud_portrait', say)
-        self.assertNotIn('phone_panel', say)
+        self.assertNotIn('use phone_panel', say)
         self.assertNotIn('ui_notebook_canvas', say)
         self.assertIn('use quick_menu', say)
         self.assertIn('QueueEvent("dismiss_unfocused")', say)

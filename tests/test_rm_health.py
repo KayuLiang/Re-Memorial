@@ -41,6 +41,10 @@ class HealthTests(unittest.TestCase):
     def test_death_cannot_be_healed_or_grown_away(self):
         p = self.p
         rm.damage_health(p, 35)
+        self.assertEqual(p.health, 9)
+        self.assertTrue(p.emergency_rescue_used)
+        self.assertTrue(p.emergency_rescue_pending)
+        rm.damage_health(p, 35)
         self.assertTrue(rm.is_dead(p))
         self.assertEqual(p.health, 0)
         self.assertEqual(rm.heal_health(p, 50), 0)
@@ -52,8 +56,8 @@ class HealthTests(unittest.TestCase):
     def test_con_drop_kills_before_zero_con(self):
         rm.damage_health(self.p, 26)
         rm.add_formal_attribute(self.p, 'con', -1)
-        self.assertEqual((self.p.health, rm.health_max(self.p)), (0, 25))
-        self.assertTrue(rm.is_dead(self.p))
+        self.assertEqual((self.p.health, rm.health_max(self.p)), (7.5, 25))
+        self.assertTrue(self.p.emergency_rescue_used)
 
     def test_old_save_initialized_once_before_con_mutation(self):
         p = self.p
@@ -98,6 +102,7 @@ class HealthTests(unittest.TestCase):
         p.deep_fatigue['relapsed'] = True
         p.day = p.deep_fatigue['last_night']
         p.weekday = 1
+        p.emergency_rescue_used = True
         rm.damage_health(p, 26)
         rm.start_turn(p, 'sleep_decision')
         before_day = p.day
@@ -111,6 +116,7 @@ class HealthTests(unittest.TestCase):
         rm.start_deep_fatigue(p)
         p.day = p.deep_fatigue['last_night']
         p.weekday = 1
+        p.emergency_rescue_used = True
         rm.damage_health(p, 22)
         rm.start_turn(p, 'sleep_decision')
         rm.continue_night(p)

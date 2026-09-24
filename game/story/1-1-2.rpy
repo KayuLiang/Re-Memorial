@@ -190,6 +190,7 @@ label story_1_1_2:
     $ rm_core.add_medicine_stock(rm_ensure_player(), "venlafaxine", 42)
     $ rm_core.add_medicine_stock(rm_ensure_player(), "trazodone", 40)
     $ rm_core.add_medicine_stock(rm_ensure_player(), "alprazolam", 12)
+    $ rm_pillbox.set_prescription(rm_ensure_player(), rm_pillbox.INITIAL_SLOTS, rm_pillbox.INITIAL_RECOMMENDATIONS)
     call unlock_inventory_button
     call unlock_medicine_button
 
@@ -344,11 +345,13 @@ label story_1_1_2:
         # 原文标注：【独白】
         # 独白演出：主角高亮，其他角色和背景变暗；普通旁白不要触发此效果。
             "他还忙前忙后地跑了这么多趟，真是麻烦他了。"
-            fro "谢谢你给我送的衣服，很合身。我马上出来了。"
+            # 这句固定回复在独立 VN 回复框中展示，发送后才成为聊天记录。
             hide screen phone_panel_background onlayer master
             $ phone_prepare_story_ami_reply()
-        elif not phone_story_ami_sent:
+        elif not phone_story_ami_sent and _return != "reply_ready":
             call screen phone_story_resume
+        if phone_story_ami_reply_ready:
+            call phone_story_reply("ami", phone_story_ami_reply_options, phone_send_story_ami_reply)
 
     # TODO 素材未确认：CG「镜中的自己」。确认CG后可替换为 scene/show。
 

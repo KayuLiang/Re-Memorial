@@ -21,14 +21,18 @@ testcase dice_growth.training_penalty_before_next_round:
     click "继续"
     click "继续"
     pause until screen "rm_test_schedule_select" timeout 5
-    click "力量训练（测试）"
+    click "负重训练（测试）"
     pause until screen "attribute_dice_select" timeout 5
     $ renpy.set_screen_variable("selected_die_ids", renpy.python.RevertableList(("str_1", "str_regression")), screen="attribute_dice_select")
     run Function(renpy.restart_interaction)
     pause .2
-    click "确认骰子"
+    click id "check_review"
     pause .2
-    click "确认"
+    click id "check_confirm"
+    pause until screen "attribute_check_roll_animation" timeout 5
+    click id "check_roll_action"
+    pause until eval renpy.get_screen_variable('roll_finished','attribute_check_roll_animation') timeout 6
+    click id "check_roll_action"
     pause until screen "attribute_check_result" timeout 5
     assert eval rm_test_check_result["_result"].dice_ids == ["str_1", "str_regression"]
     assert eval rm_test_check_result["_result"].rank == rm_core.RESULT_BIG_FAILURE
@@ -43,6 +47,7 @@ testcase dice_growth.training_penalty_before_next_round:
     assert eval rm_player.current_time_slot == "morning_1"
     # All-one d6 fixtures leave only non-targeted legal penalties.
     click expression rm_test_card_label(rm_test_pending_request["cards"][0])
+    click id "growth_confirm"
     pause until not screen "rm_test_pending_card_choice" timeout 5
     assert eval rm_player.degradation_penalty_pending["str"] == 0
     assert eval rm_player.current_time_slot == "morning_1"
@@ -79,9 +84,10 @@ testcase dice_growth.chosen_upgrade:
     run Start("rm_test_dice_growth_choice")
     pause until screen "rm_test_pending_die_choice" timeout 5
     assert eval [die["id"] for die in rm_test_pending_dice_choices(rm_test_pending_request, rm_test_pending_card)] == ["str_1"]
-    assert "str_1"
-    assert not "str_capped"
-    click "str_1"
+    assert id "growth_die_str_1"
+    assert not id "growth_die_str_capped"
+    click id "growth_die_str_1"
+    click id "growth_confirm"
     pause until screen "choice" timeout 5
     assert eval len(rm_player.find_die("str_1").faces) == 8
     assert eval rm_player.find_die("str_1").faces[-2:] == [1, 6]
@@ -106,11 +112,13 @@ testcase dice_growth.chosen_increase:
     run Start("rm_test_dice_growth_increase")
     pause until screen "rm_test_pending_die_choice" timeout 5
     assert eval [die["id"] for die in rm_test_pending_dice_choices(rm_test_pending_request, rm_test_pending_card)] == ["str_1"]
-    assert not "str_capped"
-    click "str_1"
+    assert not id "growth_die_str_capped"
+    click id "growth_die_str_1"
+    click id "growth_confirm"
     pause until screen "rm_test_pending_face_choice" timeout 5
     assert eval rm_test_pending_face_choices("str_1", card=rm_test_pending_card) == [{"index": 2, "value": 5}]
     click "第3面：5"
+    click id "growth_confirm"
     pause until screen "choice" timeout 5
     assert eval rm_player.find_die("str_1").faces == [6] * 6
     assert eval rm_player.growth_reward_pending["str"] == 0

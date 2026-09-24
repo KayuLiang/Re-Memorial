@@ -119,6 +119,9 @@ transform notebook_tab_caption:
     linear .08 alpha 1.0
 
 screen say(who, what):
+    zorder (100 if renpy.get_screen("phone_panel_background", layer="master") else 0)
+    if renpy.get_screen("phone_panel_background", layer="master"):
+        use modal_dim_background
     # One stable paper layout for speech, narration and inner monologue.
     fixed:
         xysize (2560, 1440)

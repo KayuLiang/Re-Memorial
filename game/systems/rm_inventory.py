@@ -3,7 +3,7 @@ CATEGORIES = (("all", "全部"), ("medicine", "药物"), ("food", "食物"), ("i
 ALIASES = {"项链": "奇怪的项链"}
 ITEMS = {
     "帕尔的巧克力": dict(category="food", art=0, description="抓住小偷后收到的一份谢礼。", effect="效果待定义", verb="食用"),
-    "药盒": dict(category="important", art=1, description="出院时医生交付的药物容器。具体药品、数量与游戏效果待定义；容器不能直接服用。"),
+    "药盒": dict(category="important", art=1, description="出院时医生交付的八槽旋转药盒。可从药盒入口选药，查看库存与推荐方案。"),
     "手机": dict(category="important", art=2, description="出院时从护士站取回的个人物品。"),
     "钱包": dict(category="important", art=3, description="装着证件和几张卡的钱包，出院时从护士站取回。"),
     "奇怪的项链": dict(category="important", art=4, description="若干哑黑的不规则几何体，由深褐色细麻线串起；受光处闪着碎银似的光泽。", source="出院时从护士站取回。"),

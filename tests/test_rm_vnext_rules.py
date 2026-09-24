@@ -37,7 +37,7 @@ class VNextRuleTests(unittest.TestCase):
         self.assertIsNone(player.ember)
         first = rm.apply_initial_gameplay_statuses(player, FixedRandom(randoms=[0.1]))
         second = rm.apply_initial_gameplay_statuses(player, FixedRandom(randoms=[0.9]))
-        self.assertEqual((player.ember, player.ect_residual_days, player.drug_dependence), (180, 30, True))
+        self.assertEqual((player.ember, player.ect_residual_days, player.drug_dependence), (180, 30, False))
         self.assertTrue(player.current_weather)
         self.assertTrue(first)
         self.assertEqual(second, [])
@@ -72,7 +72,7 @@ class VNextRuleTests(unittest.TestCase):
     def test_immediate_medicines_use_pow_mood_path(self):
         player = self.make_player()
         for medicine in ("venlafaxine", "trazodone", "alprazolam"):
-            rm.add_medicine_stock(player, medicine, 1)
+            rm.add_medicine_stock(player, medicine, rm.DRUG_DEFINITIONS[medicine]["dose"])
         player.mood = 0
         self.assertGreater(rm.take_medicine(player, "venlafaxine")["mood_delta"], 0)
         rm.add_emotion(player, rm.EMOTION_ANXIETY)
@@ -85,7 +85,7 @@ class VNextRuleTests(unittest.TestCase):
         player = self.make_player()
         generated = rm.generate_weather(player, season="winter", override=rm.WEATHER_HEAVY_SNOW,
             rng=FixedRandom(gauss=0.0))
-        self.assertEqual(generated, {"weather": rm.WEATHER_HEAVY_SNOW, "temperature": 0, "band": "extreme_cold"})
+        self.assertEqual(generated, {"weather": rm.WEATHER_HEAVY_SNOW, "overlays": (), "temperature": 15, "band": "cold"})
         for season in rm.SEASONS:
             self.assertEqual(sum(rm.WEATHER_WEIGHTS[season]), 100)
 
@@ -160,13 +160,13 @@ class VNextRuleTests(unittest.TestCase):
         self.assertEqual(player.formal_attributes["dex"], before - 2)
         self.assertIsNone(player.digestive_disorder)
 
-    def test_alcohol_uses_combined_social_modifier_and_forced_sleep_hook(self):
+    def test_alcohol_uses_independent_multiplier_and_forced_sleep_hook(self):
         player = self.make_player()
         for _ in range(3):
             rm.consume_alcohol(player, FixedRandom(randoms=[.9]))
         social = rm.CheckSpec("str", 1, social=True, check_context="story")
         ordinary = rm.CheckSpec("str", 1, social=False, check_context="story")
-        self.assertAlmostEqual(rm.alcohol_check_multiplier(player, social), 1.40)
+        self.assertAlmostEqual(rm.alcohol_check_multiplier(player, social), .85)
         self.assertAlmostEqual(rm.alcohol_check_multiplier(player, ordinary), .85)
         rm.consume_alcohol(player, FixedRandom(randoms=[.9]))
         events = rm.consume_alcohol(player, FixedRandom(randoms=[.9]))

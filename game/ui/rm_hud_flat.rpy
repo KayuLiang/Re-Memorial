@@ -74,17 +74,6 @@ init python:
     def rm_hud_fraction(value, maximum):
         return max(0.0, min(1.0, float(value) / maximum)) if maximum > 0 else 0.0
 
-    def rm_hud_status_rows():
-        # Core rows carry saved effects, including the generated daily environment.
-        rows = list(story_hud_effects)
-        for row in rm_status_statuses():
-            if row['id'].startswith('test_growth_') and row['value_text'] == '0/6':
-                continue
-            detail = dict(row)
-            detail['tooltip'] = "{} {}\n{}".format(row['label'], row['value_text'], row['tooltip'])
-            rows.append(detail)
-        return rows
-
 screen rm_flat_status():
     default meter_tip = None
     if rm_hud_visible() and story_hud_status_unlocked:
@@ -94,6 +83,19 @@ screen rm_flat_status():
         $ status_health, status_health_max = rm_status_health()
         $ date_text, weekday_text, day_number, round_count, round_index = rm_hud_clock_data()
         use rm_hud_clock(date_text, weekday_text, day_number, round_count, round_index)
+        vbox:
+            id "hud_environment"
+            pos (RM_HUD_LEFT + 27, 280)
+            spacing 6
+            for environment_line in rm_status_environment():
+                frame:
+                    style "rm_status_slip"
+                    padding (1, 1)
+                    frame:
+                        background "#f3eee3"
+                        padding (9, 2)
+                        ysize 34
+                        text environment_line style "rm_status_name" size 25 substitute False
 
         # Mood is longest; the short energy meter and reserved rings share y205.
         add "gui/hud_flat/neuron.svg" pos (544, 32)
@@ -192,7 +194,6 @@ screen rm_hud_nav_item(slot, icon, caption, target):
 
 screen rm_flat_sides():
     if rm_hud_visible() and story_hud_status_unlocked:
-        $ effects = rm_hud_status_rows()
         if story_hud_quests:
             vbox:
                 pos (RM_HUD_LEFT, RM_HUD_SIDE_Y)
@@ -209,35 +210,7 @@ screen rm_flat_sides():
                                 text_size 32
                                 action Show("rm_hud_details", title=heading, rows=quests)
                 textbutton "全部任务" style "rm_hud_text_button" action Show("rm_hud_details", title="任务", rows=story_hud_quests)
-        if effects:
-            vbox:
-                xpos RM_HUD_RIGHT
-                xanchor 1.0
-                ypos RM_HUD_SIDE_Y
-                xsize 320
-                spacing 21
-                text "状态" style "rm_hud_white_text" size 40 xalign 1.0
-                for effect in effects[:6]:
-                    textbutton effect['label']:
-                        style "rm_hud_text_button"
-                        xalign 1.0
-                        xsize 320
-                        text_xalign 1.0
-                        text_textalign 1.0
-                        tooltip effect['tooltip']
-                        action Show("rm_hud_details", title="状态", rows=effects)
-                if len(effects) > 6:
-                    textbutton "更多状态" style "rm_hud_text_button" xalign 1.0 action Show("rm_hud_details", title="状态", rows=effects)
-        $ side_tip = GetTooltip()
-        if side_tip:
-            frame:
-                xpos RM_HUD_RIGHT
-                xanchor 1.0
-                ypos 864
-                xmaximum 587
-                background "#292923f2"
-                padding (21, 16)
-                text side_tip size 29 color RM_HUD_IVORY
+        use rm_status_hud
 
 
 screen rm_hud_details(title, rows):

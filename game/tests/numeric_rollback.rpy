@@ -54,6 +54,14 @@ label rm_numeric_legacy_preview:
         rm_player.deep_fatigue = builtins.dict(layers=2, first_day=101, last_night=107,
                                                last_late_day=100, relapsed=True)
         rm_player.sleep_pending = builtins.dict(forced_coma=False, night_actions=1, slept_day=101)
+        rm_player.drug_dependence = True
+        rm_player.current_weather = rm_core.WEATHER_FOG
+        del rm_player.drug_dependences
+        if hasattr(rm_player, "legacy_drug_dependence"):
+            del rm_player.legacy_drug_dependence
+        if hasattr(rm_player, "legacy_drug_free_days"):
+            del rm_player.legacy_drug_free_days
+        del rm_player.weather_overlays
         del builtins
     "旧存档数据准备完成。"
     "旧存档转换测试。"
@@ -77,11 +85,11 @@ testcase numeric_rollback.rollback_nested_state:
     assert "数值变化前"
     assert eval all(isinstance(getattr(rm_player, field), rm_core.RevertableDict) for field in ("formal_attributes", "attribute_values", "attribute_bonuses", "test_growth_progress", "training_fatigue", "dice_growth_progress", "growth_reward_pending", "degradation_progress", "degradation_penalty_pending", "attribute_bonus_gain_counters", "attribute_value_gain_counters", "formal_attribute_gain_counters", "meal_choices", "emotions", "pending_bipolar_medications", "medicine_counts", "environment_diseases", "time_habits"))
     assert eval isinstance(rm_player.dice_pool, rm_core.RevertableList) and all(isinstance(die, rm_core.RevertableObject) and isinstance(die.faces, rm_core.RevertableList) for die in rm_player.dice_pool)
-    assert eval (rm_player.attribute_values["str"], len(rm_player.attribute_bonuses["str"]), rm_player.training_fatigue["test_strength_training"], rm_player.dice_growth_progress["str"]) == (0, 0, 0, 0)
+    assert eval (rm_player.attribute_values["str"], len(rm_player.attribute_bonuses["str"]), rm_player.training_load, rm_player.dice_growth_progress["str"]) == (0, 0, 0, 0)
     click pos (1500, 1250)
     pause .2
     assert "数值变化后"
-    assert eval (rm_player.attribute_values["str"], len(rm_player.attribute_bonuses["str"]), rm_player.training_fatigue["test_strength_training"], rm_player.dice_growth_progress["str"]) == (1, 1, 1, 2)
+    assert eval (rm_player.attribute_values["str"], len(rm_player.attribute_bonuses["str"]), rm_player.training_load, rm_player.dice_growth_progress["str"]) == (1, 1, 1, 2)
     assert eval isinstance(rm_player.attribute_bonuses["str"], rm_core.RevertableList) and isinstance(rm_player.attribute_bonuses["str"][0], rm_core.RevertableDict)
     assert eval (rm_player.meal_choices["breakfast"], len(rm_player.fatigue_history), rm_player.deep_fatigue["layers"]) == (True, 1, 2)
     assert eval (rm_core.emotion_layers(rm_player, rm_core.EMOTION_DISTRACTION), bool(rm_player.pending_bipolar_medications.get("lithium"))) == (2, True)
@@ -89,7 +97,7 @@ testcase numeric_rollback.rollback_nested_state:
     run Rollback(force=True)
     pause .2
     assert "数值变化前"
-    assert eval (rm_player.attribute_values["str"], len(rm_player.attribute_bonuses["str"]), rm_player.training_fatigue["test_strength_training"], rm_player.dice_growth_progress["str"]) == (0, 0, 0, 0)
+    assert eval (rm_player.attribute_values["str"], len(rm_player.attribute_bonuses["str"]), rm_player.training_load, rm_player.dice_growth_progress["str"]) == (0, 0, 0, 0)
     assert eval (rm_player.meal_choices, len(rm_player.fatigue_history), rm_player.deep_fatigue["layers"]) == ({}, 0, 1)
     assert eval (rm_core.emotion_layers(rm_player, rm_core.EMOTION_DISTRACTION), bool(rm_player.pending_bipolar_medications.get("lithium"))) == (0, False)
     assert eval (rm_player.find_die("str_1").faces[0], rm_player.find_die("str_1").enchantment, len(rm_player.dice_pool), rm_player.mood, rm_player.energy) == (1, None, 7, -40, 2)
@@ -106,7 +114,7 @@ testcase numeric_rollback.save_nested_state:
         rm_core.add_dice_growth_progress(rm_player, "dex", 2)
         rm_player.find_die("dex_1").faces[0] = 1
     assert eval rm_player.attribute_values["dex"] == 2
-    assert eval rm_player.dice_growth_progress["dex"] == 10
+    assert eval (rm_player.dice_growth_progress["dex"], rm_player.growth_reward_pending["dex"]) == (4, 1)
     assert eval rm_player.find_die("dex_1").faces[0] == 1
     run Function(renpy.load, "numeric-rollback-verification")
     pause .2
@@ -131,3 +139,7 @@ testcase numeric_rollback.legacy_save_conversion:
     assert eval isinstance(rm_player.attribute_bonuses["str"][0], rm_core.RevertableDict)
     assert eval isinstance(rm_player.dice_pool, rm_core.RevertableList) and all(isinstance(die.faces, rm_core.RevertableList) for die in rm_player.dice_pool)
     assert eval isinstance(rm_player.sleep_fatigue, rm_core.RevertableList) and isinstance(rm_player.fatigue_history, rm_core.RevertableList)
+    assert eval rm_player.legacy_drug_dependence and rm_player.drug_dependence
+    assert eval rm_player.current_weather == rm_core.WEATHER_CLOUDY and list(rm_player.weather_overlays) == ["fog"]
+    run Function(rm_core.ensure_second_stage_state, rm_player)
+    assert eval list(rm_player.weather_overlays) == ["fog"]

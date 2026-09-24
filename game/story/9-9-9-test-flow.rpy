@@ -22,6 +22,10 @@ label rm_ui_test_menu:
             call rm_ui_test_reward_choice
             jump rm_ui_test_menu
 
+        "旋转药盒":
+            call rm_pillbox_demo
+            jump rm_ui_test_menu
+
         "返回标题菜单":
             $ rm_ui_test_skin_active = False
             return
@@ -51,6 +55,9 @@ label rm_test_flow_loop:
         jump rm_health_end
     $ rm_test_sync_clock()
     $ rm_test_node = rm_ensure_player().current_time_slot
+    $ rm_medicine_context = rm_pillbox.due_context(rm_ensure_player())
+    if rm_medicine_context:
+        call rm_medicine_node(rm_medicine_context)
 
     if rm_test_node in rm_core.MEAL_SLOTS:
         menu:
@@ -84,6 +91,8 @@ label rm_test_flow_loop:
     "现在是[rm_test_day_text()][rm_test_turn_text()]时间点。"
     "接下来要做什么。"
 
+label rm_test_schedule_choice:
+
     call screen rm_test_schedule_select
     $ selected_schedule = _return
 
@@ -93,6 +102,8 @@ label rm_test_flow_loop:
 
     if rm_test_schedule_uses_check(selected_schedule):
         call rm_test_schedule_check_flow(selected_schedule)
+        if _return is False:
+            jump rm_test_schedule_choice
     else:
         $ rm_test_outcome = rm_test_execute_rest_schedule(selected_schedule)
 
@@ -105,7 +116,15 @@ label rm_test_flow_loop:
 
 
 label rm_test_sleep_flow:
-    $ rm_test_outcome = rm_test_execute_rest_schedule("test_sleep")
+    $ rm_core.settle_medication_day(rm_ensure_player())
+    $ rm_sleep_dice_ids = [die.id for die in rm_core.usable_dice(rm_ensure_player(), "con")]
+    $ rm_sleep_bonus_counts = rm_core.sleep_advantage_counts(rm_ensure_player(), rm_core.usable_dice(rm_ensure_player(), "con"))
+    $ rm_sleep_bonus_count = max(0, rm_sleep_bonus_counts[0] - rm_sleep_bonus_counts[1])
+    $ rm_sleep_bonus_die_ids = []
+    if rm_sleep_bonus_count and rm_sleep_dice_ids:
+        call screen attribute_check_choose_bonus_dice(rm_sleep_dice_ids, rm_sleep_bonus_count)
+        $ rm_sleep_bonus_die_ids = _return
+    $ rm_test_outcome = rm_test_execute_rest_schedule("test_sleep", bonus_die_ids=rm_sleep_bonus_die_ids)
     if rm_core.is_dead(rm_ensure_player()):
         jump rm_health_end
     "[rm_test_last_result_text]"
@@ -118,8 +137,15 @@ label rm_test_wake_flow:
     if rm_core.usable_dice(rm_ensure_player(), "pow"):
         $ rm_wake_requirement = rm_core.wake_requirement(rm_ensure_player())
         $ rm_wake_max_dice = rm_core.max_dice_for_check(rm_core.CheckSpec("pow", rm_wake_requirement), rm_core.mood_check_profile(rm_core.mood_state(rm_ensure_player())))
-        call screen attribute_dice_select("pow", min_dice=1, max_dice=rm_wake_max_dice, requirement=rm_wake_requirement, check_kind="起床", action_type=rm_core.ACTION_WAKE)
-        $ rm_wake_dice = _return
+        $ rm_wake_dice = None
+        while rm_wake_dice is None:
+            menu:
+                "选择起床骰子":
+                    pass
+            call screen attribute_dice_select("pow", min_dice=1, max_dice=rm_wake_max_dice, requirement=rm_wake_requirement, check_kind="起床", action_type=rm_core.ACTION_WAKE, thought="该起床了。")
+            $ rm_wake_dice = _return
+            if rm_wake_dice == "__rm_check_cancel__":
+                $ rm_wake_dice = None
         if rm_wake_dice == "__rm_ui_test_exit__":
             $ rm_ui_test_skin_active = False
             jump rm_ui_test_menu
@@ -160,6 +186,9 @@ label rm_test_wake_flow:
 
 
 label rm_test_schedule_check_flow(schedule_id):
+    if not rm_test_schedule_available(schedule_id):
+        $ rm_test_last_result_text = rm_test_schedule_unavailable_text(schedule_id)
+        return False
     $ rm_test_required_stat = rm_test_check_attribute(schedule_id)
     $ rm_test_requirement = rm_test_check_requirement(schedule_id)
     $ rm_test_check_kind = rm_test_schedule_names()[schedule_id]
@@ -171,18 +200,26 @@ label rm_test_schedule_check_flow(schedule_id):
         call screen attribute_dice_select(rm_test_required_stat, min_dice=1, max_dice=3, requirement=rm_test_requirement, check_kind=rm_test_check_kind, action_type=rm_core.ACTION_SCHEDULE, allowed_stats=rm_test_allowed_stats, required_die_stats=rm_test_required_die_stats)
         $ selected_die_ids = _return
 
+        if selected_die_ids == "__rm_check_cancel__":
+            return False
+
         if selected_die_ids == "__rm_ui_test_exit__":
             $ rm_ui_test_skin_active = False
             jump rm_ui_test_menu
 
-    $ rm_test_check_result = rm_test_perform_schedule_check(schedule_id, selected_die_ids, rm_test_requirement)
+    $ rm_bonus_count = rm_test_bonus_reroll_count(schedule_id, selected_die_ids)
+    $ rm_bonus_die_ids = []
+    if rm_bonus_count:
+        call screen attribute_check_choose_bonus_dice(selected_die_ids, rm_bonus_count)
+        $ rm_bonus_die_ids = _return
+    $ rm_test_check_result = rm_test_perform_schedule_check(schedule_id, selected_die_ids, rm_test_requirement, rm_bonus_die_ids)
 
     call screen attribute_check_roll_animation(rm_test_check_result)
 
     call screen attribute_check_result(rm_test_check_result)
 
     $ rm_test_outcome = rm_test_finalize_schedule_check(schedule_id, rm_test_check_result)
-    return
+    return True
 
 
 label rm_test_resolve_pending_cards:

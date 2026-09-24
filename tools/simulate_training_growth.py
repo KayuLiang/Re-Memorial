@@ -193,7 +193,7 @@ def training_day(state, attr, policy, rng, counts):
         dice = training_dice(state, attr)
         layers = rm.training_fatigue_layers(state, schedule)
         requirement = rm.test_training_requirement(state, attr) + rm.roll_training_fatigue_requirement_penalty(layers, rng)
-        spec = rm.CheckSpec(attr, requirement, [d.id for d in dice], big_failure_slack=layers,
+        spec = rm.CheckSpec(attr, requirement, [d.id for d in dice], big_failure_slack=0,
                             allowed_dice_attributes=('con', 'str', 'dex') if attr == 'con' else (attr,),
                             required_dice_attributes=('con',) if attr == 'con' else ())
         result = rm.perform_check(state, spec, rng) if dice else None
@@ -212,6 +212,9 @@ def training_day(state, attr, policy, rng, counts):
             rm.apply_test_exercise_schedule_result(state, schedule, result, rng)
         else:
             rm.apply_test_training_schedule_result(state, schedule, result, rng)
+        if rm.is_dead(state):
+            counts['death_during_training'] += 1
+            return False
         rm.apply_big_failure_degradation(state, result)
         settle_cards(state, policy, rng, counts)
     # STR/DEX progress is converted by the core small rest; POW stays a proxy.
@@ -221,11 +224,15 @@ def training_day(state, attr, policy, rng, counts):
         counts['test_training_bonus:pow'] += 1
     rm.start_turn(state, 'sleep_decision')
     result = rm.begin_sleep(state, rng)
-    assert result['available'] and not result['needs_wake_check']
+    if not result['available'] or rm.is_dead(state):
+        counts['death_before_wake'] += 1
+        return False
+    assert not result['needs_wake_check']
     counts.update(result['events'])
     # Do NOT drain again after large rest: newly earned formal-point rewards
     # wait for the next small rest, matching the actual end_day ordering.
     settle_cards(state, policy, rng, counts)
+    return True
 
 
 def simulate(scenario, policy, trials, max_attribute, max_days, seed):
@@ -258,7 +265,9 @@ def simulate(scenario, policy, trials, max_attribute, max_days, seed):
             if day == max_days:
                 stopped['day_limit'] += 1
                 break
-            training_day(state, attr, policy, rng, local)
+            if training_day(state, attr, policy, rng, local) is False:
+                stopped['death'] += 1
+                break
         counts.update(local)
         if (trial+1) % 100 == 0:
             print(f'{name}/{policy} {trial+1}/{trials}', flush=True)

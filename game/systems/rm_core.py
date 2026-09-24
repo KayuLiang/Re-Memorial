@@ -25,12 +25,13 @@ TEST_TRAINING_SCHEDULE_ATTRIBUTES = {
     "test_jogging": "con",
 }
 TEST_TRAINING_SCHEDULE_LABELS = {
-    "test_strength_training": "力量训练",
-    "test_dex_training": "灵巧训练",
+    "test_strength_training": "负重训练",
+    "test_dex_training": "协调训练",
     "test_jogging": "慢跑",
 }
 JOGGING_BONUS_ATTRIBUTES = ("con", "dex", "str")
-JOGGING_BONUS_WEIGHTS = (("con", 70), ("dex", 30), ("str", 30))
+JOGGING_BONUS_WEIGHTS = (("con", 60), ("dex", 20), ("str", 20))
+TRAINING_LOAD_DICE = (4, 6, 8, 10, 12, 20)
 
 ACTION_SCHEDULE = "schedule"
 ACTION_INSTANT = "instant"
@@ -57,6 +58,10 @@ RESULT_FAILURE = "failure"
 RESULT_SUCCESS = "success"
 RESULT_HARD_SUCCESS = "hard_success"
 RESULT_BIG_SUCCESS = "big_success"
+CHECK_MOOD_DELTAS = {
+    RESULT_BIG_FAILURE: -15, RESULT_FAILURE: -5, RESULT_SUCCESS: 5,
+    RESULT_HARD_SUCCESS: 10, RESULT_BIG_SUCCESS: 15,
+}
 
 EMOTION_JOY = "joy"
 EMOTION_CALM = "calm"
@@ -67,6 +72,7 @@ EMOTION_DISTRACTION = "distraction"
 
 WEATHER_SUNNY = "sunny"
 WEATHER_CLOUDY = "cloudy"
+WEATHER_OVERCAST = "overcast"
 WEATHER_LIGHT_RAIN = "light_rain"
 WEATHER_HEAVY_RAIN = "heavy_rain"
 WEATHER_STORM = "storm"
@@ -74,6 +80,7 @@ WEATHER_THUNDERSTORM = "thunderstorm"
 WEATHER_FOG = "fog"
 WEATHER_LIGHT_SNOW = "light_snow"
 WEATHER_HEAVY_SNOW = "heavy_snow"
+WEATHER_BLIZZARD = "blizzard"
 
 STRENGTH_TRAINING_STR_BONUS_TOTAL_CHANCE = {
     1: 3.00,
@@ -185,6 +192,8 @@ class RMCharacterState(RevertableObject):
         self.next_day_energy_cap_penalty = 0  # Legacy save field; fatigue now owns this penalty.
         self.test_growth_progress = RevertableDict((name, 0) for name in TEST_TRAINING_ATTRIBUTES)
         self.training_fatigue = RevertableDict((name, 0) for name in TEST_TRAINING_SCHEDULE_ATTRIBUTES)
+        self.training_load = 0
+        self.special_training_progress = self.test_growth_progress
         self.dice_growth_progress = RevertableDict((name, 0) for name in ATTRIBUTES)
         self.growth_reward_pending = RevertableDict((name, 0) for name in ATTRIBUTES)
         self.degradation_progress = RevertableDict((name, 0) for name in ATTRIBUTES)
@@ -217,13 +226,33 @@ class RMCharacterState(RevertableObject):
         self.medicine_taken_today = RevertableDict()
         self.psych_medication_days = RevertableList()
         self.drug_dependence = False
+        self.drug_dependences = RevertableDict()
+        self.psych_medication_days_by_drug = RevertableDict()
+        self.drug_free_days = RevertableDict()
+        self.withdrawal_ember_multipliers = RevertableDict()
+        self.psychiatric_extra_doses = 0
+        self.psychiatric_poisoning = False
+        self.last_ember_direction = -1
+        self.ordinary_medicine_taken_today = RevertableDict()
+        self.ordinary_poison_risk = 0.0
+        self.ordinary_poisoning = False
+        self.ordinary_treatment_streak = RevertableDict(cold=0, heat=0)
+        self.ordinary_treatment_today = RevertableDict()
+        self.psych_medication_free_days = 0
+        self.medicine_day_settled = 0
         self.initial_gameplay_statuses_applied = False
         self.current_weather = None
+        self.weather_overlays = RevertableList()
+        self.home_equipment = RevertableDict()
         self.current_temperature = None
         self.weather_override = None
         self.environment_diseases = RevertableDict()
         self.environment_natural_cure_rewards = RevertableDict()
         self.injuries = RevertableDict()
+        self.current_pain = 0
+        self.last_hospital_day = None
+        self.emergency_rescue_used = False
+        self.emergency_rescue_pending = False
         self.ever_had_pain_and_scars = False
         self.exposure_rounds = RevertableDict(cold=0, heat=0)
         self.hunger_level = 0
@@ -278,6 +307,8 @@ class CheckSpec(object):
         sport=False,
         social=False,
         rest=False,
+        bonus_die_ids=None,
+        additional_check=False,
     ):
         self.attribute = attribute
         self.requirement = requirement
@@ -298,6 +329,8 @@ class CheckSpec(object):
         self.sport = bool(sport)
         self.social = bool(social)
         self.rest = bool(rest)
+        self.bonus_die_ids = tuple(bonus_die_ids or ())
+        self.additional_check = bool(additional_check)
 
 
 class CheckResult(object):
@@ -455,9 +488,12 @@ def vnext_status_summary(state):
     ensure_second_stage_state(state)
     rows = []
     if state.current_weather:
+        temperature = state.current_temperature
         rows.append(_status_row("weather", WEATHER_LABELS[state.current_weather],
-            "{}°".format(state.current_temperature), "天气类：{}，气温{}。".format(
-                WEATHER_LABELS[state.current_weather], temperature_band(state.current_temperature)), category="weather"))
+            "{}°".format(temperature) if temperature is not None else "",
+            "天气类：{}。".format(WEATHER_LABELS[state.current_weather]) if temperature is None else
+            "天气类：{}，气温{}。".format(WEATHER_LABELS[state.current_weather], temperature_band(temperature)),
+            category="weather"))
     if state.ember is not None:
         rows.append(_status_row("ember", "余烬", "×{}".format(state.ember),
             "心情类：每日晨间使 Mood 向负向变化；抑郁病态期间锁定。", category="mood"))
@@ -477,7 +513,13 @@ def vnext_status_summary(state):
     if state.long_emotions.get("doubt"):
         rows.append(_status_row("doubt", "怀疑", "", "情绪类：任意检定获得1个惩罚骰；连续3次成功解除。", category="emotion"))
     if state.palpitations:
-        rows.append(_status_row("palpitations", "心悸", "", "生理类：所有检定最终值 ×0.75，完整睡眠后解除。", category="physiological"))
+        rows.append(_status_row("palpitations", "心悸", "", "生理类：所有检定最终值独立 ×0.85，完整睡眠后解除。", category="physiological"))
+    if state.current_pain:
+        rows.append(_status_row("pain", "疼痛", "×{}".format(state.current_pain),
+            "伤病类：全检定1惩罚骰，普通最终值每层−5%。", category="injury"))
+    if state.training_load:
+        rows.append(_status_row("training_load", "训练负荷", "×{}".format(state.training_load),
+            "日程类：三项训练共享，每日小休清零。", category="schedule"))
     if state.intoxication:
         label = "微醺" if state.intoxication <= 2 else "醉酒"
         layers = state.intoxication if state.intoxication <= 2 else state.intoxication - 2
@@ -486,9 +528,16 @@ def vnext_status_summary(state):
     if state.hunger_level:
         rows.append(_status_row("hunger", "饥饿", "×{}".format(state.hunger_level),
             "生理类：每日小休后向无状态移动一级。", category="physiological"))
-    if state.drug_dependence:
-        rows.append(_status_row("drug_dependence", "药物依赖", "",
-            "药物类：药盒节点未服精神科药物时，Mood 沿当前方向严重化5%。", category="medication"))
+    active_drugs = [drug for drug, active in state.drug_dependences.items() if active]
+    if state.legacy_drug_dependence:
+        active_drugs.append("legacy")
+    if active_drugs:
+        details = "；".join("旧存档未记录药名：连续停药{}天".format(state.legacy_drug_free_days)
+                           if drug == "legacy" else "{}：连续停药{}天".format(
+                               MEDICINE_LABELS.get(drug, drug), state.drug_free_days.get(drug, 0))
+                           for drug in active_drugs)
+        rows.append(_status_row("drug_dependence", "药物依赖", "×{}".format(len(active_drugs)),
+            "药物类：{}；每药分别按7/14建立，连续7天停药解除。".format(details), category="medication"))
     for medicine in state.pending_bipolar_medications:
         rows.append(_status_row("pending_" + medicine, medicine, "",
             "药物类：作用于下一次晨间余烬·双相结算，结算后失效。", category="medication"))
@@ -498,7 +547,7 @@ def vnext_status_summary(state):
         rows.append(_status_row("environment_disease_" + disease, label + suffix, "",
             "伤病类：所有检定获得1个惩罚骰；晨间先判定康复，失败后结算伤害。", category="injury"))
     for injury, item in state.injuries.items():
-        labels = {"strain": "肌肉拉伤", "sprain": "扭伤", "fracture": "骨折"}
+        labels = {"strain": "肌肉酸痛", "sprain": "扭伤", "fracture": "骨折"}
         rows.append(_status_row("injury_" + injury, labels[injury],
             "再伤{}".format(item.get("reinjury", 0)) if item.get("reinjury", 0) else "",
             "伤病类：运动/战斗类检定最终值受伤病倍率影响。", category="injury"))
@@ -540,6 +589,10 @@ def change_health(character, amount):
     before = character.health
     if before > 0:
         character.health = max(0.0, min(float(health_max(character)), before + amount))
+        if character.health <= 0 and not getattr(character, "emergency_rescue_used", False):
+            character.emergency_rescue_used = True
+            character.emergency_rescue_pending = True
+            character.health = health_max(character) * .30
     return character.health - before
 
 
@@ -811,13 +864,20 @@ def test_training_schedule_attribute(schedule_id):
 
 def training_fatigue_layers(character, schedule_id):
     ensure_second_stage_state(character)
-    return int(character.training_fatigue.get(schedule_id, 0))
+    return int(character.training_load)
+
+
+def training_load_dice(layers):
+    """Dice added to the training target at the start of this session."""
+    layers = max(0, int(layers))
+    return TRAINING_LOAD_DICE[:min(layers, len(TRAINING_LOAD_DICE))] + (20,) * max(
+        0, layers - len(TRAINING_LOAD_DICE))
 
 
 def roll_training_fatigue_requirement_penalty(layers, rng=None):
-    """Roll the extra target value from fatigue: each layer adds 1d4."""
+    """After load six, every further layer adds one more d20."""
     rng = _rng(rng)
-    return sum(rng.randint(1, 4) for _ in range(max(0, int(layers))))
+    return sum(rng.randint(1, sides) for sides in training_load_dice(layers))
 
 
 def training_fatigue_requirement_penalty(character, schedule_id, rng=None):
@@ -825,8 +885,7 @@ def training_fatigue_requirement_penalty(character, schedule_id, rng=None):
 
 
 def training_fatigue_big_failure_slack(character, schedule_id):
-    """Each fatigue layer expands the possible big-failure dice-total range by 1."""
-    return training_fatigue_layers(character, schedule_id)
+    return 0
 
 
 def test_training_requirement_for_schedule(character, schedule_id, rng=None):
@@ -836,36 +895,45 @@ def test_training_requirement_for_schedule(character, schedule_id, rng=None):
     return test_training_requirement(character, attribute) + training_fatigue_requirement_penalty(character, schedule_id, rng)
 
 
+def training_schedule_legal(state, schedule_id, location, slot=None):
+    ensure_second_stage_state(state)
+    if schedule_id not in TEST_TRAINING_SCHEDULE_ATTRIBUTES:
+        return False, "unknown_training"
+    slot = slot or state.current_time_slot
+    if location == "gym":
+        return (False, "gym_closed") if slot in TIME_SLOTS[6:] else (True, None)
+    if location == "park":
+        if schedule_id != "test_jogging":
+            return False, "training_not_available_in_park"
+        if state.current_weather in (WEATHER_STORM, WEATHER_BLIZZARD):
+            return False, "severe_weather_blocks_outdoors"
+        return True, None
+    if location == "home":
+        equipment = {"test_jogging": "treadmill", "test_strength_training": "dumbbell_level",
+                     "test_dex_training": "balance_level"}[schedule_id]
+        return (True, None) if state.home_equipment.get(equipment) else (False, "equipment_required")
+    return False, "training_location_required"
+
+
 def add_training_fatigue(character, schedule_id, amount=1):
     ensure_second_stage_state(character)
     if schedule_id not in TEST_TRAINING_SCHEDULE_ATTRIBUTES:
         return 0
-    character.training_fatigue[schedule_id] = max(0, int(character.training_fatigue.get(schedule_id, 0)) + int(amount))
-    return character.training_fatigue[schedule_id]
+    character.training_load = max(0, int(character.training_load) + int(amount))
+    return character.training_load
 
 
 def reduce_training_fatigue_on_rest(character):
-    """Daytime rest reduces every training fatigue stack by one layer."""
-    ensure_second_stage_state(character)
-    events = []
-    for schedule_id in TEST_TRAINING_SCHEDULE_ATTRIBUTES:
-        before = int(character.training_fatigue.get(schedule_id, 0))
-        if before > 0:
-            after = max(0, before - 1)
-            character.training_fatigue[schedule_id] = after
-            events.append("fatigue_reduced:{}:{}".format(schedule_id, after))
-    return events
+    return []
 
 
 def clear_training_fatigue_on_sleep(character):
-    """Sleep clears all accumulated training fatigue stacks."""
+    """Nightly small rest clears the shared load."""
     ensure_second_stage_state(character)
-    events = []
-    for schedule_id in TEST_TRAINING_SCHEDULE_ATTRIBUTES:
-        if int(character.training_fatigue.get(schedule_id, 0)) > 0:
-            character.training_fatigue[schedule_id] = 0
-            events.append("fatigue_cleared:{}".format(schedule_id))
-    return events
+    if not character.training_load:
+        return []
+    character.training_load = 0
+    return ["training_load_cleared"]
 
 
 def test_strength_training_progress_delta(rank):
@@ -952,27 +1020,37 @@ def strength_training_existing_bonus_decay(character):
 
 
 def apply_strength_training_str_bonus(character, check_result, rng=None):
-    """Apply only the STR attribute-bonus part of the strength-training result."""
+    return apply_specialized_training_bonus(character, "str", check_result, rng)
+
+
+def apply_specialized_training_bonus(character, attribute, check_result, rng=None):
+    """Resolve mirrored STR/DEX opportunities with live layer decay."""
     result_level = _strength_training_result_level(check_result)
-    str_value = normalize_strength_training_str(current_attribute(character, "str"))
-    plan = calculate_strength_training_bonus_plan(str_value, result_level)
+    location = getattr(getattr(check_result, "spec", None), "location", None)
+    value = normalize_strength_training_str(current_attribute(character, attribute))
+    plan = calculate_strength_training_bonus_plan(value, result_level)
     plan["base_roll_plan"] = list(plan["roll_plan"])
-    plan["existing_bonus_layers"] = _count_attribute_bonuses(character, "str")
-    plan["decay_multiplier"] = strength_training_existing_bonus_decay(character) if result_level == RESULT_SUCCESS else 1.0
+    plan["existing_bonus_layers"] = _count_attribute_bonuses(character, attribute)
+    plan["decay_multiplier"] = (2.0 / 3.0) ** plan["existing_bonus_layers"] if result_level == RESULT_SUCCESS else 1.0
     rolls = []
     success_count = 0
     adjusted_plan = []
     for chance in plan["base_roll_plan"]:
         if result_level == RESULT_SUCCESS:
-            decay = strength_training_existing_bonus_decay(character)
+            decay = (2.0 / 3.0) ** _count_attribute_bonuses(character, attribute)
             chance = _bonus_probability(chance * decay)
         adjusted_plan.append(round(chance, 4))
         success = roll_probability(chance, rng)
         rolls.append({"chance": round(chance, 4), "success": success})
         if success:
             success_count += 1
-            add_attribute_bonus(character, "str", 1)
-            character.attribute_bonuses["str"][-1]["source"] = "test_strength_training"
+            other = "dex" if attribute == "str" else "str"
+            mutation = _rng(rng).random()
+            granted = attribute if mutation < .95 else "con" if mutation < .975 else other
+            source = "test_strength_training" if attribute == "str" else "test_dex_training"
+            for _ in range(training_unit_copies(location, rng, character, attribute)):
+                _grant_attribute_bonus_with_source(character, granted, source)
+            rolls[-1]["granted"] = granted
     plan["roll_plan"] = adjusted_plan
     plan["rolls"] = rolls
     plan["success_count"] = int(success_count)
@@ -993,11 +1071,11 @@ def _grant_attribute_bonus_with_source(character, attribute, source):
 def _jogging_bonus_attributes_for_opportunity(rng=None):
     rng = _rng(rng)
     granted = []
-    if roll_probability(0.70, rng):
+    if roll_probability(0.60, rng):
         granted.append("con")
-    if roll_probability(0.30, rng):
+    if roll_probability(0.20, rng):
         granted.append("dex")
-    if roll_probability(0.30, rng):
+    if roll_probability(0.20, rng):
         granted.append("str")
     if not granted:
         granted.append(_weighted_choice(JOGGING_BONUS_WEIGHTS, rng))
@@ -1008,6 +1086,7 @@ def apply_exercise_jogging_bonus(character, check_result, rng=None):
     """Apply the jogging multi-attribute bonus rule after a successful check."""
     rng = _rng(rng)
     result_level = _strength_training_result_level(check_result)
+    location = getattr(getattr(check_result, "spec", None), "location", None)
     con_value = normalize_strength_training_str(current_attribute(character, "con"))
     plan = calculate_strength_training_bonus_plan(con_value, result_level)
     plan["base_roll_plan"] = list(plan["roll_plan"])
@@ -1026,8 +1105,9 @@ def apply_exercise_jogging_bonus(character, check_result, rng=None):
             success_count += 1
             grant = _jogging_bonus_attributes_for_opportunity(rng)
             for attribute in grant:
-                _grant_attribute_bonus_with_source(character, attribute, "test_jogging")
-                granted_attributes.append(attribute)
+                for _ in range(training_unit_copies(location, rng, character, "con")):
+                    _grant_attribute_bonus_with_source(character, attribute, "test_jogging")
+                    granted_attributes.append(attribute)
         rolls.append({"chance": round(chance, 4), "success": success, "granted": list(grant)})
     plan["roll_plan"] = adjusted_plan
     plan["rolls"] = rolls
@@ -1046,9 +1126,18 @@ def apply_test_training_result(character, attribute, result, rng=None):
     ensure_second_stage_state(character)
     if result is None or not getattr(result, "available", False):
         return {"progress_delta": 0, "bonus": None}
-    bonus = apply_strength_training_str_bonus(character, result, rng) if attribute == "str" else None
+    bonus = apply_specialized_training_bonus(character, attribute, result, rng) if result.success else None
     delta = test_training_progress_delta(result.rank)
-    character.test_growth_progress[attribute] = min(6, int(character.test_growth_progress.get(attribute, 0)) + delta)
+    character.special_training_progress[attribute] += delta
+    character.test_growth_progress[attribute] = character.special_training_progress[attribute]
+    location = getattr(getattr(result, "spec", None), "location", None)
+    for _ in range(delta):
+        copies = training_unit_copies(location, rng, character, attribute)
+        add_dice_growth_progress(character, attribute, copies)
+        character.special_training_progress[attribute] += copies - 1
+    character.test_growth_progress[attribute] = character.special_training_progress[attribute]
+    if result.rank == RESULT_BIG_SUCCESS:
+        add_growth_reward_pending(character, attribute, training_unit_copies(location, rng, character, attribute))
     return {"progress_delta": delta, "bonus": bonus}
 
 
@@ -1057,8 +1146,10 @@ def apply_test_training_schedule_result(character, schedule_id, result, rng=None
     attribute = test_training_schedule_attribute(schedule_id)
     if attribute is None:
         raise ValueError("Unknown test training schedule: {!r}".format(schedule_id))
+    load = training_fatigue_layers(character, schedule_id)
     applied = apply_test_training_result(character, attribute, result, rng)
     if result is not None and getattr(result, "available", False):
+        applied["injury_events"] = resolve_training_injury(character, result.rank, load, rng)
         applied["fatigue_layers"] = add_training_fatigue(character, schedule_id, 1)
     else:
         applied["fatigue_layers"] = training_fatigue_layers(character, schedule_id)
@@ -1072,9 +1163,19 @@ def apply_test_exercise_schedule_result(character, schedule_id, result, rng=None
     if result is None or not getattr(result, "available", False):
         bonus = None
     else:
+        load = training_fatigue_layers(character, schedule_id)
         bonus = apply_exercise_jogging_bonus(character, result, rng) if getattr(result, "success", False) else None
+        delta = test_training_progress_delta(result.rank)
+        for _ in range(delta):
+            attr = _weighted_choice(JOGGING_BONUS_WEIGHTS, rng)
+            add_dice_growth_progress(character, attr, training_unit_copies(getattr(getattr(result, "spec", None), "location", None), rng, character, "con"))
+        if result.rank == RESULT_BIG_SUCCESS:
+            add_growth_reward_pending(character, _weighted_choice(JOGGING_BONUS_WEIGHTS, rng),
+                                      training_unit_copies(getattr(getattr(result, "spec", None), "location", None), rng, character, "con"))
+        injury_events = resolve_training_injury(character, result.rank, load, rng)
         add_training_fatigue(character, schedule_id, 1)
-    return {"bonus": bonus, "fatigue_layers": training_fatigue_layers(character, schedule_id)}
+    return {"bonus": bonus, "injury_events": injury_events if result is not None and getattr(result, "available", False) else [],
+            "fatigue_layers": training_fatigue_layers(character, schedule_id)}
 
 
 def resolve_test_rest(character):
@@ -1082,15 +1183,16 @@ def resolve_test_rest(character):
     ensure_second_stage_state(character)
     events = []
     for attribute in TEST_TRAINING_ATTRIBUTES:
-        progress = int(character.test_growth_progress.get(attribute, 0))
-        if progress >= 6:
-            character.test_growth_progress[attribute] = 0
-            add_attribute_bonus(character, attribute, 1)
-            source = "test_strength_training" if attribute == "str" else "test_{}_training".format(attribute)
-            character.attribute_bonuses[attribute][-1]["source"] = source
+        progress = int(character.special_training_progress.get(attribute, 0))
+        while progress >= 6:
+            progress -= 6
+            source = "test_strength_training" if attribute == "str" else "test_dex_training"
+            _grant_attribute_bonus_with_source(character, attribute, source)
             events.append("test_training_bonus:{}".format(attribute))
             if attribute == "str":
                 events.append("test_strength_bonus:str")
+        character.special_training_progress[attribute] = progress
+        character.test_growth_progress[attribute] = progress
     return events
 
 
@@ -1099,6 +1201,7 @@ def resolve_test_small_rest(character):
     events = ["small_rest"]
     events.extend(resolve_test_rest(character))
     events.extend(process_dice_growth_progress_on_small_rest(character))
+    events.extend(clear_training_fatigue_on_sleep(character))
     return events
 
 
@@ -1109,8 +1212,17 @@ def resolve_test_day_rest(character, rng=None):
         return {"available": False, "reason": "no_usable_con_die", "events": ["rest_failed:no_usable_con_die"]}
     die = _rng(rng).choice(dice)
     roll = roll_die(die, rng)
+    if character.current_weather in (WEATHER_LIGHT_RAIN, WEATHER_HEAVY_RAIN, WEATHER_STORM):
+        rerolled = roll_single_face(die, rng)
+        roll["rolls"].append(rerolled)
+        roll["value"] = max(roll["value"], rerolled)
+        roll["mode"] = "bonus"
     before = int(character.energy)
     rolled_value = int(roll["value"])
+    if mood_state(character) == MOOD_HIGH:
+        rolled_value = int(rolled_value * .75)
+    elif mood_state(character) == DISEASE_MANIA:
+        rolled_value = int(rolled_value * .50)
     character.energy = min(energy_max(character), before + rolled_value)
     restored = int(character.energy) - before
     events = ["day_rest", "energy_restored:{}".format(restored)]
@@ -1130,11 +1242,11 @@ def resolve_test_day_rest(character, rng=None):
     }
 
 
-def resolve_test_sleep(character, rng=None):
+def resolve_test_sleep(character, rng=None, bonus_die_ids=None):
     """Test UI and ordinary sleep share one settlement entry point."""
     if character.current_time_slot is None:
         start_turn(character, "sleep_decision")
-    return begin_sleep(character, rng)
+    return begin_sleep(character, rng, bonus_die_ids=bonus_die_ids)
 
 
 def _reset_disease_values(character):
@@ -1328,8 +1440,9 @@ def roll_single_face(die, rng=None):
     return faces[min(len(faces) - 1, int(rng.random() * len(faces)))]
 
 
-def roll_die(die, rng=None, force_mode=None):
-    rng = _rng(rng)
+def die_roll_mode(die, force_mode=None):
+    if force_mode == "normal":
+        return "normal"
     bonus = die.enchantment == ENCHANT_SWIFT
     penalty = die.enchantment == ENCHANT_SLUGGISH
     if force_mode == "bonus":
@@ -1339,12 +1452,21 @@ def roll_die(die, rng=None, force_mode=None):
     if bonus and penalty:
         bonus = False
         penalty = False
-    if bonus or penalty:
+    return "bonus" if bonus else "penalty" if penalty else "normal"
+
+
+def roll_die(die, rng=None, force_mode=None):
+    rng = _rng(rng)
+    mode = die_roll_mode(die, force_mode)
+    # The result owns this throw's faces, including duplicates and slot order.
+    # Later upgrades must not rewrite a saved or still-animating throw.
+    faces = tuple(die.faces)
+    if mode != "normal":
         rolls = [roll_single_face(die, rng), roll_single_face(die, rng)]
-        value = max(rolls) if bonus else min(rolls)
-        return {"die_id": die.id, "attribute": die.attribute, "rolls": rolls, "value": value, "mode": "bonus" if bonus else "penalty", "enchantment": die.enchantment}
+        value = max(rolls) if mode == "bonus" else min(rolls)
+        return {"die_id": die.id, "attribute": die.attribute, "faces": faces, "rolls": rolls, "value": value, "mode": mode, "enchantment": die.enchantment}
     value = roll_single_face(die, rng)
-    return {"die_id": die.id, "attribute": die.attribute, "rolls": [value], "value": value, "mode": "normal", "enchantment": die.enchantment}
+    return {"die_id": die.id, "attribute": die.attribute, "faces": faces, "rolls": [value], "value": value, "mode": "normal", "enchantment": die.enchantment}
 
 
 def roll_dice(dice, rng=None, force_mode=None):
@@ -1403,6 +1525,46 @@ def forced_energy_failure(character, spec, dice, cost, state, profile):
     )
 
 
+def check_final_multiplier(character, spec, dice_count, weather=None):
+    """Shared read-only total factor for selection preview and settlement."""
+    weather = weather if weather is not None else weather_check_effects(character, spec)
+    normal = float(weather["final_multiplier"]) - 1.0
+    emotions = getattr(character, "emotions", {})
+    participating = check_generates_emotion(spec)
+    if participating and int(emotions.get(EMOTION_CALM, 0)):
+        normal += .15
+    if participating and int(emotions.get(EMOTION_ANXIETY, 0)):
+        normal -= .15
+    if participating and dice_count >= 2 and int(emotions.get(EMOTION_EXCITEMENT, 0)):
+        normal += .25
+    if participating and dice_count >= 2 and int(emotions.get(EMOTION_DISTRACTION, 0)):
+        normal -= .25
+    normal -= .05 * int(character.current_pain)
+    if getattr(spec, "social", False):
+        normal += (0, .15, .30, .45, .45, .45)[min(int(character.intoxication), 5)]
+    return max(.50, 1.0 + normal) * (.85 if character.palpitations else 1.0) * injury_check_multiplier(character, spec) * alcohol_check_multiplier(character, spec)
+
+
+def check_advantage_counts(character, spec, weather=None, dice=None):
+    """Read-only sources shared by settlement and the probability preview."""
+    weather = weather if weather is not None else weather_check_effects(character, spec)
+    advantage = int(weather["advantage_count"])
+    disadvantage = int(weather["disadvantage_count"])
+    if check_generates_emotion(spec):
+        emotions = getattr(character, "emotions", {})
+        advantage += 1 if int(emotions.get(EMOTION_JOY, 0)) else 0
+        disadvantage += 1 if int(emotions.get(EMOTION_SADNESS, 0)) else 0
+    advantage += 1 if character.long_emotions.get("confidence") else 0
+    disadvantage += 1 if character.long_emotions.get("doubt") else 0
+    disadvantage += len(character.environment_diseases)
+    disadvantage += 1 if character.current_pain > 0 else 0
+    if dice is None:
+        dice = [character.find_die(die_id) for die_id in spec.dice_ids]
+    advantage += sum(die.enchantment == ENCHANT_SWIFT for die in dice if die is not None)
+    disadvantage += sum(die.enchantment == ENCHANT_SLUGGISH for die in dice if die is not None)
+    return advantage, disadvantage
+
+
 def perform_check(character, spec, rng=None):
     ensure_second_stage_state(character)
     rng = _rng(rng)
@@ -1424,35 +1586,29 @@ def perform_check(character, spec, rng=None):
         return forced_energy_failure(character, spec, dice, cost, state, profile)
     if cost > character.energy:
         return unavailable_result(spec, "energy_shortage")
-    advantage_count = int(weather["advantage_count"])
-    disadvantage_count = int(weather["disadvantage_count"])
-    if check_generates_emotion(spec):
-        advantage_count += 1 if emotion_layers(character, EMOTION_JOY) else 0
-        disadvantage_count += 1 if emotion_layers(character, EMOTION_SADNESS) else 0
-    advantage_count += 1 if character.long_emotions.get("confidence") else 0
-    disadvantage_count += 1 if character.long_emotions.get("doubt") else 0
-    disadvantage_count += len(character.environment_diseases)
+    advantage_count, disadvantage_count = check_advantage_counts(character, spec, weather, dice)
     net_advantage = advantage_count - disadvantage_count
-    rolls = roll_dice(dice, rng, "bonus" if net_advantage > 0 else "penalty" if net_advantage < 0 else None)
+    rolls = [roll_die(die, rng, force_mode="normal") for die in dice]
+    for index in range(abs(net_advantage)):
+        if net_advantage > 0:
+            chosen_id = spec.bonus_die_ids[index] if index < len(spec.bonus_die_ids) else dice[0].id
+            die_index = next((i for i, die in enumerate(dice) if die.id == chosen_id), None)
+            if die_index is None:
+                raise ValueError("Bonus reroll die was not invested: {}".format(chosen_id))
+        else:
+            die_index = rng.randint(0, len(dice) - 1)
+        rerolled = roll_single_face(dice[die_index], rng)
+        previous = rolls[die_index]["value"]
+        rolls[die_index]["value"] = max(previous, rerolled) if net_advantage > 0 else min(previous, rerolled)
+        rolls[die_index]["rolls"].append(rerolled)
+        rolls[die_index]["mode"] = "bonus" if net_advantage > 0 else "penalty"
     dice_total = sum(item["value"] for item in rolls)
     requirement = adjusted_requirement(spec.requirement, profile)
     modifier = attribute_modifier(character, spec.attribute, profile)
     extra = spec.extra_modifier + drowsiness_check_modifier(character, spec.attribute)
     total = modifier + dice_total * profile["dice_multiplier"] + extra
-    final_multiplier = float(weather["final_multiplier"])
-    final_multiplier *= injury_check_multiplier(character, spec)
-    final_multiplier *= alcohol_check_multiplier(character, spec)
+    final_multiplier = check_final_multiplier(character, spec, len(dice), weather)
     participating = check_generates_emotion(spec)
-    if participating and emotion_layers(character, EMOTION_CALM):
-        final_multiplier *= 1.15
-    if participating and emotion_layers(character, EMOTION_ANXIETY):
-        final_multiplier *= .85
-    if participating and len(dice) >= 2 and emotion_layers(character, EMOTION_EXCITEMENT):
-        final_multiplier *= 1.25
-    if participating and len(dice) >= 2 and emotion_layers(character, EMOTION_DISTRACTION):
-        final_multiplier *= .75
-    if character.palpitations:
-        final_multiplier *= .75
     total *= final_multiplier
     rank = result_rank(total, requirement, dice_total, dice, getattr(spec, "big_failure_slack", 0))
     rank = apply_mania_big_failure(rank, total, requirement, state)
@@ -1640,6 +1796,7 @@ def try_switch_disease(character, rng=None):
 def end_action_round(character, mood_delta_base=0, rng=None, exact_mood_delta=False, check=None):
     events = []
     if check is not None and check.available:
+        mood_delta_base += CHECK_MOOD_DELTAS[check.rank]
         apply_big_failure_degradation(character, check)
         spec = getattr(check, "spec", None)
         if spec is not None:
@@ -1648,8 +1805,15 @@ def end_action_round(character, mood_delta_base=0, rng=None, exact_mood_delta=Fa
             if spec.outdoors:
                 events.extend(process_environment_exposure(character, rng))
             events.extend(record_time_habit_action(character, spec.schedule_category))
-    delta = int(mood_delta_base) if exact_mood_delta else adjusted_mood_delta(character, mood_delta_base)
-    character.mood = int(clamp(character.mood + delta, -200, 200))
+            if mood_delta_base > 0:
+                mood_delta_base *= space_mood_multiplier(spec.location, spec.social)
+    if exact_mood_delta and check is None:
+        delta = int(mood_delta_base)
+        character.mood = int(clamp(character.mood + delta, -200, 200))
+    else:
+        delta = apply_mood_delta(character, mood_delta_base)
+    if check is not None and check.available and getattr(getattr(check, "spec", None), "sport", False) and check.success:
+        apply_exercise_mood_return(character, check.rank)
     if character.disease_state == DISEASE_NONE:
         event = try_enter_disease(character, rng)
         if event:
@@ -1704,11 +1868,13 @@ SLEEP_QUALITY_GOOD = "good"
 SLEEP_QUALITY_EXCELLENT = "excellent"
 SEASONS = ("spring", "summer", "autumn", "winter")
 WEATHERS = (WEATHER_SUNNY, WEATHER_CLOUDY, WEATHER_LIGHT_RAIN, WEATHER_HEAVY_RAIN,
-            WEATHER_STORM, WEATHER_THUNDERSTORM, WEATHER_FOG, WEATHER_LIGHT_SNOW, WEATHER_HEAVY_SNOW)
+            WEATHER_STORM, WEATHER_THUNDERSTORM, WEATHER_FOG, WEATHER_LIGHT_SNOW, WEATHER_HEAVY_SNOW,
+            WEATHER_OVERCAST, WEATHER_BLIZZARD)
 WEATHER_LABELS = {
     WEATHER_SUNNY: "晴天", WEATHER_CLOUDY: "多云", WEATHER_LIGHT_RAIN: "小雨",
     WEATHER_HEAVY_RAIN: "大雨", WEATHER_STORM: "暴雨", WEATHER_THUNDERSTORM: "雷雨",
     WEATHER_FOG: "雾天", WEATHER_LIGHT_SNOW: "小雪", WEATHER_HEAVY_SNOW: "大雪",
+    WEATHER_OVERCAST: "阴", WEATHER_BLIZZARD: "暴雪",
 }
 WEATHER_WEIGHTS = {
     "spring": (30, 30, 20, 10, 0, 5, 5, 0, 0),
@@ -1718,9 +1884,10 @@ WEATHER_WEIGHTS = {
 }
 SEASON_TEMPERATURE_OFFSETS = {"spring": 0, "summer": 15, "autumn": 0, "winter": -15}
 WEATHER_TEMPERATURE_OFFSETS = {
-    WEATHER_SUNNY: 25, WEATHER_CLOUDY: 15, WEATHER_LIGHT_RAIN: -15,
-    WEATHER_HEAVY_RAIN: -25, WEATHER_STORM: -25, WEATHER_THUNDERSTORM: -25,
-    WEATHER_FOG: 0, WEATHER_LIGHT_SNOW: -25, WEATHER_HEAVY_SNOW: -50,
+    WEATHER_SUNNY: 15, WEATHER_CLOUDY: 5, WEATHER_OVERCAST: 0,
+    WEATHER_LIGHT_RAIN: -5, WEATHER_HEAVY_RAIN: -10, WEATHER_STORM: -15,
+    WEATHER_THUNDERSTORM: -10, WEATHER_FOG: 0,
+    WEATHER_LIGHT_SNOW: -10, WEATHER_HEAVY_SNOW: -20, WEATHER_BLIZZARD: -30,
 }
 PSYCHIATRIC_MEDICINES = ("lithium", "aripiprazole", "lamotrigine", "venlafaxine", "trazodone", "alprazolam")
 MEDICINE_LABELS = {"lithium": "碳酸锂", "aripiprazole": "阿立哌唑", "lamotrigine": "拉莫三嗪",
@@ -1820,6 +1987,8 @@ CARD_TYPE_LABELS = {
 
 def ensure_second_stage_state(character):
     ensure_health(character)
+    legacy_dependence = (not hasattr(character, "drug_dependences")
+                         and bool(getattr(character, "drug_dependence", False)))
     if not isinstance(character.formal_attributes, RevertableDict):
         character.formal_attributes = RevertableDict(character.formal_attributes)
     if not isinstance(character.attribute_values, RevertableDict):
@@ -1858,6 +2027,10 @@ def ensure_second_stage_state(character):
         "bipolar_ember": None,
         "ect_residual_days": 0,
         "drug_dependence": False,
+        "legacy_drug_dependence": legacy_dependence,
+        "legacy_drug_free_days": int(getattr(character, "psych_medication_free_days", 0)),
+        "psych_medication_free_days": 0,
+        "medicine_day_settled": 0,
         "initial_gameplay_statuses_applied": False,
         "ever_had_pain_and_scars": False,
         "current_weather": None,
@@ -1871,6 +2044,17 @@ def ensure_second_stage_state(character):
         "intoxication": 0,
         "coffee_count_today": 0,
         "daytime_sleep_pending": None,
+        "training_load": None,
+        "current_pain": None,
+        "last_hospital_day": None,
+        "emergency_rescue_used": False,
+        "emergency_rescue_pending": False,
+        "psychiatric_extra_doses": 0,
+        "psychiatric_poisoning": False,
+        "last_ember_direction": -1,
+        "trazodone_withdrawal_day": None,
+        "ordinary_poison_risk": 0.0,
+        "ordinary_poisoning": False,
     }
     for key, value in defaults.items():
         if not hasattr(character, key):
@@ -1909,6 +2093,15 @@ def ensure_second_stage_state(character):
         "injuries": {},
         "exposure_rounds": {"cold": 0, "heat": 0},
         "time_habits": {},
+        "special_training_progress": {},
+        "drug_dependences": {},
+        "psych_medication_days_by_drug": {},
+        "drug_free_days": {},
+        "withdrawal_ember_multipliers": {},
+        "home_equipment": {},
+        "ordinary_medicine_taken_today": {},
+        "ordinary_treatment_streak": {"cold": 0, "heat": 0},
+        "ordinary_treatment_today": {},
     }
     for key, value in mapping_defaults.items():
         current = getattr(character, key, value)
@@ -1927,11 +2120,19 @@ def ensure_second_stage_state(character):
     for key in ("cold", "heat"):
         if key not in character.exposure_rounds:
             character.exposure_rounds[key] = 0
-    for key in ("psych_medication_days", "time_habit_history", "overeating_history", "severe_hunger_history"):
+    for key in ("psych_medication_days", "time_habit_history", "overeating_history", "severe_hunger_history", "weather_overlays"):
         current = getattr(character, key, RevertableList())
         if not isinstance(current, RevertableList):
             current = RevertableList(current)
         setattr(character, key, current)
+    if character.current_weather == WEATHER_FOG:
+        character.current_weather = WEATHER_CLOUDY
+        if "fog" not in character.weather_overlays:
+            character.weather_overlays.append("fog")
+    elif character.current_weather == WEATHER_THUNDERSTORM:
+        character.current_weather = WEATHER_HEAVY_RAIN
+        if "thunder" not in character.weather_overlays:
+            character.weather_overlays.append("thunder")
     if character.sleep_pending is not None and not isinstance(character.sleep_pending, RevertableDict):
         character.sleep_pending = RevertableDict(character.sleep_pending)
     if character.deep_fatigue is not None and not isinstance(character.deep_fatigue, RevertableDict):
@@ -1974,6 +2175,23 @@ def ensure_second_stage_state(character):
         for name in TEST_TRAINING_SCHEDULE_ATTRIBUTES:
             if name not in character.training_fatigue:
                 character.training_fatigue[name] = 0
+    if character.training_load is None:
+        character.training_load = sum(int(value) for value in character.training_fatigue.values())
+    for attr in ("str", "dex"):
+        if attr not in character.special_training_progress:
+            character.special_training_progress[attr] = int(character.test_growth_progress.get(attr, 0))
+    character.test_growth_progress = character.special_training_progress
+    for drug, days in list(character.psych_medication_days_by_drug.items()):
+        if not isinstance(days, RevertableList):
+            character.psych_medication_days_by_drug[drug] = RevertableList(days)
+    for injury, episode in list(character.injuries.items()):
+        if not isinstance(episode, RevertableDict):
+            episode = RevertableDict(episode)
+            character.injuries[injury] = episode
+        if "pain_source_cap" not in episode:
+            episode["pain_source_cap"] = {"strain": 1, "sprain": 2, "fracture": 3}.get(injury, 0) * (1 + int(episode.get("reinjury", 0)))
+    if character.current_pain is None:
+        character.current_pain = sum(int(item.get("pain_source_cap", 0)) for item in character.injuries.values())
     return character
 
 
@@ -2060,36 +2278,7 @@ def settle_check_emotions(state, spec, result, rng=None):
     if not check_generates_emotion(spec) or result is None or not result.available:
         return []
     rng = _rng(rng)
-    events = []
-    if result.success:
-        state.check_streak["success"] += 1
-        state.check_streak["failure"] = 0
-    else:
-        state.check_streak["failure"] += 1
-        state.check_streak["success"] = 0
-    removed_opposite = False
-    if state.long_emotions.get("confidence") and state.check_streak["failure"] >= 3:
-        state.long_emotions["confidence"] = False
-        state.check_streak["failure"] = 0
-        removed_opposite = True
-        events.append("confidence_cleared")
-    elif state.long_emotions.get("doubt") and state.check_streak["success"] >= 3:
-        state.long_emotions["doubt"] = False
-        state.check_streak["success"] = 0
-        removed_opposite = True
-        events.append("doubt_cleared")
-    if not removed_opposite and result.success and state.check_streak["success"] >= 3:
-        state.check_streak["success"] = 0
-        if not state.long_emotions.get("confidence") and rng.random() < .15:
-            state.long_emotions["confidence"] = True
-            state.long_emotions["doubt"] = False
-            events.append("confidence_gained")
-    elif not removed_opposite and not result.success and state.check_streak["failure"] >= 3:
-        state.check_streak["failure"] = 0
-        if not state.long_emotions.get("doubt") and rng.random() < .15:
-            state.long_emotions["doubt"] = True
-            state.long_emotions["confidence"] = False
-            events.append("doubt_gained")
+    events = settle_check_streak(state, result.success, rng)
     if result.rank == RESULT_BIG_SUCCESS:
         attempts = (True, True, True)
         guaranteed = 1
@@ -2113,6 +2302,42 @@ def settle_check_emotions(state, spec, result, rng=None):
     return events
 
 
+def settle_check_streak(state, success, rng=None):
+    """Sleep and ordinary checks share long-emotion streaks without sharing draws."""
+    rng = _rng(rng)
+    events = []
+    if success:
+        state.check_streak["success"] += 1
+        state.check_streak["failure"] = 0
+    else:
+        state.check_streak["failure"] += 1
+        state.check_streak["success"] = 0
+    removed_opposite = False
+    if state.long_emotions.get("confidence") and state.check_streak["failure"] >= 3:
+        state.long_emotions["confidence"] = False
+        state.check_streak["failure"] = 0
+        removed_opposite = True
+        events.append("confidence_cleared")
+    elif state.long_emotions.get("doubt") and state.check_streak["success"] >= 3:
+        state.long_emotions["doubt"] = False
+        state.check_streak["success"] = 0
+        removed_opposite = True
+        events.append("doubt_cleared")
+    if not removed_opposite and success and state.check_streak["success"] >= 3:
+        state.check_streak["success"] = 0
+        if not state.long_emotions.get("confidence") and rng.random() < .15:
+            state.long_emotions["confidence"] = True
+            state.long_emotions["doubt"] = False
+            events.append("confidence_gained")
+    elif not removed_opposite and not success and state.check_streak["failure"] >= 3:
+        state.check_streak["failure"] = 0
+        if not state.long_emotions.get("doubt") and rng.random() < .15:
+            state.long_emotions["doubt"] = True
+            state.long_emotions["confidence"] = False
+            events.append("doubt_gained")
+    return events
+
+
 def apply_initial_gameplay_statuses(state, rng=None):
     """Explicit story hook for Flo's first controllable HUD appearance."""
     ensure_second_stage_state(state)
@@ -2120,11 +2345,10 @@ def apply_initial_gameplay_statuses(state, rng=None):
         return []
     state.ember = 180
     state.ect_residual_days = 30
-    state.drug_dependence = True
     state.initial_gameplay_statuses_applied = True
     if state.current_weather is None:
         generate_weather(state, rng=rng or daily_weather_rng(state))
-    return ["ember:180", "ect_residual:30", "drug_dependence"]
+    return ["ember:180", "ect_residual:30"]
 
 
 def diagnose_bipolar(state):
@@ -2151,7 +2375,11 @@ def bipolar_ember_delta(state, rng=None):
     for medicine in tuple(state.pending_bipolar_medications):
         positive, negative = BIPOLAR_MEDICINE_MULTIPLIERS[medicine]
         magnitude *= positive if sign > 0 else negative
+    for medicine, pair in list(state.withdrawal_ember_multipliers.items()):
+        magnitude *= pair[0] if sign > 0 else pair[1]
     state.pending_bipolar_medications.clear()
+    state.withdrawal_ember_multipliers.clear()
+    state.last_ember_direction = sign
     return int(math.floor(magnitude)) * sign
 
 
@@ -2180,11 +2408,13 @@ def add_medicine_stock(state, medicine, amount):
     return state.medicine_counts[medicine]
 
 
-def _record_psychiatric_medication_day(state):
-    days = sorted(set(int(day) for day in state.psych_medication_days if int(day) >= state.day - 6) | {state.day})
-    state.psych_medication_days = RevertableList(days)
-    if len(days) >= 5:
-        state.drug_dependence = True
+def _record_psychiatric_medication_day(state, medicine):
+    days = sorted(set(int(day) for day in state.psych_medication_days_by_drug.get(medicine, ()) if int(day) >= state.day - 13) | {state.day})
+    state.psych_medication_days_by_drug[medicine] = RevertableList(days)
+    state.drug_free_days[medicine] = 0
+    if len(days) >= 7:
+        state.drug_dependences[medicine] = True
+    state.drug_dependence = any(state.drug_dependences.values())
 
 
 def take_medicine(state, medicine, rng=None, confirm_repeat=False):
@@ -2192,7 +2422,8 @@ def take_medicine(state, medicine, rng=None, confirm_repeat=False):
     rng = _rng(rng)
     if medicine not in PSYCHIATRIC_MEDICINES:
         raise ValueError("Unknown medicine: {}".format(medicine))
-    if int(state.medicine_counts.get(medicine, 0)) <= 0:
+    dose = DRUG_DEFINITIONS[medicine]["dose"]
+    if int(state.medicine_counts.get(medicine, 0)) < dose:
         return {"available": False, "reason": "out_of_stock", "events": []}
     today_key = "medicine_taken_today"
     taken_today = getattr(state, today_key, RevertableDict())
@@ -2202,14 +2433,24 @@ def take_medicine(state, medicine, rng=None, confirm_repeat=False):
     repeat = int(taken_today.get(medicine, 0))
     if repeat and not confirm_repeat:
         return {"available": False, "reason": "repeat_confirmation_required", "repeat": True, "events": []}
-    state.medicine_counts[medicine] -= 1
+    state.medicine_counts[medicine] -= dose
     taken_today[medicine] = repeat + 1
-    _record_psychiatric_medication_day(state)
+    _record_psychiatric_medication_day(state, medicine)
     events = ["medicine:{}".format(medicine)]
     if repeat:
         events.append("repeat_medicine_event_hook:{}".format(medicine))
+        state.psychiatric_extra_doses += 1
+        chance = min(1.0, .25 * state.psychiatric_extra_doses)
+        if not state.psychiatric_poisoning and roll_probability(chance, rng):
+            state.psychiatric_poisoning = True
+            events.append("psychiatric_poisoning")
+    if state.psychiatric_poisoning:
+        direction = (-1 if state.bipolar_ember is None else
+                     1 if state.mood > 0 else -1 if state.mood < 0 else state.last_ember_direction)
+        apply_mood_delta(state, 5 * direction)
+        events.append("psychiatric_poisoning_mood")
     if medicine in BIPOLAR_MEDICINE_MULTIPLIERS:
-        if medicine not in state.pending_bipolar_medications:
+        if not repeat:
             state.pending_bipolar_medications[medicine] = True
             if medicine == "aripiprazole" and rng.random() < .5:
                 add_emotion(state, EMOTION_EXCITEMENT)
@@ -2231,24 +2472,158 @@ def take_medicine(state, medicine, rng=None, confirm_repeat=False):
 
 
 def close_medicine_node(state, took_psychiatric_medicine):
-    ensure_second_stage_state(state)
-    if state.drug_dependence and not took_psychiatric_medicine:
-        before = state.mood
-        state.mood = int(clamp(state.mood * 1.05, -200, 200))
-        return ["drug_dependence_mood:{}:{}".format(before, state.mood)]
+    # Closing a session cannot determine whether the whole day was medication-free.
     return []
+
+
+def settle_medication_day(state):
+    ensure_second_stage_state(state)
+    if state.medicine_day_settled == state.day:
+        return []
+    state.medicine_day_settled = state.day
+    events = []
+    if state.legacy_drug_dependence:
+        if any(state.medicine_taken_today.get(medicine, 0) for medicine in PSYCHIATRIC_MEDICINES):
+            state.legacy_drug_free_days = 0
+        else:
+            state.legacy_drug_free_days += 1
+            events.append("legacy_withdrawal_pending")
+            if state.legacy_drug_free_days >= 7:
+                state.legacy_drug_dependence = False
+                events.append("legacy_drug_dependence_cleared")
+    for medicine, active in list(state.drug_dependences.items()):
+        if not active:
+            continue
+        if state.medicine_taken_today.get(medicine, 0):
+            state.drug_free_days[medicine] = 0
+            continue
+        events.extend(apply_withdrawal(state, medicine))
+        state.drug_free_days[medicine] = int(state.drug_free_days.get(medicine, 0)) + 1
+        if state.drug_free_days[medicine] >= 7:
+            state.drug_dependences[medicine] = False
+            events.append("drug_dependence_cleared:{}".format(medicine))
+    events.extend(update_drug_dependence_day(state))
+    return events
 
 
 def update_drug_dependence_day(state):
     ensure_second_stage_state(state)
-    state.psych_medication_days = RevertableList(day for day in state.psych_medication_days if day >= state.day - 6)
-    last = max(state.psych_medication_days) if state.psych_medication_days else None
-    if state.drug_dependence and (last is None or state.day - last >= 21):
-        state.drug_dependence = False
-        return ["drug_dependence_cleared"]
-    if len(set(state.psych_medication_days)) >= 5:
-        state.drug_dependence = True
+    for medicine, days in list(state.psych_medication_days_by_drug.items()):
+        state.psych_medication_days_by_drug[medicine] = RevertableList(day for day in days if day >= state.day - 13)
+    state.drug_dependence = state.legacy_drug_dependence or any(state.drug_dependences.values())
     return []
+
+
+def withdrawal_resilience_multiplier(state, medicine):
+    """Scale only non-Mood withdrawal amplitudes through the existing K_pow."""
+    return 1.0 / calculate_k_pow(state)
+
+
+def apply_withdrawal(state, medicine):
+    events = ["withdrawal:{}".format(medicine)]
+    mood = {"venlafaxine": -5, "trazodone": -5, "alprazolam": -7.5}.get(medicine)
+    if mood is not None:
+        events.append("withdrawal_mood:{}:{:g}".format(medicine, apply_mood_delta(state, mood)))
+    if medicine == "trazodone":
+        state.trazodone_withdrawal_day = state.day
+    elif medicine == "alprazolam":
+        add_emotion(state, EMOTION_ANXIETY)
+    elif medicine in ("lithium", "aripiprazole", "lamotrigine"):
+        resistance = withdrawal_resilience_multiplier(state, medicine)
+        pair = {"lithium": (1.075, 1.075), "aripiprazole": (1.125, 1.0),
+                "lamotrigine": (1.0, 1.125)}[medicine]
+        state.withdrawal_ember_multipliers[medicine] = tuple(
+            1.0 + (factor - 1.0) * resistance for factor in pair)
+    return events
+
+
+ORDINARY_MEDICINES = ("cold_medicine", "electrolyte", "painkiller", "digestive_tablet", "nutrition_supplement")
+
+
+def take_ordinary_medicine(state, medicine, rng=None):
+    ensure_second_stage_state(state)
+    if medicine not in ORDINARY_MEDICINES:
+        raise ValueError("Unknown ordinary medicine: {}".format(medicine))
+    if state.medicine_counts.get(medicine, 0) <= 0:
+        return {"available": False, "reason": "out_of_stock", "events": []}
+    state.medicine_counts[medicine] -= 1
+    taken = state.ordinary_medicine_taken_today
+    events = ["medicine:{}".format(medicine)]
+    was_poisoned = state.ordinary_poisoning
+    if taken:
+        state.ordinary_poison_risk = min(1.0, state.ordinary_poison_risk + (.25 if medicine in taken else .15))
+        if not state.ordinary_poisoning and roll_probability(state.ordinary_poison_risk, rng):
+            state.ordinary_poisoning = True
+            events.append("ordinary_poisoning")
+    if was_poisoned or state.ordinary_poisoning:
+        damage = _roll_damage((4,), rng)
+        damage_health(state, damage)
+        events.append("health_damage:{}".format(damage))
+    taken[medicine] = int(taken.get(medicine, 0)) + 1
+    if medicine == "painkiller":
+        events.append("pain_reduced:{}".format(use_painkiller(state)))
+    elif medicine in ("digestive_tablet", "nutrition_supplement"):
+        disease = "digestive" if medicine == "digestive_tablet" else "malnutrition"
+        events.extend(treat_nutrition_disease(state, disease, "medicine"))
+    elif medicine in ("cold_medicine", "electrolyte"):
+        disease = "cold" if medicine == "cold_medicine" else "heat"
+        state.ordinary_treatment_today[disease] = True
+        if disease in state.environment_diseases and roll_probability(.01, rng):
+            state.environment_diseases.pop(disease)
+            events.append("medicine_cured:{}".format(disease))
+    return {"available": True, "events": events, "poison_risk": state.ordinary_poison_risk}
+
+
+def settle_ordinary_medicine_morning(state, rng=None):
+    ensure_second_stage_state(state)
+    events = []
+    for disease in ("cold", "heat"):
+        if state.ordinary_treatment_today.get(disease):
+            state.ordinary_treatment_streak[disease] = int(state.ordinary_treatment_streak.get(disease, 0)) + 1
+        else:
+            state.ordinary_treatment_streak[disease] = 0
+        streak = state.ordinary_treatment_streak[disease]
+        if disease in state.environment_diseases and streak:
+            attempts = min(streak, 3)
+            if sum(roll_probability(.5, rng) for _ in range(attempts)) or streak >= 4:
+                state.environment_diseases.pop(disease)
+                events.append("medicine_cured:{}".format(disease))
+    state.ordinary_treatment_today = RevertableDict()
+    if state.ordinary_poisoning:
+        age = int(getattr(state, "ordinary_poisoning_days", 0)) + 1
+        state.ordinary_poisoning_days = age
+        if age >= 7 or roll_probability(environment_recovery_probability(state), rng):
+            state.ordinary_poisoning = False
+            state.ordinary_poisoning_days = 0
+            events.append("ordinary_poisoning_cured")
+    if state.psychiatric_poisoning:
+        age = int(getattr(state, "psychiatric_poisoning_days", 0)) + 1
+        state.psychiatric_poisoning_days = age
+        if age >= 7 or roll_probability(environment_recovery_probability(state), rng):
+            state.psychiatric_poisoning = False
+            state.psychiatric_poisoning_days = 0
+            events.append("psychiatric_poisoning_cured")
+    state.ordinary_medicine_taken_today = RevertableDict()
+    state.ordinary_poison_risk = 0.0
+    return events
+
+
+DRUG_DEFINITIONS = {
+    drug: dict(id=drug, display_name=MEDICINE_LABELS[drug],
+               dose=(2 if drug == "venlafaxine" else 1),
+               sprite="gui/pills/{}.png".format(drug),
+               description=description, recommended_periods=periods,
+               effect_handler=take_medicine, repeat_handler=take_medicine,
+               prn=(drug == "alprazolam"), enabled=True)
+    for drug, periods, description in (
+        ("venlafaxine", ("morning",), "提升心境。"),
+        ("trazodone", ("evening",), "提升心境，并辅助当晚睡眠。"),
+        ("alprazolam", (), "需要时服用，提升心境并清除焦虑。"),
+        ("lithium", (), "影响下一次余烬·双相晨间结算。"),
+        ("aripiprazole", (), "影响下一次余烬·双相结算，首次服用可能获得兴奋。"),
+        ("lamotrigine", (), "影响下一次余烬·双相结算，首次服用可能获得涣散。"),
+    )
+}
 
 
 def season_for_day(day):
@@ -2267,15 +2642,38 @@ def generate_weather(state, season=None, override=None, rng=None):
     if season not in SEASONS:
         raise ValueError("Unknown season: {}".format(season))
     weather = override or state.weather_override
+    overlays = ()
+    if isinstance(weather, dict):
+        overlays = tuple(weather.get("overlays", ()))
+        weather = weather.get("base_weather")
     if weather is None:
-        weather = _weighted_choice(list(zip(WEATHERS, WEATHER_WEIGHTS[season])), rng)
+        precipitation = {"spring": .50, "summer": .30, "autumn": .25, "winter": .20}[season]
+        if rng.random() < precipitation:
+            intensities = {"spring": (80, 15, 5), "summer": (40, 30, 30),
+                           "autumn": (60, 30, 10), "winter": (80, 15, 5)}[season]
+            level = _weighted_choice(tuple(zip((0, 1, 2), intensities)), rng)
+            snow = season == "winter" and rng.random() < .30
+            weather = ((WEATHER_LIGHT_SNOW, WEATHER_HEAVY_SNOW, WEATHER_BLIZZARD) if snow else
+                       (WEATHER_LIGHT_RAIN, WEATHER_HEAVY_RAIN, WEATHER_STORM))[level]
+        else:
+            dry = {"spring": ((WEATHER_CLOUDY, 40), (WEATHER_OVERCAST, 40), (WEATHER_SUNNY, 20)),
+                   "summer": ((WEATHER_SUNNY, 50), (WEATHER_CLOUDY, 30), (WEATHER_OVERCAST, 20)),
+                   "autumn": ((WEATHER_CLOUDY, 50), (WEATHER_OVERCAST, 25), (WEATHER_SUNNY, 25)),
+                   "winter": ((WEATHER_OVERCAST, 50), (WEATHER_CLOUDY, 30), (WEATHER_SUNNY, 20))}[season]
+            weather = _weighted_choice(dry, rng)
     if weather not in WEATHERS:
         raise ValueError("Unknown weather: {}".format(weather))
+    if weather == WEATHER_FOG:
+        weather, overlays = WEATHER_CLOUDY, overlays + ("fog",)
+    elif weather == WEATHER_THUNDERSTORM:
+        weather, overlays = WEATHER_HEAVY_RAIN, overlays + ("thunder",)
     temperature = int(clamp(round(50 + 15 * rng.gauss(0, 1) + SEASON_TEMPERATURE_OFFSETS[season]
                                   + WEATHER_TEMPERATURE_OFFSETS[weather]), 0, 100))
     state.current_weather = weather
+    state.weather_overlays = RevertableList(overlays)
     state.current_temperature = temperature
-    return {"weather": weather, "temperature": temperature, "band": temperature_band(temperature)}
+    return {"weather": weather, "overlays": tuple(overlays), "temperature": temperature,
+            "band": temperature_band(temperature)}
 
 
 def temperature_band(temperature):
@@ -2367,27 +2765,24 @@ def settle_environment_diseases_morning(state, rng=None):
 
 
 def weather_check_effects(state, spec):
-    """Return counts/factors only; multi-source reroll placement remains configurable."""
+    """Weather contribution to the normal modifier pool and reroll counts."""
     weather = getattr(state, "current_weather", None)
+    overlays = getattr(state, "weather_overlays", ())
     effects = {"available": True, "advantage_count": 0, "disadvantage_count": 0,
                "final_multiplier": 1.0, "mood_delta_base": 0}
-    if weather == WEATHER_STORM and spec.outdoors:
-        effects.update(available=False, reason="storm_blocks_outdoors")
+    if weather in (WEATHER_STORM, WEATHER_BLIZZARD) and spec.outdoors:
+        effects.update(available=False, reason="severe_weather_blocks_outdoors")
         return effects
-    if weather in (WEATHER_HEAVY_RAIN, WEATHER_THUNDERSTORM) and spec.outdoors and spec.sport:
-        effects.update(available=False, reason="rain_blocks_outdoor_sport")
-        return effects
-    if weather in (WEATHER_LIGHT_RAIN, WEATHER_HEAVY_RAIN, WEATHER_THUNDERSTORM, WEATHER_STORM):
+    if weather in (WEATHER_LIGHT_RAIN, WEATHER_HEAVY_RAIN, WEATHER_STORM):
         if spec.rest or spec.action_type == ACTION_SLEEP:
             effects["advantage_count"] += 1
-        if weather != WEATHER_STORM or not spec.outdoors:
-            effects["mood_delta_base"] += -5 if spec.outdoors else 5
-    if weather == WEATHER_LIGHT_RAIN and spec.outdoors and spec.sport:
-        effects["disadvantage_count"] += 1
-    if weather == WEATHER_FOG and spec.outdoors:
-        effects["final_multiplier"] *= .75
-    if weather in (WEATHER_LIGHT_SNOW, WEATHER_HEAVY_SNOW) and spec.social:
-        effects["final_multiplier"] *= 1.25
+        effects["mood_delta_base"] += -5 if spec.outdoors else 5
+    if spec.outdoors and spec.sport:
+        effects["final_multiplier"] -= {WEATHER_LIGHT_RAIN: .15, WEATHER_HEAVY_RAIN: .25}.get(weather, 0)
+    if "fog" in overlays and spec.outdoors:
+        effects["final_multiplier"] -= .15
+    if weather in (WEATHER_LIGHT_SNOW, WEATHER_HEAVY_SNOW, WEATHER_BLIZZARD) and spec.social:
+        effects["final_multiplier"] += .15
     return effects
 
 
@@ -2418,6 +2813,24 @@ def apply_space_reward(value, location, reward_tag, rest=False):
     return int(math.floor(value * space_reward_multiplier(location, reward_tag, True, rest)))
 
 
+def space_mood_multiplier(location, social=False):
+    return {"park": 1.25, "home": 1.15}.get(location, 1.15 if social and location == "cafe" else
+                                                   1.25 if social and location == "bar" else 1.0)
+
+
+def training_unit_copies(location, rng=None, state=None, attribute=None):
+    level = 0
+    if location == "home" and state is not None and attribute in ("str", "dex"):
+        level = int(state.home_equipment.get("dumbbell_level" if attribute == "str" else "balance_level", 0))
+    if location == "gym" or level >= 3:
+        return 1 + int(roll_probability(.25, rng))
+    if location == "home":
+        if level >= 2:
+            return 1
+        return int(not roll_probability(.15, rng))
+    return 1
+
+
 def broad_time_period(slot):
     if slot in ("morning_1", "morning_2"):
         return "morning"
@@ -2433,7 +2846,9 @@ def record_time_habit_action(state, category, slot=None):
     period = broad_time_period(slot or state.current_time_slot)
     if not period or not category:
         return []
-    state.time_habit_history.append(RevertableDict(day=state.day, period=period, category=category))
+    if not any(int(item["day"]) == state.day and item["period"] == period
+               and item["category"] == category for item in state.time_habit_history):
+        state.time_habit_history.append(RevertableDict(day=state.day, period=period, category=category))
     return refresh_time_habits(state)
 
 
@@ -2441,8 +2856,13 @@ def refresh_time_habits(state):
     ensure_second_stage_state(state)
     state.time_habit_history = RevertableList(item for item in state.time_habit_history if int(item["day"]) >= state.day - 6)
     counts = {}
+    seen = set()
     for item in state.time_habit_history:
         key = "{}:{}".format(item["period"], item["category"])
+        occurrence = (item["day"], key)
+        if occurrence in seen:
+            continue
+        seen.add(occurrence)
         counts[key] = counts.get(key, 0) + 1
     events = []
     for key in list(state.time_habits):
@@ -2562,9 +2982,9 @@ def treat_nutrition_disease(state, disease, method):
 
 
 INJURY_RULES = {
-    "strain": {"dice": ((4,), (4, 6), (4, 6, 8)), "multiplier": .85, "q6": .50, "forced_day": 3},
-    "sprain": {"dice": ((6,), (6, 8), (6, 8, 10)), "multiplier": .75, "q6": .308, "forced_day": 7},
-    "fracture": {"dice": ((4, 6), (4, 6, 8), (4, 6, 8, 10)), "multiplier": .50, "q6": .10, "forced_day": 21},
+    "strain": {"dice": ((4,), (4, 6), (4, 6, 8)), "multiplier": .95, "q6": .50, "forced_day": 3, "pain": 1},
+    "sprain": {"dice": ((6,), (6, 8), (6, 8, 10)), "multiplier": .85, "q6": .308, "forced_day": 7, "pain": 2},
+    "fracture": {"dice": ((4, 6), (4, 6, 8), (4, 6, 8, 10)), "multiplier": .75, "q6": .10, "forced_day": 21, "pain": 3},
 }
 
 
@@ -2574,15 +2994,85 @@ def acquire_injury(state, injury, rng=None):
         raise ValueError("Unknown injury: {}".format(injury))
     current = state.injuries.get(injury)
     reinjury = min(2, int(current.get("reinjury", 0)) + 1) if current else 0
-    beyond_cap = bool(current and int(current.get("reinjury", 0)) >= 2)
     damage = _roll_damage(INJURY_RULES[injury]["dice"][reinjury], rng)
     damage_health(state, damage)
+    pain = INJURY_RULES[injury]["pain"]
+    state.current_pain += pain
+    source_cap = int(current.get("pain_source_cap", 0)) + pain if current else pain
     state.injuries[injury] = RevertableDict(reinjury=reinjury, acquired_day=state.day,
-        stage_day=state.day, severe_reinjury_hook=beyond_cap)
+        stage_day=state.day, remaining_days=INJURY_RULES[injury]["forced_day"], pain_source_cap=source_cap)
     events = ["injury:{}:{}".format(injury, reinjury), "health_damage:{}".format(damage)]
-    if beyond_cap:
-        events.append("severe_reinjury_event_hook:{}".format(injury))
     return events
+
+
+def resolve_training_injury(state, rank, load, rng=None):
+    """Use the load at the start of this completed training check."""
+    if rank not in (RESULT_FAILURE, RESULT_BIG_FAILURE):
+        return []
+    load = max(0, int(load))
+    if rank == RESULT_BIG_FAILURE:
+        injury = ("fracture" if roll_probability(min(1.0, .01 * load), rng) else
+                  "sprain" if roll_probability(min(1.0, .05 * load), rng) else "strain")
+    else:
+        sore = roll_probability(min(1.0, .25 * load), rng)
+        sprain = roll_probability(min(1.0, .05 * load), rng)
+        fracture = roll_probability(min(1.0, .01 * load), rng)
+        injury = "fracture" if fracture else "sprain" if sprain else "strain" if sore else None
+    return acquire_injury(state, injury, rng) if injury else []
+
+
+def clear_injury(state, injury):
+    episode = state.injuries.pop(injury, None)
+    if episode is None:
+        return False
+    cap = sum(int(item.get("pain_source_cap", 0)) for item in state.injuries.values())
+    state.current_pain = min(state.current_pain, cap)
+    return True
+
+
+def use_painkiller(state):
+    ensure_second_stage_state(state)
+    before = int(state.current_pain)
+    state.current_pain = before // 2
+    return before - state.current_pain
+
+
+def visit_hospital(state, treatments=()):
+    """One daily visit; price and emergency presentation belong to other systems."""
+    ensure_second_stage_state(state)
+    if is_dead(state):
+        return {"available": False, "reason": "dead", "events": []}
+    if state.last_hospital_day == state.day:
+        return {"available": False, "reason": "already_visited_today", "events": []}
+    allowed = {"cold", "heat", "digestive", "malnutrition", "strain", "sprain",
+               "fracture", "ordinary_poisoning", "psychiatric_poisoning"}
+    requested = set(treatments)
+    if requested - allowed:
+        raise ValueError("Unknown hospital treatment: {}".format(sorted(requested - allowed)))
+    state.last_hospital_day = state.day
+    events = []
+    for treatment in requested:
+        if treatment in ("cold", "heat") and treatment in state.environment_diseases:
+            state.environment_diseases.pop(treatment)
+            events.append("hospital_cured:{}".format(treatment))
+        elif treatment in ("digestive", "malnutrition"):
+            events.extend(treat_nutrition_disease(state, treatment, "hospital"))
+        elif treatment in ("strain", "sprain") and clear_injury(state, treatment):
+            events.append("hospital_cured:{}".format(treatment))
+        elif treatment == "fracture" and "fracture" in state.injuries:
+            episode = state.injuries["fracture"]
+            episode["remaining_days"] = max(1, int(episode.get("remaining_days", 21)) // 3)
+            events.append("fracture_remaining:{}".format(episode["remaining_days"]))
+        elif treatment in ("ordinary_poisoning", "psychiatric_poisoning"):
+            field = treatment
+            if getattr(state, field, False):
+                setattr(state, field, False)
+                setattr(state, field + "_days", 0)
+                events.append("hospital_cured:{}".format(treatment))
+    state.health = max(state.health, .60 * health_max(state))
+    use_painkiller(state)
+    return {"available": True, "events": events, "health": state.health,
+            "pain": state.current_pain, "cost_quote": None}
 
 
 def injury_check_multiplier(state, spec):
@@ -2605,8 +3095,9 @@ def settle_injuries_morning(state, rng=None):
         rules = INJURY_RULES[injury]
         age = state.day - int(item.get("stage_day", state.day)) + 1
         chance = 1 - ((1 - rules["q6"]) ** (con / 6.0))
-        if age >= rules["forced_day"] or roll_probability(chance, rng):
-            state.injuries.pop(injury, None)
+        item["remaining_days"] = max(0, int(item.get("remaining_days", rules["forced_day"])) - 1)
+        if age >= rules["forced_day"] or item["remaining_days"] <= 0 or roll_probability(chance, rng):
+            clear_injury(state, injury)
             events.append("injury_cured:{}".format(injury))
     return events
 
@@ -2723,6 +3214,21 @@ def apply_disease_switch(state):
 
 
 def sleep_factor(state, quality=SLEEP_QUALITY_GOOD):
+    factor = pow_sleep_factor(state)
+    if getattr(state, "good_routine", False):
+        factor -= 0.025
+    if quality == SLEEP_QUALITY_POOR:
+        factor += .025
+    elif quality == SLEEP_QUALITY_EXCELLENT:
+        factor -= .025
+    if emotion_layers(state, EMOTION_DISTRACTION):
+        factor = 1 - (1 - factor) * 1.25
+    if emotion_layers(state, EMOTION_EXCITEMENT):
+        factor = 1 - (1 - factor) * .75
+    return max(.85, factor)
+
+
+def pow_sleep_factor(state):
     pow_value = effective_attribute(state, "pow")
     if pow_value <= 6:
         factor = 0.95
@@ -2732,18 +3238,17 @@ def sleep_factor(state, quality=SLEEP_QUALITY_GOOD):
         factor = 0.90 + (0.875 - 0.90) * ((pow_value - 12) / 6.0)
     else:
         factor = 0.875 + (0.867 - 0.875) * ((pow_value - 18) / 2.0)
-    if getattr(state, "good_routine", False):
-        factor = max(0.85, factor - 0.025)
-    if quality == SLEEP_QUALITY_POOR:
-        factor += .025
-    elif quality == SLEEP_QUALITY_EXCELLENT:
-        factor -= .025
-    if emotion_layers(state, EMOTION_DISTRACTION):
-        factor = 1 - (1 - factor) * 1.25
-    if emotion_layers(state, EMOTION_EXCITEMENT):
-        factor = 1 - (1 - factor) * .75
-    factor = max(.85, factor)
     return factor
+
+
+def apply_exercise_mood_return(state, rank):
+    offset = {RESULT_SUCCESS: 0, RESULT_HARD_SUCCESS: .025,
+              RESULT_BIG_SUCCESS: .05}.get(rank)
+    if offset is None:
+        return 0
+    before = state.mood
+    state.mood = int(round(state.mood * (pow_sleep_factor(state) - offset), 10))
+    return state.mood - before
 
 
 def apply_sleep_recovery(state, quality=SLEEP_QUALITY_GOOD):
@@ -2821,9 +3326,9 @@ def add_attribute_bonus(state, attr, amount):
     for _ in range(abs(int(amount))):
         state.attribute_bonuses[attr].append(RevertableDict(value=1 if amount >= 0 else -1, source="second_stage"))
         state.attribute_bonus_gain_counters[attr] += 1
-        rewards = _counter_step(state.attribute_bonus_gain_counters, attr, 4)
+        rewards = _counter_step(state.attribute_bonus_gain_counters, attr, 3)
         if rewards:
-            add_dice_growth_progress(state, attr, rewards * 6)
+            add_growth_reward_pending(state, attr, rewards)
     return current_attribute(state, attr)
 
 
@@ -2842,7 +3347,7 @@ def add_attribute_value(state, attr, amount):
         state.attribute_value_gain_counters[attr] += int(amount)
         rewards = _counter_step(state.attribute_value_gain_counters, attr, 2)
         if rewards:
-            add_dice_growth_progress(state, attr, rewards * 6)
+            add_growth_reward_pending(state, attr, rewards)
     return current_attribute(state, attr)
 
 
@@ -2856,19 +3361,18 @@ def add_formal_attribute(state, attr, amount):
         state.formal_attribute_gain_counters[attr] += int(amount)
         rewards = _counter_step(state.formal_attribute_gain_counters, attr, 1)
         if rewards:
-            add_dice_growth_progress(state, attr, rewards * 6)
+            add_growth_reward_pending(state, attr, rewards)
     elif amount < 0:
-        # Manual 5.10: each actually lost formal point gives 6 degradation points.
         lost = before - state.formal_attributes[attr]
         if lost:
-            add_degradation_progress(state, attr, lost * 6)
+            state.degradation_penalty_pending[attr] += lost
     return current_attribute(state, attr)
 
 
 def process_small_rest(state, rng=None):
     rng = _rng(rng)
     ensure_second_stage_state(state)
-    events = resolve_test_rest(state)
+    events = []
     for attr in ATTRIBUTES:
         remaining = []
         for bonus in state.attribute_bonuses[attr]:
@@ -2882,6 +3386,8 @@ def process_small_rest(state, rng=None):
                 events.append("bonus_to_value:{}".format(attr))
         state.attribute_bonuses[attr] = RevertableList(remaining)
     events.extend(process_dice_growth_progress_on_small_rest(state))
+    events.extend(resolve_test_rest(state))
+    events.extend(clear_training_fatigue_on_sleep(state))
     return events
 
 
@@ -3448,7 +3954,7 @@ def apply_big_failure_degradation(state, result):
     state_name = mood_state(state)
     if state_name in (DISEASE_MANIA, DISEASE_DEPRESSION):
         amount += 1
-    if state_name in (MOOD_HIGH, DISEASE_MANIA):
+    if getattr(getattr(result, "spec", None), "additional_check", False) and state_name in (MOOD_HIGH, DISEASE_MANIA):
         amount += 1
     return add_degradation_progress(state, result.attribute, amount)
 
@@ -3563,7 +4069,13 @@ def end_turn(state, turn_result, rng=None):
                 events.extend(process_environment_exposure(state, rng))
             events.extend(record_time_habit_action(state, spec.schedule_category))
     weather_delta = int(getattr(check, "weather_mood_delta_base", 0)) if check is not None else 0
-    delta = apply_mood_delta(state, turn_result.get("mood_delta", 0) + weather_delta)
+    generic = CHECK_MOOD_DELTAS[check.rank] if check is not None else 0
+    mood_base = turn_result.get("mood_delta", 0) + weather_delta + generic
+    if check is not None and mood_base > 0:
+        mood_base *= space_mood_multiplier(check.spec.location, check.spec.social)
+    delta = apply_mood_delta(state, mood_base)
+    if check is not None and check.success and getattr(getattr(check, "spec", None), "sport", False):
+        delta += apply_exercise_mood_return(state, check.rank)
     events.extend(process_disease_end_turn_checks(state, rng))
     disease_event = maybe_trigger_disease_random_event(state, rng)
     if disease_event:
@@ -3704,7 +4216,7 @@ def consume_coffee(state, rng=None):
     risks = (0.0, .25, .50, 1.0)
     risk = risks[min(state.coffee_count_today - 1, 3)]
     events = ["coffee", "emotion:excitement:{}".format(added)]
-    if roll_probability(risk, rng):
+    if not state.palpitations and roll_probability(risk, rng):
         state.palpitations = True
         events.append("palpitations")
         if roll_probability(.5, rng):
@@ -3725,7 +4237,7 @@ def consume_alcohol(state, rng=None):
         add_emotion(state, EMOTION_DISTRACTION, 1)
         events.append("emotion:distraction")
     factor = 1.05 if count <= 3 else 1.10
-    state.mood = int(clamp(state.mood * factor, -200, 200))
+    apply_mood_delta(state, state.mood * (factor - 1.0))
     if count == 5:
         events.extend(("forced_drunk_sleep", "drunk_hospital_event_hook"))
     return events
@@ -3735,9 +4247,7 @@ def alcohol_check_multiplier(state, spec):
     count = int(getattr(state, "intoxication", 0))
     if count <= 0:
         return 1.0
-    general = (0, -.05, -.10, -.15, -.40, -.65)[min(count, 5)]
-    social = (0, .15, .30, .55, .55, .55)[min(count, 5)] if getattr(spec, "social", False) else 0
-    return max(0.0, 1 + general + social)
+    return (1.0, .95, .90, .85, .70, .55)[min(count, 5)]
 
 
 def gain_sleep_fatigue(state):
@@ -3821,6 +4331,7 @@ def finish_wake(state, result, rng=None):
         state.meal_choices["breakfast"] = False
     state.time_slot_index = skip
     outcome["events"].extend(settle_morning_mood(state, rng))
+    outcome["events"].extend(settle_ordinary_medicine_morning(state, rng))
     outcome["events"].extend(settle_environment_diseases_morning(state, rng))
     outcome["events"].extend(settle_injuries_morning(state, rng))
     outcome["events"].extend(update_drug_dependence_day(state))
@@ -3829,26 +4340,56 @@ def finish_wake(state, result, rng=None):
     return outcome
 
 
-def perform_sleep_quality_check(state, rng=None):
+def sleep_advantage_counts(state, dice):
+    rainy = state.current_weather in (WEATHER_LIGHT_RAIN, WEATHER_HEAVY_RAIN, WEATHER_STORM)
+    advantage = int(rainy) + int(bool(emotion_layers(state, EMOTION_JOY))) + int(bool(state.long_emotions.get("confidence")))
+    disadvantage = len(state.environment_diseases) + int(bool(emotion_layers(state, EMOTION_SADNESS)))
+    disadvantage += int(bool(state.long_emotions.get("doubt"))) + int(state.current_pain > 0)
+    advantage += sum(die.enchantment == ENCHANT_SWIFT for die in dice)
+    disadvantage += sum(die.enchantment == ENCHANT_SLUGGISH for die in dice)
+    return advantage, disadvantage
+
+
+def perform_sleep_quality_check(state, rng=None, bonus_die_ids=None):
     """Special CON check: all usable dice, no attribute modifier and no energy cost."""
     ensure_second_stage_state(state)
     dice = usable_dice(state, "con")
     if not dice:
         return CheckResult(available=False, reason="no_usable_con_die", attribute="con")
     rng = _rng(rng)
-    rainy = state.current_weather in (WEATHER_LIGHT_RAIN, WEATHER_HEAVY_RAIN, WEATHER_THUNDERSTORM, WEATHER_STORM)
-    advantage_count = 1 if rainy else 0
-    disadvantage_count = len(state.environment_diseases)
+    advantage_count, disadvantage_count = sleep_advantage_counts(state, dice)
     net = advantage_count - disadvantage_count
-    rolls = roll_dice(dice, rng, "bonus" if net > 0 else "penalty" if net < 0 else None)
+    rolls = [roll_die(die, rng, force_mode="normal") for die in dice]
+    for step in range(abs(net)):
+        if net > 0:
+            chosen = bonus_die_ids[step] if bonus_die_ids is not None and step < len(bonus_die_ids) else dice[0].id
+            index = next((i for i, die in enumerate(dice) if die.id == chosen), None)
+            if index is None:
+                raise ValueError("Sleep bonus reroll die was not invested: {}".format(chosen))
+        else:
+            index = rng.randint(0, len(dice) - 1)
+        previous = rolls[index]["value"]
+        rerolled = roll_single_face(dice[index], rng)
+        rolls[index]["value"] = max(previous, rerolled) if net > 0 else min(previous, rerolled)
+        rolls[index]["rolls"].append(rerolled)
     dice_total = sum(item["value"] for item in rolls)
     multiplier = 1.0 + .15 * emotion_layers(state, EMOTION_DISTRACTION) - .15 * emotion_layers(state, EMOTION_EXCITEMENT)
+    multiplier += .15 * int(bool(emotion_layers(state, EMOTION_CALM))) - .15 * int(bool(emotion_layers(state, EMOTION_ANXIETY)))
+    multiplier -= .05 * state.current_pain
     if int(getattr(state, "trazodone_sleep_bonus_day", -1)) == state.day:
         multiplier += .15
-    if state.current_weather in (WEATHER_THUNDERSTORM, WEATHER_STORM):
+    if getattr(state, "trazodone_withdrawal_day", None) == state.day:
+        multiplier -= .075 * withdrawal_resilience_multiplier(state, "trazodone")
+    if state.current_weather in (WEATHER_STORM, WEATHER_BLIZZARD):
+        multiplier -= .15
+    if "thunder" in state.weather_overlays:
         multiplier -= .25
-    total = dice_total * max(0.0, multiplier)
-    requirement = int(math.floor(dice_max_total(dice) / 2.0))
+    elif "wind" in state.weather_overlays:
+        multiplier -= .15
+    profile = mood_check_profile(mood_state(state))
+    total = dice_total * profile["dice_multiplier"] * max(.50, multiplier)
+    total *= (.85 if state.palpitations else 1.0) * alcohol_check_multiplier(state, None)
+    requirement = adjusted_requirement(int(math.floor(dice_max_total(dice) / 2.0)), profile)
     rank = result_rank(total, requirement, dice_total, dice)
     if rank in (RESULT_BIG_FAILURE, RESULT_FAILURE):
         quality = SLEEP_QUALITY_POOR
@@ -3856,13 +4397,16 @@ def perform_sleep_quality_check(state, rng=None):
         quality = SLEEP_QUALITY_GOOD
     else:
         quality = SLEEP_QUALITY_EXCELLENT
+    normalized_rank = RESULT_FAILURE if rank == RESULT_BIG_FAILURE else RESULT_HARD_SUCCESS if rank == RESULT_BIG_SUCCESS else rank
     result = CheckResult(available=True, attribute="con", requirement=requirement,
         base_requirement=requirement, attribute_modifier=0, dice_multiplier=multiplier,
-        dice_total=dice_total, total=total, rank=rank, success=quality != SLEEP_QUALITY_POOR,
+        dice_total=dice_total, total=total, rank=normalized_rank, success=quality != SLEEP_QUALITY_POOR,
         energy_cost=0, dice_ids=[die.id for die in dice], dice_results=rolls, dice_count=len(dice))
     result.quality = quality
+    result.raw_rank = rank
     result.advantage_count = advantage_count
     result.disadvantage_count = disadvantage_count
+    result.streak_events = settle_check_streak(state, result.success, rng)
     return result
 
 
@@ -3892,9 +4436,11 @@ def begin_daytime_drunk_sleep(state, rng=None):
     result = perform_sleep_quality_check(state, rng)
     if not result.available:
         return {"available": False, "reason": result.reason, "events": []}
+    apply_mood_delta(state, CHECK_MOOD_DELTAS[result.rank])
     quality = _downgrade_sleep_quality(result.quality)
     recovery = restore_sleep_energy(state, quality, night_main=False)
     events = ["daytime_drunk_sleep", "sleep_quality:{}".format(quality)]
+    events.extend(result.streak_events)
     events.extend(clear_sleep_emotions(state))
     events.extend(clear_training_fatigue_on_sleep(state))
     remaining = 3
@@ -3922,15 +4468,18 @@ def continue_daytime_sleep_to_next_day(state, rng=None):
         return {"available": False, "reason": "no_daytime_sleep_pending", "events": []}
     quality = state.daytime_sleep_pending["quality"]
     state.daytime_sleep_pending = None
-    events = end_day(state, rng, on_time=False, quality=quality)["events"]
+    events = settle_medication_day(state)
+    events.extend(end_day(state, rng, on_time=False, quality=quality)["events"])
     state.next_day_energy_cap_bonus = 1 if quality == SLEEP_QUALITY_EXCELLENT else 0
     events.extend(clear_sleep_emotions(state, night_main=True))
     state.day += 1
     state.weekday = 1 + (state.weekday % 7)
     state.meal_choices = RevertableDict()
     state.medicine_taken_today = RevertableDict()
+    state.psychiatric_extra_doses = 0
     state.coffee_count_today = 0
     events.extend(settle_morning_mood(state, rng))
+    events.extend(settle_ordinary_medicine_morning(state, rng))
     events.extend(settle_environment_diseases_morning(state, rng))
     events.extend(settle_injuries_morning(state, rng))
     events.extend(update_drug_dependence_day(state))
@@ -3939,7 +4488,7 @@ def continue_daytime_sleep_to_next_day(state, rng=None):
     return {"available": True, "events": events}
 
 
-def begin_sleep(state, rng=None):
+def begin_sleep(state, rng=None, bonus_die_ids=None):
     """Settle the old night's rest once, then wait for a free wake check if late."""
     ensure_second_stage_state(state)
     if is_dead(state):
@@ -3950,11 +4499,13 @@ def begin_sleep(state, rng=None):
     forced_coma = state.current_time_slot == "forced_sleep"
     night_actions = state.night_actions_completed
     slept_day = state.day
-    quality_result = perform_sleep_quality_check(state, rng)
+    bedtime_events = settle_medication_day(state)
+    quality_result = perform_sleep_quality_check(state, rng, bonus_die_ids)
     if not quality_result.available:
         return {"available": False, "reason": quality_result.reason, "events": []}
     quality = quality_result.quality
-    events = ["sleep", "sleep_quality:{}".format(quality)]
+    events = bedtime_events + ["sleep", "sleep_quality:{}".format(quality)] + quality_result.streak_events
+    apply_mood_delta(state, CHECK_MOOD_DELTAS[quality_result.rank])
     events.extend(end_day(state, rng, on_time=on_time, quality=quality)["events"])
     recovery = restore_sleep_energy(state, quality, night_main=True)
     events.extend(clear_sleep_emotions(state, night_main=True))
@@ -3966,12 +4517,14 @@ def begin_sleep(state, rng=None):
     state.fatigue_history = RevertableList(expiry for expiry in state.fatigue_history if expiry > state.day)
     state.meal_choices = RevertableDict()
     state.medicine_taken_today = RevertableDict()
+    state.psychiatric_extra_doses = 0
     state.coffee_count_today = 0
     state.night_actions_completed = 0
     state.night_snack_eaten = False
     state.time_slot_index = 0
     if on_time:
         events.extend(settle_morning_mood(state, rng))
+        events.extend(settle_ordinary_medicine_morning(state, rng))
         events.extend(settle_environment_diseases_morning(state, rng))
         events.extend(settle_injuries_morning(state, rng))
         events.extend(update_drug_dependence_day(state))
@@ -3991,6 +4544,7 @@ def end_day(state, rng=None, on_time=None, quality=SLEEP_QUALITY_GOOD):
     if is_dead(state):
         return {"events": ["death"]}
     events = ["sleep_recovery", "small_rest"]
+    events.extend(settle_medication_day(state))
     apply_sleep_recovery(state, quality)
     events.extend(process_small_rest(state, rng))
     # Night-only recovery: daytime rest and standalone growth settlement do not heal.

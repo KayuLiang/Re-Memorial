@@ -93,7 +93,6 @@ class RMTestFlowCoreTests(unittest.TestCase):
 
         self.assertIn("small_rest", events)
         self.assertIn("test_strength_bonus:str", events)
-        self.assertIn("growth_reward_pending:str", events)
         self.assertEqual(character.growth_reward_pending["str"], 1)
         self.assertIn("attr_bonus_str_test_strength_training", status_ids)
         self.assertIn("growth_reward_pending_str", status_ids)
@@ -110,35 +109,30 @@ class RMTestFlowCoreTests(unittest.TestCase):
         self.assertGreaterEqual(result["restored"], 1)
         self.assertEqual(character.energy, min(rm.energy_max(character), 1 + result["restored"]))
 
-    def test_day_rest_reduces_each_training_fatigue_by_one_layer(self):
+    def test_day_rest_does_not_reduce_shared_training_load(self):
         character = rm.create_initial_character({"str": 3, "dex": 3, "int": 2}, rng=random.Random(105))
-        character.training_fatigue["test_strength_training"] = 2
-        character.training_fatigue["test_dex_training"] = 1
+        rm.add_training_fatigue(character, "test_strength_training", 2)
+        rm.add_training_fatigue(character, "test_dex_training", 1)
 
         result = rm.resolve_test_day_rest(character, rng=random.Random(106))
 
         self.assertTrue(result["available"])
-        self.assertEqual(character.training_fatigue["test_strength_training"], 1)
-        self.assertEqual(character.training_fatigue["test_dex_training"], 0)
-        self.assertIn("fatigue_reduced:test_strength_training:1", result["events"])
-        self.assertIn("fatigue_reduced:test_dex_training:0", result["events"])
+        self.assertEqual(character.training_load, 3)
+        self.assertFalse(any(event.startswith("fatigue_reduced") for event in result["events"]))
 
     def test_test_sleep_uses_quality_check_and_restores_energy(self):
         character = rm.create_initial_character({"str": 3, "dex": 3, "int": 2}, rng=random.Random(9))
         character.energy = 0
         character.test_growth_progress["str"] = 6
-        character.training_fatigue["test_strength_training"] = 2
-        character.training_fatigue["test_dex_training"] = 1
+        character.training_load = 3
 
         result = rm.resolve_test_sleep(character, rng=random.Random(0))
 
         self.assertTrue(result["available"])
         self.assertEqual(character.energy, rm.energy_max(character))
         self.assertIn("sleep", result["events"])
-        self.assertEqual(character.training_fatigue["test_strength_training"], 0)
-        self.assertEqual(character.training_fatigue["test_dex_training"], 0)
-        self.assertIn("fatigue_cleared:test_strength_training", result["events"])
-        self.assertIn("fatigue_cleared:test_dex_training", result["events"])
+        self.assertEqual(character.training_load, 0)
+        self.assertIn("training_load_cleared", result["events"])
 
     def test_sleep_converts_training_progress_once_and_enters_small_rest(self):
         for slot in ("sleep_decision", "night_break_1", "forced_sleep"):
@@ -158,15 +152,15 @@ class RMTestFlowCoreTests(unittest.TestCase):
                 self.assertFalse(again["available"])
                 self.assertEqual(character.growth_reward_pending["str"], 1)
 
-    def test_direct_small_rest_converts_training_before_attribute_conversion(self):
+    def test_direct_small_rest_converts_existing_bonus_before_special_progress(self):
         character = rm.create_initial_character(rng=random.Random(8))
         character.test_growth_progress["dex"] = 6
         character.attribute_value_gain_counters["dex"] = 1
         events = rm.process_small_rest(character, SequenceRandom([.9]))
         self.assertEqual(character.test_growth_progress["dex"], 0)
-        self.assertEqual(character.attribute_values["dex"], 1)
-        self.assertEqual(character.growth_reward_pending["dex"], 1)
-        self.assertLess(events.index("test_training_bonus:dex"), events.index("bonus_to_value:dex"))
+        self.assertEqual(character.attribute_values["dex"], 0)
+        self.assertEqual(len(character.attribute_bonuses["dex"]), 1)
+        self.assertIn("test_training_bonus:dex", events)
 
     def test_training_failure_degradation_is_settled_once_before_mood_changes(self):
         for schedule, attr in rm.TEST_TRAINING_SCHEDULE_ATTRIBUTES.items():
@@ -175,11 +169,12 @@ class RMTestFlowCoreTests(unittest.TestCase):
                 character.mood = 61
                 character.degradation_progress[attr] = 4
                 check = rm.CheckResult(available=True, attribute=attr, rank=rm.RESULT_BIG_FAILURE)
+                check.spec = rm.CheckSpec(attr, 10, additional_check=True)
                 apply = rm.apply_test_exercise_schedule_result if attr == "con" else rm.apply_test_training_schedule_result
                 apply(character, schedule, check, random.Random(3))
                 self.assertEqual(character.degradation_progress[attr], 4)
-                rm.end_action_round(character, -10, random.Random(4), exact_mood_delta=True, check=check)
-                self.assertEqual(character.mood, 51)
+                rm.end_action_round(character, 0, random.Random(4), check=check)
+                self.assertEqual(character.mood, 46)
                 self.assertEqual(character.degradation_progress[attr], 0)
                 self.assertEqual(character.degradation_penalty_pending[attr], 1)
 
@@ -300,7 +295,7 @@ class RMTestFlowCoreTests(unittest.TestCase):
 
     def test_training_schedule_fatigue_increases_requirement_and_big_failure_range(self):
         character = rm.create_initial_character({"str": 3, "dex": 3, "int": 2}, rng=random.Random(107))
-        character.training_fatigue["test_strength_training"] = 2
+        rm.add_training_fatigue(character, "test_dex_training", 2)
 
         requirement = rm.test_training_requirement_for_schedule(character, "test_strength_training", rng=random.Random(1))
         spec = rm.CheckSpec(
@@ -318,7 +313,7 @@ class RMTestFlowCoreTests(unittest.TestCase):
 
         result = rm.perform_check(character, spec, rng=random.Random(108))
 
-        self.assertEqual(requirement, 5 + 3)
+        self.assertEqual(requirement, 5 + 2 + 5)
         self.assertEqual(result.rank, rm.RESULT_BIG_FAILURE)
 
     def test_training_schedule_result_adds_matching_fatigue_layer(self):
@@ -327,7 +322,7 @@ class RMTestFlowCoreTests(unittest.TestCase):
 
         rm.apply_test_training_schedule_result(character, "test_dex_training", result, rng=random.Random(110))
 
-        self.assertEqual(character.training_fatigue["test_dex_training"], 1)
+        self.assertEqual(character.training_load, 1)
 
     def test_jogging_check_can_use_con_dex_str_but_requires_con_die(self):
         character = rm.create_initial_character({"str": 3, "dex": 3, "int": 2}, rng=random.Random(111))
@@ -377,7 +372,7 @@ class RMTestFlowCoreTests(unittest.TestCase):
             character,
             "test_jogging",
             result,
-            rng=SequenceRandom([0.0, 0.1, 0.2, 0.8]),
+            rng=SequenceRandom([0.0, 0.1, 0.1, 0.8]),
         )
 
         self.assertEqual(applied["bonus"]["success_count"], 1)
@@ -413,13 +408,13 @@ class RMTestFlowCoreTests(unittest.TestCase):
 
         self.assertEqual(summary["roll_plan"], [0.2894])
 
-    def test_jogging_schedule_result_adds_own_fatigue_layer(self):
+    def test_jogging_schedule_result_adds_shared_load(self):
         character = rm.create_initial_character({"str": 3, "dex": 3, "int": 2}, rng=random.Random(117))
         result = rm.CheckResult(available=True, attribute="con", rank=rm.RESULT_FAILURE, success=False)
 
         rm.apply_test_exercise_schedule_result(character, "test_jogging", result, rng=random.Random(118))
 
-        self.assertEqual(character.training_fatigue["test_jogging"], 1)
+        self.assertEqual(character.training_load, 1)
 
 
 class RMTestFlowRenpyTests(unittest.TestCase):
@@ -485,7 +480,7 @@ class RMTestFlowRenpyTests(unittest.TestCase):
         self.assertIn("$ rm_test_required_die_stats = rm_test_required_die_attributes(schedule_id)", source)
         self.assertIn("call screen attribute_dice_select(rm_test_required_stat, min_dice=1, max_dice=3, requirement=rm_test_requirement, check_kind=rm_test_check_kind, action_type=rm_core.ACTION_SCHEDULE, allowed_stats=rm_test_allowed_stats, required_die_stats=rm_test_required_die_stats)", source)
         self.assertNotIn("call screen attribute_dice_confirm(rm_test_required_stat, selected_die_ids)", source)
-        self.assertIn("$ rm_test_check_result = rm_test_perform_schedule_check(schedule_id, selected_die_ids, rm_test_requirement)", source)
+        self.assertIn("$ rm_test_check_result = rm_test_perform_schedule_check(schedule_id, selected_die_ids, rm_test_requirement, rm_bonus_die_ids)", source)
         self.assertIn("call screen attribute_check_roll_animation(rm_test_check_result)", source)
         self.assertIn("call screen attribute_check_result(rm_test_check_result)", source)
         self.assertIn("$ rm_test_outcome = rm_test_finalize_schedule_check(schedule_id, rm_test_check_result)", source)
@@ -494,8 +489,9 @@ class RMTestFlowRenpyTests(unittest.TestCase):
     def test_attribute_dice_select_uses_dynamic_attribute_label(self):
         source = (GAME_DIR / "screens_attribute_checks.rpy").read_text(encoding="utf-8")
 
-        self.assertIn("$ required_stat_label = rm_core.ATTRIBUTE_LABELS[required_stat]", source)
-        self.assertIn("本次行动需要使用【[required_stat_label]】骰子。", source)
+        self.assertIn("rm_check_formula(preview,required_stat)", source)
+        self.assertIn("rm_core.ATTRIBUTE_LABELS[attribute]", source)
+        self.assertIn("rm_core.ATTRIBUTE_LABELS[a] for a in allowed", source)
 
     def test_attribute_dice_select_has_tabs_summary_and_inline_confirm(self):
         source = (GAME_DIR / "screens_attribute_checks.rpy").read_text(encoding="utf-8")
@@ -508,32 +504,27 @@ class RMTestFlowRenpyTests(unittest.TestCase):
             with self.subTest(tab=tab):
                 self.assertIn(tab, source)
         self.assertIn("attribute_check_header", source)
-        self.assertIn("attribute_check_energy_cost", source)
-        self.assertIn("至少还需要投出", source)
-        self.assertIn("确认要花费", source)
-        self.assertIn("default invalid_open = False", source)
+        self.assertIn("rm_dice_view.check_selection", source)
+        self.assertNotIn("至少还需要投出", source)
         self.assertIn("attribute_dice_selection_error", source)
-        self.assertIn("If(len(selected_die_ids) >= min_dice and required_selection_met", source)
-        self.assertNotIn("sensitive len(selected_die_ids) >= min_dice and required_selection_met", source)
+        self.assertIn("sensitive can_confirm and not confirm_open and not details_open", source)
         self.assertIn('style "attribute_check_confirm_dim"', source)
-        self.assertIn("style attribute_check_confirm_dim is button:", source)
-        self.assertIn('background Solid("#00000099")', source)
-        self.assertIn("if invalid_open:", source)
-        self.assertIn("style attribute_check_invalid_hint is text:", source)
-        self.assertIn("action Return(selected_die_ids)", source)
+        self.assertIn('id "check_cancel"', source)
+        self.assertIn("action Return(actual_ids)", source)
 
-    def test_roll_animation_auto_returns_and_result_shows_rank(self):
+    def test_roll_animation_is_interactive_and_result_shows_rank(self):
         source = (GAME_DIR / "screens_attribute_checks.rpy").read_text(encoding="utf-8")
 
-        self.assertEqual(source.count("use rm_allow_game_menu"), 3)
-        self.assertIn("timer 1.32 action Return()", source)
-        self.assertNotIn("textbutton \"查看结果\"", source)
+        self.assertEqual(source.count("use rm_allow_game_menu"), 4)
+        self.assertIn("default roll_table = RMRealtimeDice", source)
+        self.assertIn("Function(roll_table.launch)", source)
+        self.assertIn("sensitive phase != 'rolling'", source)
         self.assertIn("attribute_check_rank_label", source)
 
     def test_test_schedule_screen_and_executor_define_three_test_schedules(self):
         source = TEST_SCHEDULES_PATH.read_text(encoding="utf-8")
 
-        for label in ("休息（测试）", "睡觉（测试）", "力量训练（测试）", "灵巧训练（测试）"):
+        for label in ("休息（测试）", "睡觉（测试）", "负重训练（测试）", "协调训练（测试）"):
             with self.subTest(label=label):
                 self.assertIn(label, source)
         self.assertIn('screen rm_test_schedule_select():', source)
@@ -553,10 +544,10 @@ class RMTestFlowRenpyTests(unittest.TestCase):
         self.assertIn('"test_training_bonus:{}".format(attribute)', source)
         self.assertIn("def rm_test_schedule_available(schedule_id):", source)
         self.assertIn("def rm_test_schedule_uses_check(schedule_id):", source)
-        self.assertIn("def rm_test_execute_rest_schedule(schedule_id, character=None):", source)
+        self.assertIn("def rm_test_execute_rest_schedule(schedule_id, character=None, bonus_die_ids=None):", source)
         self.assertIn("rm_core.resolve_test_day_rest(character", source)
         self.assertIn("def rm_test_check_attribute(schedule_id):", source)
-        self.assertIn("def rm_test_perform_schedule_check(schedule_id, dice_ids, requirement=None):", source)
+        self.assertIn("def rm_test_perform_schedule_check(schedule_id, dice_ids, requirement=None, bonus_die_ids=None):", source)
         self.assertIn("big_failure_slack=rm_core.training_fatigue_big_failure_slack(character, schedule_id)", source)
         self.assertIn("def rm_test_finalize_schedule_check(schedule_id, result_dict, character=None):", source)
         self.assertIn("def rm_test_perform_strength_training_check(die_id):", source)
@@ -569,7 +560,7 @@ class RMTestFlowRenpyTests(unittest.TestCase):
         self.assertIn("rm_test_pending_dice_choices(request, card)", source)
         self.assertIn("rm_core.growth_reward_dice_candidates(character, attr, card)", source)
         self.assertIn("screen rm_test_pending_card_choice", source)
-        self.assertIn("style \"rm_test_reward_card_button\"", source)
+        self.assertIn("default selected_card = None", source)
         self.assertIn("rm_test_card_description(card)", source)
         self.assertIn("screen rm_test_pending_die_choice(request, card=None):", source)
         self.assertIn("screen rm_test_pending_face_choice", source)
@@ -588,25 +579,28 @@ class RMTestFlowRenpyTests(unittest.TestCase):
 
         self.assertNotIn("else (0,)", schedules)
         self.assertNotIn("else 0", schedules)
-        self.assertIn('if result["available"] and result["rolls"]:', screens)
-        self.assertIn("本次没有完成掷骰", screens)
+        self.assertIn("if rows:", screens)
+        self.assertIn("rm_check_reason(result.get('reason'))", screens)
 
-    def test_statuses_render_in_character_panel_and_left_story_overlay(self):
+    def test_statuses_render_in_character_panel_and_right_story_overlay(self):
         source = STORY_HUD_PATH.read_text(encoding="utf-8")
 
         self.assertIn('config.overlay_screens.append("rm_test_status_overlay")', source)
         self.assertIn("summary['statuses']", source)
         self.assertIn("screen rm_test_status_overlay():", source)
         flat = (GAME_DIR / "ui/rm_hud_flat.rpy").read_text(encoding="utf-8")
-        self.assertIn("rm_status_statuses()", flat)
+        status = (GAME_DIR / "ui/rm_status_hud.rpy").read_text(encoding="utf-8")
+        self.assertIn("use rm_status_hud", flat)
+        self.assertIn("rm_hud_status.snapshot(rm_ensure_player(), story_hud_effects)", status)
         self.assertIn("hovered SetScreenVariable", source)
         self.assertIn("viewport:", source)
         self.assertIn("mousewheel True", source)
         self.assertIn("draggable True", source)
         self.assertIn("vpgrid:", source)
         self.assertIn("use rm_flat_sides", source)
-        self.assertIn("xpos RM_HUD_RIGHT", flat)
-        self.assertIn("for effect in effects[:6]:", flat)
+        self.assertIn("RM_HUD_RIGHT - RM_STATUS_WIDE", status)
+        self.assertIn('use rm_status_group(group, SetLocalVariable("expanded", True), expanded)', status)
+        self.assertNotIn("for effect in effects[:6]:", flat)
 
     def test_test_console_button_and_screen_expose_required_controls(self):
         source = STORY_HUD_PATH.read_text(encoding="utf-8")

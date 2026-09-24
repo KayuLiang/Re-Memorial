@@ -10,11 +10,24 @@ init -9 python:
     RM_DICE_STAGE = (405,420,860)
     RM_DICE_CARD_SIZE = (360,510)
     RM_DICE_CARD_ART = (50,146,260)
+    # Fade only translucent shadow at the clip boundary; opaque stone stays
+    # intact even when a low corner comes close to the bottom of the texture.
+    renpy.register_shader("rm.dice_shadow_edge", variables="""
+        varying vec2 v_tex_coord;
+    """, fragment_300="""
+        vec2 edge = min(v_tex_coord, 1.0-v_tex_coord);
+        float feather = smoothstep(0.0, 0.14, min(edge.x, edge.y));
+        float stone = smoothstep(0.85, 0.98, gl_FragColor.a);
+        gl_FragColor *= mix(feather, 1.0, stone);
+    """)
     RM_DICE_MODELS = {}
+    RM_DICE_ROLL_MODELS = {}
     RM_DICE_PAGES = {}
     for _sides in (4, 6, 8, 10, 12, 20):
         with renpy.file("gui/dice_obsidian/d%d.json" % _sides) as _file:
             RM_DICE_MODELS[_sides] = json.load(_file)
+        with renpy.file("gui/dice_obsidian/roll/d%d.json" % _sides) as _file:
+            RM_DICE_ROLL_MODELS[_sides] = json.load(_file)
         with renpy.file("gui/dice_obsidian/d%d-page.json" % _sides) as _file:
             RM_DICE_PAGES[_sides] = json.load(_file)
 
@@ -85,12 +98,29 @@ init -9 python:
 
     class RMDiceArt(renpy.Displayable):
         """Blender mineral renders with live face numerals projected onto the facets."""
-        def __init__(self, faces, size=400, opened=None, **kwargs):
+        def __init__(self, faces, size=400, opened=None, roll_value=None, roll_delay=0, **kwargs):
             super(RMDiceArt, self).__init__(**kwargs)
             self.faces, self.size, self.opened = tuple(faces), size, opened
-            self.frame_count = len(RM_DICE_MODELS[len(faces)])
+            if len(faces) == 4:
+                self.live = rm_live_thumbnail(self.faces,size)
+                return
+            self.roll_value, self.roll_delay = roll_value, roll_delay
+            self.duration = 1.4 if roll_value is not None else 1.2
+            self.model = RM_DICE_MODELS[len(faces)]
+            prefix = "gui/dice_obsidian/"
+            if roll_value is not None:
+                clip = RM_DICE_ROLL_MODELS[len(faces)]
+                self.model = clip['frames']
+                prefix += "roll/"
+                # Bind the already-resolved value before the throw. Only the
+                # display's face orientation changes; keep the die and RNG intact.
+                printed = list(faces)
+                source, target = printed.index(roll_value), clip['result_face']
+                printed[source], printed[target] = printed[target], printed[source]
+                self.faces = tuple(printed)
+            self.frame_count = len(self.model)
             indices = range(self.frame_count) if opened is not None else (self.frame_count-1,)
-            self.frames = [renpy.displayable("gui/dice_obsidian/d%d-%02d.png" % (len(faces), i)) for i in indices]
+            self.frames = [renpy.displayable(prefix+"d%d-%02d.png" % (len(faces), i)) for i in indices]
             self.letters = {}
             for value in set(faces):
                 self.letters[value] = Text(str(value), font="gui/dice_obsidian/Almendra-Regular.ttf",
@@ -99,13 +129,17 @@ init -9 python:
                     xsize=128, ysize=128, text_align=.5, layout="nobreak")
 
         def render(self, width, height, st, at):
+            if len(self.faces) == 4:
+                return renpy.render(self.live,self.size,self.size,st,at)
             moving = self.opened is not None and bool(_preferences.transitions)
-            elapsed = max(0,rm_dice_elapsed(self.opened)-.12) if moving else 1.2
-            frame = min(self.frame_count-1,int(elapsed*(self.frame_count-1)/1.2))
+            elapsed = max(0,rm_dice_elapsed(self.opened)-.12-self.roll_delay) if moving else self.duration
+            frame = min(self.frame_count-1,int(elapsed*(self.frame_count-1)/self.duration))
             scale = self.size/800.0
             result = renpy.Render(self.size,self.size)
-            result.blit(renpy.render(Transform(self.frames[frame if moving else -1],xysize=(self.size,self.size)),self.size,self.size,st,at),(0,0))
-            for face in RM_DICE_MODELS[len(self.faces)][frame]:
+            body = Transform(self.frames[frame if moving else -1],xysize=(self.size,self.size),
+                shader="rm.dice_shadow_edge" if self.roll_value is not None else None)
+            result.blit(renpy.render(body,self.size,self.size,st,at),(0,0))
+            for face in self.model[frame]:
                 a,b,c,d = [v*scale/128 for v in face['basis']]
                 glyph = Transform(self.letters[self.faces[face['index']]],
                     matrixtransform=Matrix([a,b,c,d]))
@@ -117,6 +151,8 @@ init -9 python:
             return result
 
         def visit(self):
+            if len(self.faces) == 4:
+                return [self.live]
             return self.frames + list(self.letters.values())
 
     class RMDicePage(renpy.Displayable):
@@ -198,6 +234,7 @@ screen rm_dice_content(dice_mode, dice_filter, dice_order, dice_enchantment, dic
     $ page = min(dice_page, page_count-1)
     $ visible = pool[page*6:page*6+6]
     $ selected = next((d for d in pool if d['id'] == dice_selected), None)
+    $ shown_die = selected or (visible[0] if visible else None)
     add Solid(RM_DICE_PAPER)
     text "骰组" xpos 68 ypos 0 size 96
     button:
@@ -222,7 +259,7 @@ screen rm_dice_content(dice_mode, dice_filter, dice_order, dice_enchantment, dic
                 id ("dice_tab_"+mode)
                 xpos (338+index*226) ypos 28 xysize (176,80)
                 background (RM_DICE_INK if dice_mode == mode else None)
-                action SetScreenVariable("dice_mode",mode)
+                action [SetScreenVariable("dice_mode",mode), SetScreenVariable("dice_menu",None)]
                 text label align (.5,.5) size 48 color (RM_DICE_PAPER if dice_mode == mode else RM_DICE_INK)
         if dice_mode == "growth":
             use rm_dice_growth(character, selected, dice_growth_attribute)
@@ -251,7 +288,7 @@ screen rm_dice_content(dice_mode, dice_filter, dice_order, dice_enchantment, dic
                     xpos (145+index%3*520) ypos (252+index//3*532) xysize RM_DICE_CARD_SIZE
                     background None
                     hover_background None
-                    foreground ("gui/dice_obsidian/card-focus.svg" if die['id']==dice_selected else None)
+                    foreground ("gui/dice_obsidian/card-focus.svg" if shown_die and die['id']==shown_die['id'] else None)
                     hover_foreground "gui/dice_obsidian/card-focus.svg"
                     action Function(rm_dice_choose,die['id'])
                     add rm_dice_card_stock(die)
@@ -277,7 +314,8 @@ screen rm_dice_content(dice_mode, dice_filter, dice_order, dice_enchantment, dic
                 xpos 875 ypos 1322 xysize (72,80)
                 sensitive page+1 < page_count
                 action [SetScreenVariable("dice_page",page+1),SetScreenVariable("dice_selected",None)]
-            use rm_dice_detail(selected or (visible[0] if visible else None), False)
+            text "单击选中；再次点击展开骰面" xpos 1010 ypos 1354 size 27 color "#625b50"
+            use rm_dice_detail(shown_die, False)
             if dice_menu:
                 frame:
                     xpos (1140 if dice_menu == "sort" else 1400) ypos 232 xsize 250
@@ -399,7 +437,7 @@ screen rm_dice_growth(character, selected, dice_growth_attribute):
         add RMDiceArt(die['faces'],940) xpos -15 ypos 465
     else:
         text "暂无骰子" xpos 118 ypos 600 size 44 color RM_DICE_PAPER
-    text "累计进度" xpos 2470 xanchor 1.0 ypos 182 size 39
+    text "每累计 6 点，小休时转为一次待选奖励" xpos 938 ypos 174 size 32
     for i, (key,label,progress,pending) in enumerate(rm_dice_view.growth(character) if character else []):
         $ y = 262+i*197
         button:
@@ -417,7 +455,8 @@ screen rm_dice_growth(character, selected, dice_growth_attribute):
                     add Solid(RM_DICE_PAPER) xpos (385+j*132) ypos 55 xysize (80,80)
             text ("%d / 6" % progress) xpos 1270 ypos 39 size 77
             if pending:
-                text ("待选择 %d" % pending) xpos 1270 ypos 135 size 30
+                text ("待结算 %d 次" % pending) xpos 1200 ypos 135 size 30
+    text "奖励在休息 / 日程流程中选择；此页仅查看进度。" xpos 938 ypos 1252 size 28 color "#625b50"
     button:
         id "dice_growth_view"
         xpos 1920 ypos 1290 xysize (580,100)

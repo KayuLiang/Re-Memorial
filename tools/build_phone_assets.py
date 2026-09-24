@@ -12,17 +12,17 @@ def svg(name, w, h, content):
 
 
 def build():
-    svg("device", 552, 1226, '''
+    svg("device", 660, 1320, '''
       <rect x="1" y="208" width="6" height="62" rx="3" fill="#899099"/>
       <rect x="1" y="294" width="6" height="106" rx="3" fill="#899099"/>
-      <rect x="545" y="274" width="6" height="124" rx="3" fill="#899099"/>
-      <rect x="5" y="1" width="542" height="1224" rx="75" fill="#555c65"/>
-      <rect x="8" y="4" width="536" height="1218" rx="72" fill="#15191f" stroke="#aab0b6" stroke-width="2"/>
-      <rect x="17" y="14" width="518" height="1198" rx="63" fill="#f5f6f8"/>
-      <rect x="213" y="29" width="126" height="32" rx="16" fill="#171b22"/>
-      <rect x="239" y="41" width="54" height="4" rx="2" fill="#454c57"/>
-      <circle cx="316" cy="45" r="7" fill="#2e3743"/>
-      <circle cx="316" cy="45" r="3" fill="#17252e"/>
+      <rect x="653" y="274" width="6" height="124" rx="3" fill="#899099"/>
+      <rect x="5" y="1" width="650" height="1318" rx="75" fill="#555c65"/>
+      <rect x="8" y="4" width="644" height="1312" rx="72" fill="#15191f" stroke="#aab0b6" stroke-width="2"/>
+      <rect x="17" y="14" width="626" height="1292" rx="63" fill="#f5f6f8"/>
+      <rect x="267" y="29" width="126" height="32" rx="16" fill="#171b22"/>
+      <rect x="293" y="41" width="54" height="4" rx="2" fill="#454c57"/>
+      <circle cx="370" cy="45" r="7" fill="#2e3743"/>
+      <circle cx="370" cy="45" r="3" fill="#17252e"/>
     ''')
     for name, color in [("white", "#ffffff"), ("blue", "#2868c7"), ("soft", "#e8edf4"), ("avatar", "#dce6e9"), ("dark", "#202b3c")]:
         # Fixed-size nine-slice source avoids SVG raster seams in Ren'Py Frame.

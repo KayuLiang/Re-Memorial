@@ -47,6 +47,11 @@ testcase health.hud_and_save:
     assert eval renpy.get_save_data("health-verification")["rm_player"].health == 15.75
     run Function(rm_damage_health, 30)
     pause .2
+    assert eval rm_player.emergency_rescue_pending
+    assert eval rm_player.emergency_rescue_used
+    assert eval rm_player.health > 0
+    run Function(rm_damage_health, 30)
+    pause .2
     assert id "health_death_title"
     assert eval rm_health_game_over()
     run Function(renpy.screenshot, "E:/ChatGPT/Temp/rememorial-health/death.png")
@@ -94,8 +99,9 @@ testcase health.sleep_death:
     pause until screen "choice" timeout 5
     click "睡觉"
     pause .2
-    assert eval rm_player.health == 0
-    assert id "health_death_title"
+    assert eval rm_player.emergency_rescue_used
+    assert eval rm_player.health > 0
+    assert not id "health_death_title"
 
 testcase health.wake_death:
     run Start("rm_test_flow_start")
@@ -112,5 +118,6 @@ testcase health.wake_death:
         rm_core.finish_wake(rm_player, rm_core.RESULT_FAILURE, renpy.random)
     run Function(renpy.restart_interaction)
     pause .2
-    assert eval rm_player.health == 0
-    assert id "health_death_title"
+    assert eval rm_player.emergency_rescue_used
+    assert eval rm_player.health > 0
+    assert not id "health_death_title"

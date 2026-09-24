@@ -23,7 +23,7 @@ class RMTestFlowStaticTests(unittest.TestCase):
         self.assertIn('return not rm_test_is_deep_night_turn()', schedules)
         self.assertIn('return "休息（测试）只能在深夜以外使用。"', schedules)
         self.assertIn("def rm_test_check_attribute(schedule_id):", schedules)
-        self.assertIn("def rm_test_perform_schedule_check(schedule_id, dice_ids, requirement=None):", schedules)
+        self.assertIn("def rm_test_perform_schedule_check(schedule_id, dice_ids, requirement=None, bonus_die_ids=None):", schedules)
 
 
 if __name__ == "__main__":

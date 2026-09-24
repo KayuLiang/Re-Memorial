@@ -2,6 +2,7 @@ default rm_test_flow_active = False
 default rm_test_day = 101
 default rm_test_turn_index = 0
 default rm_test_last_result_text = ""
+default rm_test_training_location = "gym"
 
 init -9 python:
     RM_TEST_TURNS = (
@@ -44,6 +45,7 @@ init -9 python:
         store.rm_test_day = 101
         store.rm_test_turn_index = 0
         store.rm_test_last_result_text = ""
+        store.rm_test_training_location = "gym"
         store.rm_player = rm_core.create_initial_character({"str": 3, "dex": 3, "int": 2}, rng=renpy.random)
         store.rm_player.day = 101
         store.rm_player.weekday = 3
@@ -67,8 +69,8 @@ init -9 python:
         return {
             "test_rest": "休息（测试）",
             "test_sleep": "睡觉（测试）",
-            "test_strength_training": "力量训练（测试）",
-            "test_dex_training": "灵巧训练（测试）",
+            "test_strength_training": "负重训练（测试）",
+            "test_dex_training": "协调训练（测试）",
             "test_jogging": "慢跑（测试）",
         }
 
@@ -79,16 +81,25 @@ init -9 python:
         return rm_ensure_player().current_time_slot in rm_core.TIME_SLOTS[6:]
 
     def rm_test_schedule_available(schedule_id):
-        slot = rm_ensure_player().current_time_slot
+        player = rm_ensure_player()
+        slot = player.current_time_slot
+        if schedule_id != "test_sleep" and slot not in rm_core.TIME_SLOTS:
+            return False
+        if schedule_id in rm_core.TEST_TRAINING_SCHEDULE_ATTRIBUTES:
+            return rm_core.training_schedule_legal(player, schedule_id, store.rm_test_training_location, slot)[0]
         if schedule_id == "test_sleep":
             return slot in rm_core.SLEEP_DECISIONS + ("forced_sleep",)
-        if slot not in rm_core.TIME_SLOTS:
-            return False
         if schedule_id == "test_rest":
             return not rm_test_is_deep_night_turn()
         return True
 
     def rm_test_schedule_unavailable_text(schedule_id):
+        if schedule_id in rm_core.TEST_TRAINING_SCHEDULE_ATTRIBUTES:
+            reason = rm_core.training_schedule_legal(rm_ensure_player(), schedule_id,
+                store.rm_test_training_location)[1]
+            return {"gym_closed": "深夜健身房关闭。", "training_not_available_in_park": "公园只能慢跑。",
+                "severe_weather_blocks_outdoors": "恶劣天气不能在公园训练。",
+                "equipment_required": "家中缺少该训练所需设备。"}.get(reason, "当前地点不能执行该训练。")
         if schedule_id == "test_rest":
             return "休息（测试）只能在深夜以外使用。"
         if schedule_id == "test_sleep":
@@ -164,8 +175,24 @@ init -9 python:
             "roll_value": roll_value,
         }
 
-    def rm_test_perform_schedule_check(schedule_id, dice_ids, requirement=None):
+    def rm_test_bonus_reroll_count(schedule_id, dice_ids):
         character = rm_ensure_player()
+        spec = rm_core.CheckSpec(rm_test_check_attribute(schedule_id), 1,
+            dice_ids=dice_ids, action_type=rm_core.ACTION_SCHEDULE, sport=True,
+            location=store.rm_test_training_location,
+            outdoors=store.rm_test_training_location == "park")
+        weather = rm_core.weather_check_effects(character, spec)
+        dice = [character.find_die(die_id) for die_id in dice_ids]
+        bonus, penalty = rm_core.check_advantage_counts(character, spec, weather, dice)
+        return max(0, bonus - penalty)
+
+    def rm_test_perform_schedule_check(schedule_id, dice_ids, requirement=None, bonus_die_ids=None):
+        character = rm_ensure_player()
+        legal, reason = rm_core.training_schedule_legal(character, schedule_id, store.rm_test_training_location)
+        if not legal:
+            return rm_test_result_dict_for_schedule(rm_core.unavailable_result(
+                rm_core.CheckSpec(rm_test_check_attribute(schedule_id), requirement or 1), reason),
+                character, dice_ids, schedule_id)
         attribute = rm_test_check_attribute(schedule_id)
         if requirement is None:
             requirement = rm_test_check_requirement(schedule_id, character)
@@ -179,6 +206,10 @@ init -9 python:
             big_failure_slack=rm_core.training_fatigue_big_failure_slack(character, schedule_id),
             allowed_dice_attributes=rm_test_allowed_die_attributes(schedule_id),
             required_dice_attributes=rm_test_required_die_attributes(schedule_id),
+            sport=True,
+            outdoors=store.rm_test_training_location == "park",
+            location=store.rm_test_training_location,
+            bonus_die_ids=bonus_die_ids,
         )
         result = rm_core.perform_check(character, spec, rng=renpy.random)
         return rm_test_result_dict_for_schedule(result, character, selected_ids, schedule_id)
@@ -206,7 +237,7 @@ init -9 python:
             raise ValueError("Unknown test schedule: {!r}".format(schedule_id))
         return events
 
-    def rm_test_execute_rest_schedule(schedule_id, character=None):
+    def rm_test_execute_rest_schedule(schedule_id, character=None, bonus_die_ids=None):
         character = character or rm_ensure_player()
         name = rm_test_schedule_names()[schedule_id]
         if not rm_test_schedule_available(schedule_id):
@@ -215,7 +246,7 @@ init -9 python:
         if schedule_id == "test_rest":
             result = rm_core.resolve_test_day_rest(character, rng=renpy.random)
         elif schedule_id == "test_sleep":
-            result = rm_core.resolve_test_sleep(character, rng=renpy.random)
+            result = rm_core.resolve_test_sleep(character, rng=renpy.random, bonus_die_ids=bonus_die_ids)
         else:
             raise ValueError("Schedule must use the check flow: {!r}".format(schedule_id))
         events = result.get("events", [])
@@ -325,8 +356,7 @@ init -9 python:
             store.rm_test_last_result_text = "检定无法执行，不消耗行动轮。"
             return {"available": False, "events": []}
         events = rm_test_apply_schedule_effect(schedule_id, result, character)
-        mood_delta = 10 if result_dict.get("available") and result_dict.get("success") else -10
-        turn = rm_core.end_action_round(character, mood_delta, rng=renpy.random, exact_mood_delta=True, check=result)
+        turn = rm_core.end_action_round(character, 0, rng=renpy.random, check=result)
         name = rm_test_schedule_names()[schedule_id]
         event_text = rm_test_event_text(events)
         store.rm_test_last_result_text = "{}完成。{} 本轮事件：{}。".format(
@@ -378,7 +408,7 @@ init -9 python:
     def rm_test_perform_strength_training_check(die_id):
         character = rm_ensure_player()
         requirement = rm_core.test_strength_training_requirement(character)
-        spec = rm_core.CheckSpec("str", requirement, dice_ids=[die_id], action_type=rm_core.ACTION_SCHEDULE)
+        spec = rm_core.CheckSpec("str", requirement, dice_ids=[die_id], action_type=rm_core.ACTION_SCHEDULE, sport=True)
         result = rm_core.perform_check(character, spec, rng=renpy.random)
         return rm_test_result_dict(result, character, die_id)
 
@@ -387,8 +417,7 @@ init -9 python:
         result = result_dict.get("_result")
         if result is not None:
             rm_core.apply_test_strength_training_result(character, result, rng=renpy.random)
-        mood_delta = 10 if result_dict.get("available") and result_dict.get("success") else -10
-        turn = rm_core.end_action_round(character, mood_delta, rng=renpy.random, exact_mood_delta=True, check=result)
+        turn = rm_core.end_action_round(character, 0, rng=renpy.random, check=result)
         store.rm_test_last_result_text = "{}完成。{} 本轮事件：无。".format(
             rm_test_schedule_names()["test_strength_training"],
             rm_test_check_text(result) if result is not None else "",
@@ -548,6 +577,9 @@ screen rm_test_schedule_select():
 
             text "选择日程" style "rm_test_schedule_title_text"
             text "当前时间：[rm_test_day_text()] [rm_test_turn_text()]" style "rm_test_schedule_hint_text"
+            textbutton ("训练地点：" + {"gym": "健身房", "park": "公园", "home": "家"}[rm_test_training_location]):
+                style "rm_test_schedule_button"
+                action SetVariable("rm_test_training_location", {"gym": "park", "park": "home", "home": "gym"}[rm_test_training_location])
 
             textbutton "休息（测试）":
                 style "rm_test_schedule_button"
@@ -560,105 +592,182 @@ screen rm_test_schedule_select():
                     sensitive rm_test_schedule_available("test_sleep")
                     action Return("test_sleep")
 
-            textbutton "力量训练（测试）":
+            textbutton "负重训练（测试）":
                 style "rm_test_schedule_button"
+                sensitive rm_test_schedule_available("test_strength_training")
                 action Return("test_strength_training")
 
-            textbutton "灵巧训练（测试）":
+            textbutton "协调训练（测试）":
                 style "rm_test_schedule_button"
+                sensitive rm_test_schedule_available("test_dex_training")
                 action Return("test_dex_training")
 
             textbutton "慢跑（测试）":
                 style "rm_test_schedule_button"
+                sensitive rm_test_schedule_available("test_jogging")
                 action Return("test_jogging")
 
     if rm_ui_test_skin_active:
         use rm_ui_test_close_button()
 
 
+# These screens only return a confirmed choice. The existing flow owns application.
 screen rm_test_pending_card_choice(request):
     modal True
     zorder 215
-
+    default selected_card = None
     use rm_allow_game_menu
     use modal_dim_background
-
+    if selected_card is not None:
+        key "game_menu" action SetScreenVariable("selected_card", None)
     frame:
-        style "rm_test_schedule_frame"
-
-        vbox:
-            spacing 21
-            xfill True
-
-            text "[rm_test_pending_card_title(request)]" style "rm_test_schedule_title_text"
-            text "选择一张卡并立即结算。" style "rm_test_schedule_hint_text"
-
+        style "attribute_check_panel"
+        fixed:
+            text rm_test_pending_card_title(request) style "attribute_check_title"
+            text "先选择一项，再确认；选择期间不会消耗待结算次数。" style "attribute_check_muted_text" ypos 90
             hbox:
-                spacing 24
-                xalign 0.5
-
-                for card in request.get("cards", []):
+                ypos 188 spacing 24
+                for index, card in enumerate(request.get('cards', [])):
                     button:
-                        style "rm_test_reward_card_button"
-                        action Return(card)
-
+                        id ("growth_card_"+str(index))
+                        style "attribute_check_choice"
+                        xysize (628,510)
+                        selected selected_card == index
+                        action SetScreenVariable("selected_card", index)
                         vbox:
-                            spacing 16
-                            xfill True
-                            text "[rm_test_card_label(card)]" style "rm_test_reward_card_title_text"
-                            text "[rm_test_card_description(card)]" style "rm_test_reward_card_description_text"
-
+                            spacing 30 xfill True
+                            text rm_test_card_label(card) style "attribute_check_section_title"
+                            text rm_test_card_description(card) style "attribute_check_body"
+                            text ("已选" if selected_card == index else "点击选择") style "attribute_check_hint_text"
+            vbox:
+                ypos 750 spacing 18 xsize 1936
+                if selected_card is not None:
+                    $ card = request['cards'][selected_card]
+                    text ("已选："+rm_test_card_label(card)) style "attribute_check_section_title"
+                    text ("下一步选择目标骰子；仍未应用奖励。" if rm_test_card_needs_die_choice(card) else "确认后立即结算这一项；含随机结果的部分在结算时确定。") style "attribute_check_muted_text"
+                else:
+                    text "选择上方一项以查看确认步骤。" style "attribute_check_muted_text"
+            add Solid("#b4aa96") ypos 958 xysize (1936,2)
+            if selected_card is not None:
+                textbutton "取消选择" id "growth_clear" style "attribute_check_tab_button" ypos 984 xsize 240 action SetScreenVariable("selected_card", None)
+            textbutton ("下一步：选择骰子" if selected_card is not None and rm_test_card_needs_die_choice(request['cards'][selected_card]) else "确认并应用"):
+                id "growth_confirm"
+                style "attribute_check_button"
+                xpos 1456 ypos 984 xsize 480
+                sensitive selected_card is not None
+                action Return(request['cards'][selected_card] if selected_card is not None else None)
     if rm_ui_test_skin_active:
         use rm_ui_test_close_button()
-
 
 screen rm_test_pending_die_choice(request, card=None):
     modal True
     zorder 216
-
+    default selected_die = None
     use rm_allow_game_menu
     use modal_dim_background
-
+    $ candidates = rm_test_pending_dice_choices(request, card)
+    $ display_rows = {d['id']: d for d in rm_dice_view.rows(rm_ensure_player())}
+    if selected_die is not None:
+        key "game_menu" action SetScreenVariable("selected_die", None)
     frame:
-        style "rm_test_schedule_frame"
-
-        vbox:
-            spacing 21
-            xfill True
-
-            text "选择骰子" style "rm_test_schedule_title_text"
-            text "[rm_test_pending_card_title(request)]" style "rm_test_schedule_hint_text"
-
-            for die in rm_test_pending_dice_choices(request, card):
-                textbutton "[die['label']] [die['id']]  [die['faces_text']]":
-                    style "rm_test_schedule_button"
-                    action Return(die["id"])
-
+        style "attribute_check_panel"
+        fixed:
+            text "选择目标骰子" style "attribute_check_title"
+            text rm_test_pending_card_title(request) style "attribute_check_muted_text" ypos 90
+            vpgrid:
+                ypos 188 xysize (1120,714)
+                cols 1 spacing 16 mousewheel True draggable True scrollbars "vertical"
+                vscrollbar_xsize 10
+                vscrollbar_base_bar "#dfd7c8"
+                vscrollbar_thumb "#9c8d70"
+                vscrollbar_hover_thumb "#6c6048"
+                vscrollbar_unscrollable "hide"
+                for die in candidates:
+                    $ row = display_rows[die['id']]
+                    button:
+                        id ("growth_die_"+die['id'])
+                        style "attribute_check_choice"
+                        xysize (1080,194)
+                        selected selected_die == die['id']
+                        action SetScreenVariable("selected_die", die['id'])
+                        vbox:
+                            spacing 12
+                            text ("{} D{} · {:02d}  /  {}".format(row['label'], row['sides'], row['serial'], row['enchantment_label'])) style "attribute_check_section_title"
+                            text die['faces_text'] style "attribute_check_body"
+            add Solid("#b4aa96") xpos 1192 ypos 188 xysize (1,714)
+            vbox:
+                xpos 1232 ypos 188 spacing 30 xsize 704
+                if card:
+                    text rm_test_card_label(card) style "attribute_check_section_title"
+                    text rm_test_card_description(card) style "attribute_check_body"
+                if selected_die is not None:
+                    $ chosen = rm_ensure_player().find_die(selected_die)
+                    text "变化预览" style "attribute_check_section_title"
+                    text rm_dice_view.growth_comparison(chosen, card or {}) style "attribute_check_body" id "growth_comparison"
+                    text ("下一步选择具体骰面。" if card and rm_test_card_needs_face_choice(card) else "确认后才会应用到这颗骰子。") style "attribute_check_muted_text"
+                else:
+                    text "从左侧选择一颗骰子。只列出符合条件的目标。" style "attribute_check_muted_text"
+            add Solid("#b4aa96") ypos 958 xysize (1936,2)
+            if selected_die is not None:
+                textbutton "取消选择" id "growth_clear" style "attribute_check_tab_button" ypos 984 xsize 240 action SetScreenVariable("selected_die", None)
+            textbutton ("下一步：选择骰面" if card and rm_test_card_needs_face_choice(card) else "确认并应用"):
+                id "growth_confirm"
+                style "attribute_check_button"
+                xpos 1456 ypos 984 xsize 480
+                sensitive selected_die is not None
+                action Return(selected_die)
     if rm_ui_test_skin_active:
         use rm_ui_test_close_button()
-
 
 screen rm_test_pending_face_choice(die_id, card=None):
     modal True
     zorder 217
-
+    default selected_face = None
     use rm_allow_game_menu
     use modal_dim_background
-
+    $ die = rm_ensure_player().find_die(die_id)
+    if selected_face is not None:
+        key "game_menu" action SetScreenVariable("selected_face", None)
     frame:
-        style "rm_test_schedule_frame"
-
-        vbox:
-            spacing 21
-            xfill True
-
-            text "选择面值" style "rm_test_schedule_title_text"
-
-            for face in rm_test_pending_face_choices(die_id, card=card):
-                textbutton "第[face['index'] + 1]面：[face['value']]":
-                    style "rm_test_schedule_button"
-                    action Return(face["index"])
-
+        style "attribute_check_panel"
+        fixed:
+            text "选择目标骰面" style "attribute_check_title"
+            text (_die_label(die)+"  ·  "+rm_test_card_label(card or {})) style "attribute_check_muted_text" ypos 90
+            vpgrid:
+                ypos 188 xysize (1120,714)
+                cols 3 spacing 16 mousewheel True draggable True scrollbars "vertical"
+                vscrollbar_xsize 10
+                vscrollbar_base_bar "#dfd7c8"
+                vscrollbar_thumb "#9c8d70"
+                vscrollbar_hover_thumb "#6c6048"
+                vscrollbar_unscrollable "hide"
+                for face in rm_test_pending_face_choices(die_id, card=card):
+                    button:
+                        id ("growth_face_"+str(face['index']))
+                        style "attribute_check_choice"
+                        xysize (352,150)
+                        selected selected_face == face['index']
+                        action SetScreenVariable("selected_face", face['index'])
+                        text "第[face['index'] + 1]面：[face['value']]" style "attribute_check_section_title" align (.5,.5)
+            add Solid("#b4aa96") xpos 1192 ypos 188 xysize (1,714)
+            vbox:
+                xpos 1232 ypos 188 spacing 30 xsize 704
+                text "变化预览" style "attribute_check_section_title"
+                if selected_face is not None:
+                    text rm_dice_view.growth_comparison(die, card or {}, selected_face) style "attribute_check_title" id "growth_comparison"
+                    text "只改变这一个骰面，其余骰面保持原值。" style "attribute_check_muted_text"
+                else:
+                    text "选择一个可用骰面，查看本次变化。" style "attribute_check_body"
+                text "确认后应用；取消选择可重新比较。" style "attribute_check_muted_text"
+            add Solid("#b4aa96") ypos 958 xysize (1936,2)
+            if selected_face is not None:
+                textbutton "取消选择" id "growth_clear" style "attribute_check_tab_button" ypos 984 xsize 240 action SetScreenVariable("selected_face", None)
+            textbutton "确认并应用":
+                id "growth_confirm"
+                style "attribute_check_button"
+                xpos 1456 ypos 984 xsize 480
+                sensitive selected_face is not None
+                action Return(selected_face)
     if rm_ui_test_skin_active:
         use rm_ui_test_close_button()
 

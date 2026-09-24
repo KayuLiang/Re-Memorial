@@ -5,6 +5,23 @@ from game.systems import rm_core as rm
 
 
 class RMCoreTests(unittest.TestCase):
+    def test_throw_faces_are_snapshotted_without_extra_gameplay_randomness(self):
+        original = (3,3,3,5,5,6)
+        for mode in ("normal", "bonus", "penalty"):
+            die = rm.RMDice("mutable", "str", list(original))
+            rng, expected = random.Random(7), random.Random(7)
+            draws = [expected.choice(original) for _ in range(1 if mode == "normal" else 2)]
+            result = rm.roll_die(die, rng, force_mode=mode)
+            self.assertEqual(result["faces"], original)
+            self.assertEqual(result["rolls"], draws)
+            self.assertEqual(rng.getstate(), expected.getstate())
+            die.faces[:] = [16]*8
+            self.assertEqual(result["faces"], original)
+            self.assertIn(result["value"], original)
+            next_result = rm.roll_die(die, rng)
+            self.assertEqual(next_result["faces"], (16,)*8)
+            self.assertEqual(next_result["value"], 16)
+
     def test_create_initial_character_and_energy_cap(self):
         character = rm.create_initial_character({"str": 3, "dex": 3, "int": 2}, rng=random.Random(1))
 
