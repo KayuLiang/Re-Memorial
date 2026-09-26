@@ -3,7 +3,8 @@
 import json
 import sys
 import uuid
-from http.server import BaseHTTPRequestHandler, HTTPServer
+import webbrowser
+from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from urllib.parse import parse_qs, urlparse
 
@@ -99,5 +100,9 @@ class Handler(BaseHTTPRequestHandler):
 
 if __name__ == "__main__":
     address = ("127.0.0.1", 8765)
-    print("ReMemorial cooking: http://%s:%s" % address)
-    HTTPServer(address, Handler).serve_forever()
+    server = ThreadingHTTPServer(address, Handler)
+    url = "http://%s:%s/" % address
+    print("ReMemorial cooking: " + url, flush=True)
+    if "--open" in sys.argv:
+        webbrowser.open(url)
+    server.serve_forever()

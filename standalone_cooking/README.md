@@ -2,7 +2,9 @@
 
 本地浏览器试玩入口，与游戏内适配层共用 `game/systems/cooking_core`。食材目录在试玩中无限取用，用于验证配方；它不代表正式游戏的库存或经济。
 
-在 PowerShell 中运行：
+在 Windows 上双击 `start_cooking.cmd`，浏览器会自动打开小游戏。游玩期间保持启动窗口开启；关闭窗口后服务停止。
+
+也可以在 PowerShell 中运行：
 
 ```powershell
 & 'E:\renpy-8.5.3-sdk\lib\py3-windows-x86_64\python.exe' 'E:\RenpyProject\ReMemorial\standalone_cooking\server.py'
