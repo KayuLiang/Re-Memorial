@@ -1,0 +1,594 @@
+{
+  "水": {
+    "fixed": 0,
+    "categories": [],
+    "signals": {
+      "water_degree": 1,
+      "liquid_degree": 1
+    },
+    "processed": false
+  },
+  "冰": {
+    "fixed": 0,
+    "categories": [],
+    "signals": {},
+    "processed": false
+  },
+  "糖": {
+    "fixed": 1,
+    "categories": [],
+    "signals": {
+      "sweet_degree": 1,
+      "sweet_load": 1
+    },
+    "processed": false
+  },
+  "盐": {
+    "fixed": 1,
+    "categories": [],
+    "signals": {},
+    "processed": false
+  },
+  "油": {
+    "fixed": 1,
+    "categories": [],
+    "signals": {
+      "oilfat_degree": 1,
+      "fry_signal": 1
+    },
+    "processed": false
+  },
+  "方便面": {
+    "fixed": 1,
+    "categories": [
+      "noodle"
+    ],
+    "signals": {},
+    "processed": false
+  },
+  "米饭": {
+    "fixed": 1,
+    "categories": [
+      "rice"
+    ],
+    "signals": {},
+    "processed": false
+  },
+  "面粉": {
+    "fixed": 1,
+    "categories": [
+      "flour"
+    ],
+    "signals": {},
+    "processed": false
+  },
+  "香辛料": {
+    "fixed": 1,
+    "categories": [],
+    "signals": {
+      "spice_degree": 1
+    },
+    "processed": false
+  },
+  "酱油": {
+    "fixed": 1,
+    "categories": [],
+    "signals": {
+      "soy_degree": 1,
+      "soy_load": 1
+    },
+    "processed": false
+  },
+  "醋": {
+    "fixed": 1,
+    "categories": [],
+    "signals": {
+      "acid_degree": 1,
+      "acid_load": 1
+    },
+    "processed": false
+  },
+  "酒": {
+    "fixed": 1,
+    "categories": [],
+    "signals": {
+      "liquid_degree": 1,
+      "alcohol_load": 1
+    },
+    "processed": false
+  },
+  "海苔": {
+    "fixed": 1,
+    "categories": [],
+    "signals": {},
+    "processed": false
+  },
+  "蛋": {
+    "fixed": 2,
+    "categories": [
+      "egg"
+    ],
+    "signals": {},
+    "processed": false
+  },
+  "兽奶": {
+    "fixed": 2,
+    "categories": [],
+    "signals": {
+      "liquid_degree": 1,
+      "dairy_degree": 1
+    },
+    "processed": false
+  },
+  "青菜": {
+    "fixed": 2,
+    "categories": [
+      "vegetable"
+    ],
+    "signals": {},
+    "processed": false
+  },
+  "土豆": {
+    "fixed": 2,
+    "categories": [
+      "vegetable"
+    ],
+    "signals": {},
+    "processed": false
+  },
+  "番茄": {
+    "fixed": 2,
+    "categories": [
+      "vegetable"
+    ],
+    "signals": {
+      "tomato_degree": 1
+    },
+    "processed": false
+  },
+  "洋葱": {
+    "fixed": 2,
+    "categories": [
+      "vegetable"
+    ],
+    "signals": {},
+    "processed": false
+  },
+  "茄子": {
+    "fixed": 2,
+    "categories": [
+      "vegetable"
+    ],
+    "signals": {},
+    "processed": false
+  },
+  "辣椒": {
+    "fixed": 2,
+    "categories": [
+      "vegetable"
+    ],
+    "signals": {
+      "spicy_degree": 1,
+      "spicy_load": 1
+    },
+    "processed": false
+  },
+  "胡萝卜": {
+    "fixed": 2,
+    "categories": [
+      "vegetable"
+    ],
+    "signals": {},
+    "processed": false
+  },
+  "白萝卜": {
+    "fixed": 2,
+    "categories": [
+      "vegetable"
+    ],
+    "signals": {},
+    "processed": false
+  },
+  "南瓜": {
+    "fixed": 2,
+    "categories": [
+      "vegetable"
+    ],
+    "signals": {},
+    "processed": false
+  },
+  "玉米": {
+    "fixed": 2,
+    "categories": [
+      "vegetable"
+    ],
+    "signals": {},
+    "processed": false
+  },
+  "普通蘑菇": {
+    "fixed": 2,
+    "categories": [
+      "mushroom"
+    ],
+    "signals": {},
+    "processed": false
+  },
+  "西兰花": {
+    "fixed": 2,
+    "categories": [
+      "vegetable"
+    ],
+    "signals": {},
+    "processed": false
+  },
+  "莲藕": {
+    "fixed": 2,
+    "categories": [
+      "vegetable"
+    ],
+    "signals": {},
+    "processed": false
+  },
+  "苹果": {
+    "fixed": 2,
+    "categories": [
+      "fruit"
+    ],
+    "signals": {},
+    "processed": false
+  },
+  "橘子": {
+    "fixed": 2,
+    "categories": [
+      "fruit"
+    ],
+    "signals": {
+      "acid_degree": 1,
+      "acid_load": 1
+    },
+    "processed": false
+  },
+  "梨": {
+    "fixed": 2,
+    "categories": [
+      "fruit"
+    ],
+    "signals": {},
+    "processed": false
+  },
+  "香蕉": {
+    "fixed": 2,
+    "categories": [
+      "fruit"
+    ],
+    "signals": {},
+    "processed": false
+  },
+  "西瓜": {
+    "fixed": 2,
+    "categories": [
+      "fruit"
+    ],
+    "signals": {},
+    "processed": false
+  },
+  "柠檬": {
+    "fixed": 2,
+    "categories": [
+      "fruit"
+    ],
+    "signals": {
+      "acid_degree": 1,
+      "acid_load": 1
+    },
+    "processed": false
+  },
+  "豆腐": {
+    "fixed": 2,
+    "categories": [],
+    "signals": {},
+    "processed": false
+  },
+  "红豆": {
+    "fixed": 2,
+    "categories": [
+      "bean"
+    ],
+    "signals": {},
+    "processed": false
+  },
+  "绿豆": {
+    "fixed": 2,
+    "categories": [
+      "bean"
+    ],
+    "signals": {},
+    "processed": false
+  },
+  "禽肉": {
+    "fixed": 3,
+    "categories": [
+      "meat"
+    ],
+    "signals": {
+      "meat_degree": 1
+    },
+    "processed": false
+  },
+  "桃": {
+    "fixed": 3,
+    "categories": [
+      "fruit"
+    ],
+    "signals": {},
+    "processed": false
+  },
+  "葡萄": {
+    "fixed": 3,
+    "categories": [
+      "fruit"
+    ],
+    "signals": {},
+    "processed": false
+  },
+  "草莓": {
+    "fixed": 3,
+    "categories": [
+      "fruit"
+    ],
+    "signals": {},
+    "processed": false
+  },
+  "蓝莓": {
+    "fixed": 3,
+    "categories": [
+      "fruit"
+    ],
+    "signals": {},
+    "processed": false
+  },
+  "菠萝": {
+    "fixed": 3,
+    "categories": [
+      "fruit"
+    ],
+    "signals": {},
+    "processed": false
+  },
+  "芒果": {
+    "fixed": 3,
+    "categories": [
+      "fruit"
+    ],
+    "signals": {},
+    "processed": false
+  },
+  "咖啡豆": {
+    "fixed": 3,
+    "categories": [],
+    "signals": {
+      "coffee_degree": 1,
+      "coffee_load": 1
+    },
+    "processed": false
+  },
+  "茶叶": {
+    "fixed": 3,
+    "categories": [],
+    "signals": {
+      "tea_degree": 1
+    },
+    "processed": false
+  },
+  "蜂蜜": {
+    "fixed": 3,
+    "categories": [],
+    "signals": {
+      "sweet_degree": 1,
+      "sweet_load": 1
+    },
+    "processed": false
+  },
+  "豆浆粉": {
+    "fixed": 3,
+    "categories": [],
+    "signals": {},
+    "processed": false
+  },
+  "鲜虾": {
+    "fixed": 4,
+    "categories": [
+      "seafood"
+    ],
+    "signals": {
+      "seafood_degree": 1
+    },
+    "processed": false
+  },
+  "海贝": {
+    "fixed": 4,
+    "categories": [
+      "seafood"
+    ],
+    "signals": {
+      "seafood_degree": 1
+    },
+    "processed": false
+  },
+  "干酪": {
+    "fixed": 4,
+    "categories": [],
+    "signals": {
+      "dairy_degree": 1
+    },
+    "processed": false
+  },
+  "黄油": {
+    "fixed": 4,
+    "categories": [],
+    "signals": {
+      "oilfat_degree": 1,
+      "dairy_degree": 1
+    },
+    "processed": false
+  },
+  "可可": {
+    "fixed": 4,
+    "categories": [],
+    "signals": {
+      "cocoa_degree": 1,
+      "cocoa_load": 1
+    },
+    "processed": false
+  },
+  "兽肉": {
+    "fixed": 5,
+    "categories": [
+      "meat"
+    ],
+    "signals": {
+      "meat_degree": 2
+    },
+    "processed": false
+  },
+  "鱼肉": {
+    "fixed": 5,
+    "categories": [
+      "seafood"
+    ],
+    "signals": {
+      "seafood_degree": 1
+    },
+    "processed": false
+  },
+  "鳗鱼": {
+    "fixed": 5,
+    "categories": [
+      "seafood"
+    ],
+    "signals": {
+      "seafood_degree": 1
+    },
+    "processed": false
+  },
+  "螃蟹": {
+    "fixed": 5,
+    "categories": [
+      "seafood"
+    ],
+    "signals": {
+      "seafood_degree": 3
+    },
+    "processed": false
+  },
+  "榴莲": {
+    "fixed": 5,
+    "categories": [
+      "fruit"
+    ],
+    "signals": {},
+    "processed": false
+  },
+  "龙虾": {
+    "fixed": 6,
+    "categories": [
+      "seafood"
+    ],
+    "signals": {
+      "seafood_degree": 3
+    },
+    "processed": false
+  },
+  "松茸": {
+    "fixed": 6,
+    "categories": [
+      "mushroom"
+    ],
+    "signals": {},
+    "processed": false
+  },
+  "松露": {
+    "fixed": 6,
+    "categories": [
+      "mushroom"
+    ],
+    "signals": {},
+    "processed": false
+  },
+  "咖啡粉": {
+    "fixed": 3,
+    "categories": [],
+    "signals": {
+      "coffee_degree": 1,
+      "coffee_load": 1
+    },
+    "processed": true
+  },
+  "抹茶粉": {
+    "fixed": 3,
+    "categories": [],
+    "signals": {
+      "tea_degree": 1,
+      "matcha_load": 1
+    },
+    "processed": true
+  },
+  "可可粉": {
+    "fixed": 4,
+    "categories": [],
+    "signals": {
+      "cocoa_degree": 1,
+      "cocoa_load": 1
+    },
+    "processed": true
+  },
+  "豆沙": {
+    "fixed": 2,
+    "categories": [],
+    "signals": {
+      "beanpaste_signal": 1
+    },
+    "processed": true
+  },
+  "果酱": {
+    "fixed": null,
+    "categories": [],
+    "signals": {
+      "jam_signal": 1
+    },
+    "processed": true
+  },
+  "面包": {
+    "fixed": 1,
+    "categories": [],
+    "signals": {
+      "bread_signal": 1
+    },
+    "processed": true
+  },
+  "番茄酱": {
+    "fixed": 2,
+    "categories": [],
+    "signals": {
+      "tomato_degree": 1
+    },
+    "processed": true
+  },
+  "番茄罐头": {
+    "fixed": 2,
+    "categories": [],
+    "signals": {
+      "tomato_degree": 1
+    },
+    "processed": true
+  },
+  "老干爹辣椒酱": {
+    "fixed": 2,
+    "categories": [],
+    "signals": {
+      "spicy_degree": 1,
+      "spicy_load": 1
+    },
+    "processed": true
+  }
+}

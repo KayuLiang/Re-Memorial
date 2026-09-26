@@ -2901,7 +2901,28 @@ def time_habit_energy_discount(state, spec):
     return 1 if period and category and state.time_habits.get("{}:{}".format(period, category)) else 0
 
 
-FOOD_SATIETY = {"meal": 5, "appetizer": 3, "dessert": 2, "drink": 1}
+FOOD_SATIETY = {"盛宴": 5, "简餐": 3, "甜品": 2, "饮料": 1,
+                "meal": 5, "appetizer": 3, "dessert": 2, "drink": 1}
+
+
+def add_hunger(state, amount=1, rng=None):
+    """Record each increase that reaches severe hunger, regardless of its source."""
+    ensure_second_stage_state(state)
+    for _ in range(amount):
+        state.hunger_level += 1
+        if state.hunger_level >= 4:
+            state.severe_hunger_history.append(state.day)
+            state.severe_hunger_history = RevertableList(day for day in state.severe_hunger_history
+                                                         if day >= state.day - 6)
+            if state.malnutrition is not None:
+                state.malnutrition["layers"] += 1
+                state.malnutrition["last_trigger_day"] = state.day
+                damage_health(state, _roll_damage((4,), rng))
+            elif len(state.severe_hunger_history) >= 3:
+                state.malnutrition = RevertableDict(layers=1, last_trigger_day=state.day)
+                state.severe_hunger_history = RevertableList()
+                damage_health(state, _roll_damage((4,), rng))
+    return state.hunger_level
 
 
 def begin_meal_node(state):
@@ -2910,7 +2931,7 @@ def begin_meal_node(state):
     if state.hunger_level < 0:
         state.hunger_level = 0
     else:
-        state.hunger_level += 1
+        add_hunger(state)
     return state.hunger_level
 
 
@@ -2943,17 +2964,6 @@ def consume_food(state, food_type, rng=None):
 def finish_meal_node(state, rng=None):
     ensure_second_stage_state(state)
     events = []
-    if state.hunger_level >= 3:
-        if state.malnutrition is not None:
-            state.malnutrition["layers"] += 1
-            state.malnutrition["last_trigger_day"] = state.day
-            damage = _roll_damage((4,), rng)
-            damage_health(state, damage)
-            events.extend(("malnutrition_aggravated", "health_damage:{}".format(damage)))
-        else:
-            state.severe_hunger_history.append(state.day)
-            events.append("severe_hunger_record")
-    state.meal_satiety_progress = 0
     state.overeating_history = RevertableList(day for day in state.overeating_history if day >= state.day - 6)
     state.severe_hunger_history = RevertableList(day for day in state.severe_hunger_history if day >= state.day - 6)
     if len(state.overeating_history) >= 3 and state.digestive_disorder is None:
@@ -2962,12 +2972,6 @@ def finish_meal_node(state, rng=None):
         damage = _roll_damage((4,), rng)
         damage_health(state, damage)
         events.extend(("digestive_disorder", "health_damage:{}".format(damage)))
-    if len(state.severe_hunger_history) >= 3 and state.malnutrition is None:
-        state.malnutrition = RevertableDict(layers=1, last_trigger_day=state.day)
-        state.severe_hunger_history = RevertableList()
-        damage = _roll_damage((4,), rng)
-        damage_health(state, damage)
-        events.extend(("malnutrition", "health_damage:{}".format(damage)))
     return events
 
 
@@ -4143,7 +4147,7 @@ def choose_meal(state, eat, special_event=None):
     state.meal_choices[slot] = eat
     events = ["meal:{}:{}".format(slot, "eat" if eat else "skip")]
     if eat:
-        events.extend(consume_food(state, "meal"))
+        events.extend(consume_food(state, "盛宴"))
     events.extend(finish_meal_node(state))
     if special_event is not None:
         events.extend(special_event(state, slot, eat) or [])
@@ -4160,7 +4164,7 @@ def choose_night_snack(state, special_event=None):
     state.meal_choices["night_snack_{}".format(consumed_round)] = True
     events = ["meal:night_snack:eat"]
     state.meal_satiety_progress = 0
-    events.extend(consume_food(state, "meal"))
+    events.extend(consume_food(state, "盛宴"))
     state.meal_satiety_progress = 0
     if special_event is not None:
         events.extend(special_event(state, "night_snack", True) or [])

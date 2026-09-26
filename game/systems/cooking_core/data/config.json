@@ -1,0 +1,203 @@
+{
+  "specs": {
+    "饮料": {
+      "satiety": 1,
+      "capacity": 1,
+      "M": 0.5,
+      "B": 0.5,
+      "SpecBase": 7.5
+    },
+    "甜品": {
+      "satiety": 2,
+      "capacity": 1,
+      "M": 0.65,
+      "B": 0.75,
+      "SpecBase": 15
+    },
+    "简餐": {
+      "satiety": 3,
+      "capacity": 2,
+      "M": 0.75,
+      "B": 1.0,
+      "SpecBase": 15
+    },
+    "盛宴": {
+      "satiety": 5,
+      "capacity": 3,
+      "M": 1.0,
+      "B": 2.0,
+      "SpecBase": 22.5
+    }
+  },
+  "flavor_matrix": {
+    "savory_meat": {
+      "matcha": "ANTI",
+      "coffee": "ANTI",
+      "cocoa": "ANTI",
+      "spicy": "OK",
+      "soy": "OK",
+      "sweet": "RECIPE",
+      "acid": "OK",
+      "alcohol": "OK"
+    },
+    "savory_seafood": {
+      "matcha": "ANTI",
+      "coffee": "ANTI",
+      "cocoa": "ANTI",
+      "spicy": "OK",
+      "soy": "OK",
+      "sweet": "RECIPE",
+      "acid": "OK",
+      "alcohol": "OK"
+    },
+    "savory_egg_tofu": {
+      "matcha": "ANTI",
+      "coffee": "ANTI",
+      "cocoa": "ANTI",
+      "spicy": "OK",
+      "soy": "OK",
+      "sweet": "RECIPE",
+      "acid": "OK",
+      "alcohol": "OK"
+    },
+    "savory_rice_noodle": {
+      "matcha": "ANTI",
+      "coffee": "ANTI",
+      "cocoa": "ANTI",
+      "spicy": "OK",
+      "soy": "OK",
+      "sweet": "RECIPE",
+      "acid": "RECIPE",
+      "alcohol": "OK"
+    },
+    "savory_flour": {
+      "matcha": "ANTI",
+      "coffee": "ANTI",
+      "cocoa": "ANTI",
+      "spicy": "OK",
+      "soy": "OK",
+      "sweet": "RECIPE",
+      "acid": "RECIPE",
+      "alcohol": "OK"
+    },
+    "vegetarian_salad": {
+      "matcha": "ANTI",
+      "coffee": "ANTI",
+      "cocoa": "ANTI",
+      "spicy": "OK",
+      "soy": "OK",
+      "sweet": "OK",
+      "acid": "OK",
+      "alcohol": "OK"
+    },
+    "dessert": {
+      "matcha": "OK",
+      "coffee": "OK",
+      "cocoa": "OK",
+      "spicy": "ANTI",
+      "soy": "ANTI",
+      "sweet": "OK",
+      "acid": "OK",
+      "alcohol": "OK"
+    },
+    "drink": {
+      "matcha": "OK",
+      "coffee": "OK",
+      "cocoa": "OK",
+      "spicy": "ANTI",
+      "soy": "ANTI",
+      "sweet": "OK",
+      "acid": "OK",
+      "alcohol": "OK"
+    }
+  },
+  "quality_multiplier": {
+    "普通的": 1.0,
+    "美味的": 1.25,
+    "完美的": 1.5
+  },
+  "quality_roll": {
+    "big_failure": [
+      [
+        "奇怪的",
+        25
+      ],
+      [
+        "潮湿黏糊",
+        75
+      ]
+    ],
+    "failure": [
+      [
+        "奇怪的",
+        75
+      ],
+      [
+        "潮湿黏糊",
+        25
+      ]
+    ],
+    "success": [
+      [
+        "普通的",
+        75
+      ],
+      [
+        "美味的",
+        25
+      ]
+    ],
+    "hard_success": [
+      [
+        "普通的",
+        25
+      ],
+      [
+        "美味的",
+        50
+      ],
+      [
+        "完美的",
+        25
+      ]
+    ],
+    "big_success": [
+      [
+        "美味的",
+        25
+      ],
+      [
+        "完美的",
+        75
+      ]
+    ]
+  },
+  "result_xp": {
+    "big_failure": -6,
+    "failure": 0,
+    "success": 1,
+    "hard_success": 2,
+    "big_success": 3
+  },
+  "quality_xp_per_satiety": {
+    "潮湿黏糊": 0,
+    "奇怪的": 0,
+    "普通的": 1,
+    "美味的": 3,
+    "完美的": 5
+  },
+  "wet_goop_target": null,
+  "budget_effects": null,
+  "cooking_skill_nodes": {
+    "5": null,
+    "10": null,
+    "15": null,
+    "20": null
+  },
+  "cooking_initial_level": null,
+  "cooking_xp_floor": null,
+  "coefficients": {
+    "C_dice": 1,
+    "C_fixed": 1
+  }
+}

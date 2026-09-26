@@ -1,0 +1,57 @@
+<!doctype html>
+<html lang="zh-CN" data-ark-theme="ark" data-ark-depth="complex">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Re: Memorial — 烹饪实验室</title>
+  <link rel="stylesheet" href="/style.css">
+  <script src="/app.js" defer></script>
+</head>
+<body>
+  <div class="shell">
+    <header class="topbar">
+      <div class="mark" aria-label="Re Memorial">R<span>:</span>M</div>
+      <div class="top-title"><span class="micro">RE: MEMORIAL / COOKING</span><strong>烹饪实验室</strong></div>
+      <div class="top-stat"><span class="micro">RECIPE REGISTRY</span><strong id="recipeCount">—</strong></div>
+      <div class="top-stat"><span class="micro">POT CONTENTS</span><strong id="potCount">0 份</strong></div>
+    </header>
+
+    <main class="workspace">
+      <section class="pantry" aria-labelledby="pantryTitle">
+        <div class="section-heading"><span class="micro">01 / MATERIALS</span><h2 id="pantryTitle">食材库</h2></div>
+        <label class="search"><span class="sr-only">搜索食材</span><input id="search" type="search" placeholder="搜索食材"></label>
+        <div class="filters" id="filters" role="group" aria-label="食材分类"></div>
+        <div class="ingredient-list" id="ingredientList" aria-live="polite"></div>
+        <p class="pantry-note">自由实验模式：食材目录无限取用，不代表游戏内库存或价格。</p>
+      </section>
+
+      <section class="stage" aria-labelledby="stageTitle">
+        <div class="stage-head"><span class="micro">02 / PREPARATION</span><span class="stage-index">COOK / 01</span></div>
+        <h1 id="stageTitle">把想法放进锅里<span class="period">.</span></h1>
+        <p class="stage-sub">选择食材后，菜谱会按结构、口味冲突和优先级解析。预览不会投骰。</p>
+        <div class="pot-scene" aria-hidden="true"><div class="pot-ring ring-a"></div><div class="pot-ring ring-b"></div><div class="pot-core"><span>R:M</span><small>COOKING VESSEL</small></div><div class="pot-cross cross-a"></div><div class="pot-cross cross-b"></div></div>
+        <div class="tray-header"><span class="micro">CURRENT INGREDIENTS</span><span id="trayHint">选择食材加入锅中</span></div>
+        <div class="tray" id="tray" aria-live="polite"></div>
+        <div class="controls">
+          <div class="control-title"><span class="micro">CHECK PARAMETERS / 试玩参数</span><p>独立试玩可设定等级、精力和骰型；正式游戏读取角色状态。</p></div>
+          <label>烹饪等级 <input id="level" type="number" min="0" value="0"></label>
+          <label>当前精力 <input id="energy" type="number" min="0" value="3"></label>
+          <label>骰 1 <select id="die1"></select></label>
+          <label>骰 2 <select id="die2"></select></label>
+          <label>骰 3 <select id="die3"></select></label>
+        </div>
+        <div class="actions"><button id="cookButton" class="primary" type="button">开始烹饪 <span aria-hidden="true">↗</span></button><button id="resetButton" class="secondary" type="button">清空并开始新锅</button></div>
+      </section>
+
+      <aside class="dossier" aria-labelledby="dossierTitle">
+        <div class="section-heading"><span class="micro">03 / RESOLUTION</span><h2 id="dossierTitle">解析结果</h2></div>
+        <div class="target-line"><span>当前目标</span><strong id="targetValue">—</strong></div>
+        <div id="preview" class="preview" aria-live="polite"><p class="empty">尚未投料。点击左侧食材开始。</p></div>
+        <div class="result-heading"><span class="micro">FINAL DISH</span><span id="stateText">等待烹饪</span></div>
+        <div id="result" class="result" aria-live="polite"><p class="empty">检定结果会留在此处。退出或刷新后，同一锅的随机结果不会重抽。</p></div>
+        <details class="rules"><summary>已确定的结算规则</summary><p>第 7 份食材起增加目标；6–7 份有 50% 大份量概率，8 份及以上必定大份量。大份量使饱腹翻倍、效果触发概率 ×1.5。具体效果仍待策划配置。</p></details>
+      </aside>
+    </main>
+  </div>
+</body>
+</html>

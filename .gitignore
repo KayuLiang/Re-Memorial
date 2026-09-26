@@ -34,3 +34,6 @@
 
 # Ren'Py distribution output.
 /ReMemorial-*-dists
+
+# Local cooking mini-game sessions.
+/standalone_cooking/.sessions.json
